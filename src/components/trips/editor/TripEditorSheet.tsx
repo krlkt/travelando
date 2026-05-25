@@ -161,17 +161,18 @@ export function TripEditorSheet({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="grid min-w-0 gap-1.5">
               <Label htmlFor="trip-start">Start</Label>
               <Input
                 id="trip-start"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
+                className="min-w-0"
               />
             </div>
-            <div className="grid gap-1.5">
+            <div className="grid min-w-0 gap-1.5">
               <Label htmlFor="trip-end">End</Label>
               <Input
                 id="trip-end"
@@ -179,6 +180,7 @@ export function TripEditorSheet({
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 min={startDate}
+                className="min-w-0"
               />
             </div>
           </div>

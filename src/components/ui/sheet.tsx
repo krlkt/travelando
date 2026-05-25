@@ -59,7 +59,9 @@ const SheetContent = React.forwardRef<
       className={cn(sheetVariants({ side }), className)}
       {...props}
     >
-      <div className="flex flex-col gap-6 p-6 pb-10">{children}</div>
+      <div className="flex flex-col gap-6 p-4 pb-8 sm:p-6 sm:pb-10">
+        {children}
+      </div>
       <DialogPrimitive.Close className="text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:ring-ring absolute top-4 right-4 rounded-full p-2 transition focus:outline-none focus-visible:ring-2">
         <X className="size-4" />
         <span className="sr-only">Close</span>

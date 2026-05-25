@@ -191,17 +191,18 @@ export function ItemEditorSheet({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+            <div className="grid min-w-0 gap-1.5">
               <Label htmlFor="item-start">Starts</Label>
               <Input
                 id="item-start"
                 type="datetime-local"
                 value={startsAt}
                 onChange={(e) => setStartsAt(e.target.value)}
+                className="min-w-0"
               />
             </div>
-            <div className="grid gap-1.5">
+            <div className="grid min-w-0 gap-1.5">
               <Label htmlFor="item-end">Ends</Label>
               <Input
                 id="item-end"
@@ -209,6 +210,7 @@ export function ItemEditorSheet({
                 value={endsAt}
                 onChange={(e) => setEndsAt(e.target.value)}
                 min={startsAt}
+                className="min-w-0"
               />
             </div>
           </div>
