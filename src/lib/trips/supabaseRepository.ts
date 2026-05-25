@@ -11,6 +11,12 @@ import {
 } from './mappers';
 import type { TripsRepository } from './repository';
 import type { ItemDraft, Trip, TripDraft, TripItem } from './types';
+import {
+  DEMO_TRIP_PROTECTED_ERROR,
+  getDemoTrip,
+  isDemoTrip,
+  listDemoTrips,
+} from './demoTrips';
 
 const TRIP_COLUMNS =
   'id, owner_id, title, destination, cover_image, cover_gradient, start_date, end_date, travelers';
@@ -43,15 +49,24 @@ export function createSupabaseRepository(
         .order('start_date', { ascending: true });
 
       if (error) throw new Error(`findAll: ${error.message}`);
-      return (data ?? []).map((row) =>
+      const dbTrips = (data ?? []).map((row) =>
         rowToTrip(
           row as TripWithItemsRow,
           (row as TripWithItemsRow).trip_items,
         ),
       );
+      const merged = [...listDemoTrips(), ...dbTrips];
+      merged.sort(
+        (a, b) =>
+          new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+      );
+      return merged;
     },
 
     async findById(id: string): Promise<Trip | null> {
+      const demo = getDemoTrip(id);
+      if (demo) return demo;
+
       const { data, error } = await client
         .from('trips')
         .select(TRIP_WITH_ITEMS)
@@ -76,6 +91,7 @@ export function createSupabaseRepository(
     },
 
     async update(id: string, patch: Partial<TripDraft>): Promise<Trip> {
+      if (isDemoTrip(id)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
       const update = tripPatchToUpdate(patch);
       const { data, error } = await client
         .from('trips')
@@ -92,11 +108,13 @@ export function createSupabaseRepository(
     },
 
     async remove(id: string): Promise<void> {
+      if (isDemoTrip(id)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
       const { error } = await client.from('trips').delete().eq('id', id);
       if (error) throw new Error(`remove trip ${id}: ${error.message}`);
     },
 
     async addItem(tripId: string, draft: ItemDraft): Promise<TripItem> {
+      if (isDemoTrip(tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
       const insert = itemDraftToInsert(tripId, draft);
       const { data, error } = await client
         .from('trip_items')
@@ -112,6 +130,7 @@ export function createSupabaseRepository(
       itemId: string,
       patch: Partial<ItemDraft>,
     ): Promise<TripItem> {
+      if (isDemoTrip(tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
       const update = itemPatchToUpdate(patch);
       const { data, error } = await client
         .from('trip_items')
@@ -129,6 +148,7 @@ export function createSupabaseRepository(
     },
 
     async removeItem(tripId: string, itemId: string): Promise<void> {
+      if (isDemoTrip(tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
       const { error } = await client
         .from('trip_items')
         .delete()

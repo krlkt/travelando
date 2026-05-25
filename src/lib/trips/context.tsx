@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { ItemDraft, Trip, TripDraft, TripItem } from './types';
+import { DEMO_TRIP_PROTECTED_ERROR, isDemoTrip } from './demoTrips';
 
 interface TripsState {
   trips: Trip[];
@@ -118,6 +119,10 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   );
 
   const removeTrip = useCallback(async (id: string): Promise<void> => {
+    if (isDemoTrip(id)) {
+      throw new Error(DEMO_TRIP_PROTECTED_ERROR);
+    }
+
     let snapshot: Trip | undefined;
     setTrips((prev) => {
       snapshot = prev.find((t) => t.id === id);

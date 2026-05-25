@@ -27,6 +27,7 @@ import {
   findNextItem,
 } from '@/lib/trips/grouping';
 import { useTrips } from '@/lib/trips/context';
+import { isDemoTrip } from '@/lib/trips/demoTrips';
 import type { Trip } from '@/lib/trips/types';
 
 interface TripCardProps {
@@ -43,6 +44,7 @@ export function TripCard({ trip, highlight }: TripCardProps) {
   const totals = totalsByCurrency(trip.items);
   const currentItem = ongoing ? findCurrentItem(trip.items, now) : null;
   const nextItem = ongoing ? findNextItem(trip.items, now) : null;
+  const isDemo = isDemoTrip(trip.id);
 
   return (
     <motion.article
@@ -102,39 +104,45 @@ export function TripCard({ trip, highlight }: TripCardProps) {
               {days} {days === 1 ? 'day' : 'days'}
             </span>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`More for ${trip.title}`}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onSelect={() => {
-                  if (!confirm(`Delete "${trip.title}"?`)) return;
-                  void (async () => {
-                    try {
-                      await removeTrip(trip.id);
-                      toast.success('Trip deleted');
-                    } catch (err) {
-                      const message =
-                        err instanceof Error ? err.message : 'Delete failed';
-                      toast.error(`Couldn't delete trip: ${message}`);
-                    }
-                  })();
-                }}
-                className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-              >
-                <Trash2 className="size-4" />
-                Delete trip
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {isDemo ? (
+            <Badge variant="muted" title="Demo trip — always available">
+              Demo
+            </Badge>
+          ) : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`More for ${trip.title}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onSelect={() => {
+                    if (!confirm(`Delete "${trip.title}"?`)) return;
+                    void (async () => {
+                      try {
+                        await removeTrip(trip.id);
+                        toast.success('Trip deleted');
+                      } catch (err) {
+                        const message =
+                          err instanceof Error ? err.message : 'Delete failed';
+                        toast.error(`Couldn't delete trip: ${message}`);
+                      }
+                    })();
+                  }}
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                >
+                  <Trash2 className="size-4" />
+                  Delete trip
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {ongoing && (currentItem || nextItem) ? (

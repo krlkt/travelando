@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createSupabaseRepository } from '@/lib/trips/supabaseRepository';
 import { tripPatchSchema } from '@/lib/trips/schemas';
+import { DEMO_TRIP_PROTECTED_ERROR, isDemoTrip } from '@/lib/trips/demoTrips';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -25,6 +26,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
+
+  if (isDemoTrip(id)) {
+    return NextResponse.json(
+      { success: false, error: DEMO_TRIP_PROTECTED_ERROR },
+      { status: 403 },
+    );
+  }
 
   let body: unknown;
   try {
@@ -73,6 +81,13 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
   }
 
   const { id } = await context.params;
+
+  if (isDemoTrip(id)) {
+    return NextResponse.json(
+      { success: false, error: DEMO_TRIP_PROTECTED_ERROR },
+      { status: 403 },
+    );
+  }
 
   try {
     const repo = createSupabaseRepository(supabase);
