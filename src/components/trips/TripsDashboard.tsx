@@ -87,7 +87,7 @@ export function TripsDashboard() {
         type="button"
         onClick={() => setEditorOpen(true)}
         aria-label="New trip"
-        className="bg-primary text-primary-foreground fixed right-4 bottom-24 z-30 grid size-14 place-items-center rounded-full shadow-[0_18px_42px_-12px_oklch(58%_0.16_38_/_0.6)] transition-transform active:scale-95 md:hidden"
+        className="bg-primary text-primary-foreground fixed right-4 bottom-24 z-30 grid size-14 cursor-pointer place-items-center rounded-full shadow-[0_18px_42px_-12px_oklch(58%_0.16_38_/_0.6)] transition-transform active:scale-95 md:hidden"
       >
         <Plus className="size-6" />
       </button>

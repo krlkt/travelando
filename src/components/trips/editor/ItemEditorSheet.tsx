@@ -84,7 +84,9 @@ export function ItemEditorSheet({
     setError(null);
   }, [open, item]);
 
-  const handleSave = () => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
     if (!title.trim()) {
       setError('Add a title.');
       return;
@@ -116,14 +118,23 @@ export function ItemEditorSheet({
           : undefined,
     };
 
-    if (isEdit && item) {
-      updateItem(tripId, item.id, draft);
-      toast.success('Item updated');
-    } else {
-      addItem(tripId, draft);
-      toast.success('Item added');
+    setSaving(true);
+    try {
+      if (isEdit && item) {
+        await updateItem(tripId, item.id, draft);
+        toast.success('Item updated');
+      } else {
+        await addItem(tripId, draft);
+        toast.success('Item added');
+      }
+      onOpenChange(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Save failed';
+      setError(message);
+      toast.error(`Couldn't save item: ${message}`);
+    } finally {
+      setSaving(false);
     }
-    onOpenChange(false);
   };
 
   return (
@@ -298,8 +309,8 @@ export function ItemEditorSheet({
           <SheetClose asChild>
             <Button variant="ghost">Cancel</Button>
           </SheetClose>
-          <Button onClick={handleSave}>
-            {isEdit ? 'Save changes' : 'Add item'}
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add item'}
           </Button>
         </SheetFooter>
       </SheetContent>

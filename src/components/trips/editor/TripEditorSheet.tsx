@@ -76,7 +76,9 @@ export function TripEditorSheet({
     setError(null);
   }, [open, trip]);
 
-  const handleSave = () => {
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
     if (!title.trim()) {
       setError('Give your trip a name first.');
       return;
@@ -106,15 +108,24 @@ export function TripEditorSheet({
       coverGradient: gradient,
     };
 
-    if (isEdit && trip) {
-      updateTrip(trip.id, draft);
-      toast.success('Trip updated');
-      onOpenChange(false);
-    } else {
-      const created = createTrip(draft);
-      toast.success('Trip created');
-      onOpenChange(false);
-      router.push(`/trips/${created.id}`);
+    setSaving(true);
+    try {
+      if (isEdit && trip) {
+        await updateTrip(trip.id, draft);
+        toast.success('Trip updated');
+        onOpenChange(false);
+      } else {
+        const created = await createTrip(draft);
+        toast.success('Trip created');
+        onOpenChange(false);
+        router.push(`/trips/${created.id}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Save failed';
+      setError(message);
+      toast.error(`Couldn't save trip: ${message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -215,8 +226,8 @@ export function TripEditorSheet({
           <SheetClose asChild>
             <Button variant="ghost">Cancel</Button>
           </SheetClose>
-          <Button onClick={handleSave}>
-            {isEdit ? 'Save changes' : 'Create trip'}
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create trip'}
           </Button>
         </SheetFooter>
       </SheetContent>

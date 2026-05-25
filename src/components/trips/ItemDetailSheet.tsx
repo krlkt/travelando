@@ -9,6 +9,7 @@ import {
   Trash2,
   Wallet,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Sheet,
   SheetContent,
@@ -126,8 +127,19 @@ export function ItemDetailSheet({
           <Button
             variant="ghost"
             onClick={() => {
-              removeItem(item.tripId, item.id);
+              const tripId = item.tripId;
+              const itemId = item.id;
               onOpenChange(false);
+              void (async () => {
+                try {
+                  await removeItem(tripId, itemId);
+                  toast.success('Item deleted');
+                } catch (err) {
+                  const message =
+                    err instanceof Error ? err.message : 'Delete failed';
+                  toast.error(`Couldn't delete item: ${message}`);
+                }
+              })();
             }}
             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
           >

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { Radio, MoreHorizontal, Trash2, Calendar } from 'lucide-react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -115,7 +116,17 @@ export function TripCard({ trip, highlight }: TripCardProps) {
             <DropdownMenuContent align="end">
               <DropdownMenuItem
                 onSelect={() => {
-                  if (confirm(`Delete "${trip.title}"?`)) removeTrip(trip.id);
+                  if (!confirm(`Delete "${trip.title}"?`)) return;
+                  void (async () => {
+                    try {
+                      await removeTrip(trip.id);
+                      toast.success('Trip deleted');
+                    } catch (err) {
+                      const message =
+                        err instanceof Error ? err.message : 'Delete failed';
+                      toast.error(`Couldn't delete trip: ${message}`);
+                    }
+                  })();
                 }}
                 className="text-destructive focus:bg-destructive/10 focus:text-destructive"
               >
