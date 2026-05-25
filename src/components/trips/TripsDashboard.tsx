@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { TripCard } from './TripCard';
 import { TripEditorSheet } from './editor/TripEditorSheet';
 import { useTrips } from '@/lib/trips/context';
+import { isDemoTrip } from '@/lib/trips/demoTrips';
 import { isOngoing, isUpcoming } from '@/lib/time/formatDate';
 import { fadeUp, stagger } from '@/lib/motion/presets';
 import type { Trip } from '@/lib/trips/types';
@@ -16,11 +17,16 @@ export function TripsDashboard() {
   const [editorOpen, setEditorOpen] = useState(false);
   const now = new Date();
 
+  const visibleTrips = useMemo(
+    () => trips.filter((t) => !isDemoTrip(t.id)),
+    [trips],
+  );
+
   const { ongoing, upcoming, past } = useMemo(() => {
     const o: Trip[] = [];
     const u: Trip[] = [];
     const p: Trip[] = [];
-    const sorted = [...trips].sort(
+    const sorted = [...visibleTrips].sort(
       (a, b) =>
         new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
     );
@@ -30,7 +36,7 @@ export function TripsDashboard() {
       else p.push(t);
     }
     return { ongoing: o, upcoming: u, past: p.reverse() };
-  }, [trips, now]);
+  }, [visibleTrips, now]);
 
   return (
     <div className="px-4 pt-6 pb-16 sm:px-6 md:px-10 md:pt-14">
@@ -57,7 +63,7 @@ export function TripsDashboard() {
           </motion.div>
         </motion.div>
 
-        {trips.length === 0 ? (
+        {visibleTrips.length === 0 ? (
           <EmptyState onCreate={() => setEditorOpen(true)} />
         ) : (
           <div className="mt-12 space-y-14">
