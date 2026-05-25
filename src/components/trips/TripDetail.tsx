@@ -51,6 +51,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
   const [itemEditorOpen, setItemEditorOpen] = useState(false);
   const [tripEditorOpen, setTripEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<TripItem | null>(null);
+  const [defaultDayDate, setDefaultDayDate] = useState<Date | null>(null);
 
   const totalDays = tripDayCount(trip.startDate, trip.endDate);
 
@@ -186,8 +187,9 @@ export function TripDetail({ tripId }: TripDetailProps) {
                     bucket={day}
                     currentItemId={current?.id ?? null}
                     onSelect={(item) => setSelectedItem(item)}
-                    onAdd={() => {
+                    onAdd={(dayDate) => {
                       setEditingItem(null);
+                      setDefaultDayDate(dayDate);
                       setItemEditorOpen(true);
                     }}
                   />
@@ -226,10 +228,14 @@ export function TripDetail({ tripId }: TripDetailProps) {
       <ItemEditorSheet
         tripId={trip.id}
         item={editingItem}
+        defaultDate={editingItem ? null : defaultDayDate}
         open={itemEditorOpen}
         onOpenChange={(o) => {
           setItemEditorOpen(o);
-          if (!o) setEditingItem(null);
+          if (!o) {
+            setEditingItem(null);
+            setDefaultDayDate(null);
+          }
         }}
       />
 
@@ -251,7 +257,7 @@ function DayContent({
   bucket: ReturnType<typeof groupItemsByDay>[number];
   currentItemId: string | null;
   onSelect: (item: TripItem) => void;
-  onAdd: () => void;
+  onAdd: (dayDate: Date) => void;
 }) {
   return (
     <AnimatePresence mode="wait">
@@ -273,7 +279,7 @@ function DayContent({
               size="sm"
               variant="outline"
               className="mt-4"
-              onClick={onAdd}
+              onClick={() => onAdd(bucket.date)}
             >
               <Plus className="size-4" />
               Add an item
@@ -301,7 +307,7 @@ function DayContent({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onAdd}
+                onClick={() => onAdd(bucket.date)}
                 className="text-muted-foreground hover:text-foreground"
               >
                 <Plus className="size-4" />

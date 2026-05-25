@@ -33,6 +33,7 @@ import type {
 interface ItemEditorSheetProps {
   tripId: string;
   item?: TripItem | null;
+  defaultDate?: Date | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -51,6 +52,7 @@ function fromLocalInput(value: string): string {
 export function ItemEditorSheet({
   tripId,
   item,
+  defaultDate,
   open,
   onOpenChange,
 }: ItemEditorSheetProps) {
@@ -73,8 +75,20 @@ export function ItemEditorSheet({
     if (!open) return;
     setKind(item?.kind ?? 'activity');
     setTitle(item?.title ?? '');
-    setStartsAt(toLocalInput(item?.startsAt));
-    setEndsAt(toLocalInput(item?.endsAt));
+    if (item) {
+      setStartsAt(toLocalInput(item.startsAt));
+      setEndsAt(toLocalInput(item.endsAt));
+    } else if (defaultDate) {
+      const start = new Date(defaultDate);
+      start.setHours(9, 0, 0, 0);
+      const end = new Date(defaultDate);
+      end.setHours(10, 0, 0, 0);
+      setStartsAt(toLocalInput(start.toISOString()));
+      setEndsAt(toLocalInput(end.toISOString()));
+    } else {
+      setStartsAt('');
+      setEndsAt('');
+    }
     setFromLabel(item?.from?.label ?? '');
     setToLabel(item?.to?.label ?? '');
     setTransportMode((item?.transportMode as TransportMode) ?? 'flight');
@@ -82,7 +96,7 @@ export function ItemEditorSheet({
     setExpenseAmount(item?.expense ? String(item.expense.amount) : '');
     setExpenseCurrency(item?.expense?.currency ?? 'EUR');
     setError(null);
-  }, [open, item]);
+  }, [open, item, defaultDate]);
 
   const [saving, setSaving] = useState(false);
 
@@ -191,7 +205,7 @@ export function ItemEditorSheet({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid min-w-0 gap-1.5">
               <Label htmlFor="item-start">Starts</Label>
               <Input
