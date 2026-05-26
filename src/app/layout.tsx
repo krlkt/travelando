@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Instrument_Serif } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppShell } from '@/components/shell/AppShell';
+import { AuthProvider } from '@/lib/auth/context';
 import './globals.css';
 
 const geistSans = Geist({
@@ -52,18 +53,20 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-svh">
-        <TooltipProvider delayDuration={150}>
-          <AppShell>{children}</AppShell>
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              classNames: {
-                toast:
-                  'rounded-[var(--radius)] border border-border/70 bg-card text-card-foreground shadow-lg',
-              },
-            }}
-          />
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider delayDuration={150}>
+            <AppShell>{children}</AppShell>
+            <Toaster
+              position="top-center"
+              toastOptions={{
+                classNames: {
+                  toast:
+                    'rounded-[var(--radius)] border border-border/70 bg-card text-card-foreground shadow-lg',
+                },
+              }}
+            />
+          </TooltipProvider>
+        </AuthProvider>
       </body>
     </html>
   );

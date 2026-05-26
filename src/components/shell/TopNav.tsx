@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import { Plane } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/lib/auth/context';
+import { AccountMenu, SignInAffordance } from '@/components/auth/AccountMenu';
 
 const links = [
   { href: '/', label: 'Home' },
@@ -14,6 +16,8 @@ const links = [
 export function TopNav() {
   const pathname = usePathname();
   const isLanding = pathname === '/';
+  const { user, loading } = useAuth();
+  const isPermanent = !!user && !user.isAnonymous;
 
   return (
     <header
@@ -56,12 +60,21 @@ export function TopNav() {
         </nav>
 
         <div className="flex items-center gap-2">
-          <Button asChild size="sm" variant="ghost">
-            <Link href="/trips">Open the app</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link href="/trips">New trip</Link>
-          </Button>
+          {loading ? (
+            <div
+              aria-hidden
+              className="bg-secondary/60 size-9 animate-pulse rounded-full"
+            />
+          ) : isPermanent && user ? (
+            <>
+              <Button asChild size="sm" variant="ghost">
+                <Link href="/trips">Open the app</Link>
+              </Button>
+              <AccountMenu user={user} />
+            </>
+          ) : (
+            <SignInAffordance next={isLanding ? '/trips' : pathname} />
+          )}
         </div>
       </div>
     </header>

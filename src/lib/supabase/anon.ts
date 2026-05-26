@@ -17,6 +17,8 @@ export function ensureAnonSession(
 
   inFlight = (async () => {
     const { data, error } = await client.auth.getUser();
+    // Already signed in (anonymous or permanent) — never sign in again,
+    // otherwise we'd clobber a freshly-authed user with a new anon uid.
     if (!error && data.user) return;
 
     const { error: signInError } = await client.auth.signInAnonymously();
