@@ -1,4 +1,7 @@
 {
+  "env": {
+    "ECC_GATEGUARD": "off"
+  },
   "permissions": {
     "allow": [
       "Bash(npx *)",
@@ -6,10 +9,8 @@
       "Bash(pnpm add *)",
       "Bash(git init *)",
       "Bash(pnpm tsc *)",
-      "Bash(env)"
+      "Bash(env)",
+      "Bash(pnpm eslint *)"
     ]
-  },
-  "env": {
-    "ECC_GATEGUARD": "off"
   }
 }
