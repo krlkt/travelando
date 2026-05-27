@@ -114,8 +114,8 @@ export function deriveCitiesByDay(
       currentPlaceId = override.cityPlaceId;
     }
 
-    const dayItems = sortedItems.filter((i) =>
-      itemOverlapsDay(i, dayStart, dayEnd),
+    const dayItems = sortedItems.filter(
+      (i) => i.kind !== 'lodging' && itemOverlapsDay(i, dayStart, dayEnd),
     );
 
     const cityChangeTransports = dayItems.filter((i) => {
@@ -193,6 +193,52 @@ export function cityForDay(
     return { cityLabel: trip.destination };
   const last = bucket.segments[bucket.segments.length - 1];
   return { cityLabel: last.cityLabel, cityPlaceId: last.cityPlaceId };
+}
+
+export function lodgingForDay(trip: Trip, key: string): TripItem | null {
+  const date = new Date(`${key}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  const dayEnd = date.getTime() + 24 * 60 * 60 * 1000 - 1;
+
+  const candidates = trip.items.filter((i) => {
+    if (i.kind !== 'lodging') return false;
+    const startTs = new Date(i.startsAt).getTime();
+    if (startTs > dayEnd) return false;
+    if (!i.endsAt) return false;
+    const endTs = new Date(i.endsAt).getTime();
+    return endTs > dayEnd;
+  });
+
+  if (candidates.length === 0) return null;
+  return candidates.reduce((latest, item) =>
+    new Date(item.startsAt).getTime() > new Date(latest.startsAt).getTime()
+      ? item
+      : latest,
+  );
+}
+
+export function findLodgingConflict(
+  trip: Trip,
+  checkInIso: string,
+  checkOutIso: string,
+  excludeId?: string,
+): TripItem | null {
+  const aStart = new Date(checkInIso).getTime();
+  const aEnd = new Date(checkOutIso).getTime();
+  if (!Number.isFinite(aStart) || !Number.isFinite(aEnd) || aEnd <= aStart) {
+    return null;
+  }
+
+  for (const item of trip.items) {
+    if (item.kind !== 'lodging') continue;
+    if (item.id === excludeId) continue;
+    if (!item.endsAt) continue;
+    const bStart = new Date(item.startsAt).getTime();
+    const bEnd = new Date(item.endsAt).getTime();
+    // Half-open intervals: overlap iff aStart < bEnd && bStart < aEnd
+    if (aStart < bEnd && bStart < aEnd) return item;
+  }
+  return null;
 }
 
 export function foodPlaceCitiesForDay(

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, MapPin, Plus, Radio, Share2 } from 'lucide-react';
+import { ArrowLeft, Bed, MapPin, Plus, Radio, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -17,7 +17,7 @@ import { ItemEditorSheet } from './editor/ItemEditorSheet';
 import { TripEditorSheet } from './editor/TripEditorSheet';
 import { useTrips } from '@/lib/trips/context';
 import { findCurrentItem } from '@/lib/trips/grouping';
-import { cityForDay, deriveCitiesByDay } from '@/lib/trips/cities';
+import { deriveCitiesByDay, lodgingForDay } from '@/lib/trips/cities';
 import {
   formatDateRange,
   formatDate,
@@ -77,6 +77,9 @@ export function TripDetail({ tripId }: TripDetailProps) {
   const activeCityLabel =
     activeBucket?.segments[activeBucket.segments.length - 1]?.cityLabel ??
     trip.destination;
+  const activeLodging = activeBucket
+    ? lodgingForDay(trip, activeBucket.key)
+    : null;
   const existingOverride: CityOverride | undefined = (
     cityOverrides[tripId] ?? []
   ).find((o) => o.dayKey === activeDay);
@@ -215,20 +218,40 @@ export function TripDetail({ tripId }: TripDetailProps) {
                 </div>
               </div>
 
-              {/* City indicator for active day */}
+              {/* City + lodging indicator for active day */}
               {activeBucket && (
-                <div className="mb-2 flex items-center gap-1.5">
-                  <MapPin className="text-muted-foreground/60 size-3" />
-                  <span className="text-muted-foreground text-xs">
-                    {activeCityLabel}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setCityOverrideOpen(true)}
-                    className="text-muted-foreground/50 hover:text-muted-foreground text-[10px] underline-offset-2 hover:underline"
-                  >
-                    change
-                  </button>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <MapPin className="text-muted-foreground/60 size-3 shrink-0" />
+                    <span className="text-muted-foreground truncate text-xs">
+                      {activeCityLabel}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCityOverrideOpen(true)}
+                      className="text-muted-foreground/50 hover:text-muted-foreground shrink-0 text-[10px] underline-offset-2 hover:underline"
+                    >
+                      change
+                    </button>
+                  </div>
+                  {activeLodging ? (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedItem(activeLodging)}
+                      className="text-muted-foreground hover:text-foreground flex min-w-0 items-center gap-1.5 text-xs underline-offset-4 hover:underline"
+                      title="Where you're staying tonight"
+                    >
+                      <Bed className="size-3 shrink-0 opacity-60" />
+                      <span className="truncate">
+                        {activeLodging.to?.label ?? activeLodging.title}
+                      </span>
+                    </button>
+                  ) : (
+                    <span className="text-muted-foreground/50 flex shrink-0 items-center gap-1.5 text-xs">
+                      <Bed className="size-3 opacity-60" />
+                      No lodging
+                    </span>
+                  )}
                 </div>
               )}
 

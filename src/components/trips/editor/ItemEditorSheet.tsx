@@ -24,9 +24,13 @@ import {
 import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
 import { useTrips } from '@/lib/trips/context';
 import { itemKinds, transportModes, kindMeta } from '@/lib/trips/kindMeta';
-import { latestCityBefore, foodPlaceCitiesForDay } from '@/lib/trips/cities';
+import {
+  latestCityBefore,
+  foodPlaceCitiesForDay,
+  findLodgingConflict,
+} from '@/lib/trips/cities';
 import { formatAmountInput, parseAmountInput } from '@/lib/trips/grouping';
-import { dayKey } from '@/lib/time/formatDate';
+import { dayKey, formatDate } from '@/lib/time/formatDate';
 import type {
   FoodPlace,
   ItemDraft,
@@ -124,6 +128,18 @@ export function ItemEditorSheet({
       setFromValue(city.cityLabel);
       setFromPlace({ label: city.cityLabel, placeId: city.cityPlaceId });
     }
+    if (newKind === 'lodging' && !isEdit) {
+      const base = startsAt ? new Date(fromLocalInput(startsAt)) : new Date();
+      const checkIn = new Date(base);
+      checkIn.setHours(15, 0, 0, 0);
+      const checkOut = new Date(checkIn);
+      checkOut.setDate(checkOut.getDate() + 1);
+      checkOut.setHours(11, 0, 0, 0);
+      setStartsAt(toLocalInput(checkIn.toISOString()));
+      setEndsAt(toLocalInput(checkOut.toISOString()));
+      setFromValue('');
+      setFromPlace(undefined);
+    }
   }
 
   const dayCities = useMemo(() => {
@@ -166,7 +182,13 @@ export function ItemEditorSheet({
   }
 
   const handleSave = async () => {
-    if (!title.trim()) {
+    const effectiveTitle =
+      kind === 'lodging' ? (toPlace?.label ?? toValue.trim()) : title.trim();
+    if (kind === 'lodging' && !effectiveTitle) {
+      setError('Add where you are staying.');
+      return;
+    }
+    if (!effectiveTitle) {
       setError('Add a title.');
       return;
     }
@@ -178,9 +200,30 @@ export function ItemEditorSheet({
       setError("End time can't be before the start.");
       return;
     }
+    if (kind === 'lodging') {
+      if (!endsAt) {
+        setError('Lodging needs a check-out time.');
+        return;
+      }
+      const conflict = findLodgingConflict(
+        trip,
+        fromLocalInput(startsAt),
+        fromLocalInput(endsAt),
+        item?.id,
+      );
+      if (conflict) {
+        const range = conflict.endsAt
+          ? `${formatDate(conflict.startsAt)} → ${formatDate(conflict.endsAt)}`
+          : formatDate(conflict.startsAt);
+        setError(
+          `Overlaps with "${conflict.title}" (${range}). Only one lodging per night.`,
+        );
+        return;
+      }
+    }
 
     const resolvedFrom: Place | undefined =
-      kind === 'meal'
+      kind === 'meal' || kind === 'lodging'
         ? undefined
         : (fromPlace ??
           (fromValue.trim() ? { label: fromValue.trim() } : undefined));
@@ -200,7 +243,7 @@ export function ItemEditorSheet({
       if (isEdit && item) {
         const patch: ItemPatch = {
           kind,
-          title: title.trim(),
+          title: effectiveTitle,
           startsAt: fromLocalInput(startsAt),
           endsAt: endsAt ? fromLocalInput(endsAt) : null,
           from: resolvedFrom ?? null,
@@ -214,7 +257,7 @@ export function ItemEditorSheet({
       } else {
         const draft: ItemDraft = {
           kind,
-          title: title.trim(),
+          title: effectiveTitle,
           startsAt: fromLocalInput(startsAt),
           endsAt: endsAt ? fromLocalInput(endsAt) : undefined,
           from: resolvedFrom,
@@ -279,16 +322,18 @@ export function ItemEditorSheet({
             </div>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="item-title">Title</Label>
-            <Input
-              id="item-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Dinner at Cervejaria Ramiro"
-              autoFocus
-            />
-          </div>
+          {kind !== 'lodging' && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="item-title">Title</Label>
+              <Input
+                id="item-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Dinner at Cervejaria Ramiro"
+                autoFocus
+              />
+            </div>
+          )}
 
           {kind === 'meal' && (
             <div className="grid gap-1.5">
@@ -361,25 +406,29 @@ export function ItemEditorSheet({
           )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="grid min-w-0 gap-1.5">
-              <Label htmlFor="item-start">Starts</Label>
+            <div className="grid min-w-0 gap-1.5 overflow-hidden">
+              <Label htmlFor="item-start">
+                {kind === 'lodging' ? 'Check-in' : 'Starts'}
+              </Label>
               <Input
                 id="item-start"
                 type="datetime-local"
                 value={startsAt}
                 onChange={(e) => setStartsAt(e.target.value)}
-                className="min-w-0"
+                className="max-w-full min-w-0"
               />
             </div>
-            <div className="grid min-w-0 gap-1.5">
-              <Label htmlFor="item-end">Ends</Label>
+            <div className="grid min-w-0 gap-1.5 overflow-hidden">
+              <Label htmlFor="item-end">
+                {kind === 'lodging' ? 'Check-out' : 'Ends'}
+              </Label>
               <Input
                 id="item-end"
                 type="datetime-local"
                 value={endsAt}
                 onChange={(e) => setEndsAt(e.target.value)}
                 min={startsAt}
-                className="min-w-0"
+                className="max-w-full min-w-0"
               />
             </div>
           </div>
@@ -407,10 +456,12 @@ export function ItemEditorSheet({
 
           <div
             className={
-              kind === 'meal' ? 'grid gap-3' : 'grid grid-cols-2 gap-3'
+              kind === 'meal' || kind === 'lodging'
+                ? 'grid gap-3'
+                : 'grid grid-cols-2 gap-3'
             }
           >
-            {kind !== 'meal' && (
+            {kind !== 'meal' && kind !== 'lodging' && (
               <div className="grid gap-1.5">
                 <Label>From</Label>
                 <PlaceAutocomplete
@@ -430,7 +481,13 @@ export function ItemEditorSheet({
               </div>
             )}
             <div className="grid gap-1.5">
-              <Label>{kind === 'transport' ? 'To' : 'Place'}</Label>
+              <Label>
+                {kind === 'transport'
+                  ? 'To'
+                  : kind === 'lodging'
+                    ? 'Where'
+                    : 'Place'}
+              </Label>
               <PlaceAutocomplete
                 value={toValue}
                 onChange={(v) => {
@@ -442,7 +499,11 @@ export function ItemEditorSheet({
                   setToPlace(place);
                 }}
                 placeholder={
-                  kind === 'transport' ? 'LIS Lisbon' : 'Cervejaria Ramiro'
+                  kind === 'transport'
+                    ? 'LIS Lisbon'
+                    : kind === 'lodging'
+                      ? 'Casa do Príncipe'
+                      : 'Cervejaria Ramiro'
                 }
               />
             </div>
