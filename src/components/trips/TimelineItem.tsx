@@ -4,7 +4,7 @@ import { motion } from 'motion/react';
 import { ArrowRight, MapPin } from 'lucide-react';
 import type { TripItem } from '@/lib/trips/types';
 import { Badge } from '@/components/ui/badge';
-import { formatTime } from '@/lib/time/formatDate';
+import { dayOffsetFrom, formatTime } from '@/lib/time/formatDate';
 import { formatMoney } from '@/lib/trips/grouping';
 import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
 import { fadeUp, spring } from '@/lib/motion/presets';
@@ -14,13 +14,21 @@ interface TimelineItemProps {
   item: TripItem;
   isLast?: boolean;
   isCurrent?: boolean;
+  bucketDate?: Date;
   onSelect?: () => void;
+}
+
+function dayOffsetSuffix(offset: number): string {
+  if (offset === 0) return '';
+  const sign = offset > 0 ? '+' : '−';
+  return ` ${sign}${Math.abs(offset)}d`;
 }
 
 export function TimelineItem({
   item,
   isLast,
   isCurrent,
+  bucketDate,
   onSelect,
 }: TimelineItemProps) {
   const meta = kindMeta[item.kind];
@@ -28,6 +36,12 @@ export function TimelineItem({
     item.kind === 'transport' && item.transportMode
       ? transportIcons[item.transportMode]
       : meta.icon;
+
+  const startOffset = bucketDate ? dayOffsetFrom(bucketDate, item.startsAt) : 0;
+  const endOffset =
+    bucketDate && item.endsAt ? dayOffsetFrom(bucketDate, item.endsAt) : 0;
+  const startSuffix = dayOffsetSuffix(startOffset);
+  const endSuffix = dayOffsetSuffix(endOffset);
 
   return (
     <motion.li
@@ -38,10 +52,20 @@ export function TimelineItem({
       <div className="flex flex-col items-end pt-1">
         <span className="text-sm leading-tight tabular-nums">
           {formatTime(item.startsAt)}
+          {startSuffix && (
+            <span className="text-muted-foreground/80 ml-0.5 text-[10px]">
+              {startSuffix}
+            </span>
+          )}
         </span>
         {item.endsAt && (
           <span className="text-muted-foreground text-[11px] leading-tight tabular-nums">
             {formatTime(item.endsAt)}
+            {endSuffix && (
+              <span className="text-muted-foreground/80 ml-0.5 text-[10px]">
+                {endSuffix}
+              </span>
+            )}
           </span>
         )}
       </div>

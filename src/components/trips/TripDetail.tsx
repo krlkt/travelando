@@ -377,6 +377,7 @@ function DayContent({
                         item={item}
                         isLast={idx === seg.items.length - 1}
                         isCurrent={item.id === currentItemId}
+                        bucketDate={bucket.date}
                         onSelect={() => onSelect(item)}
                       />
                     ))}

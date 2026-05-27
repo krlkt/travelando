@@ -50,6 +50,32 @@ export function dayKey(iso: string): string {
   ).padStart(2, '0')}`;
 }
 
+function startOfLocalDay(d: Date): number {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x.getTime();
+}
+
+export function isSameDay(a: string | Date, b: string | Date): boolean {
+  const da = a instanceof Date ? a : new Date(a);
+  const db = b instanceof Date ? b : new Date(b);
+  return (
+    da.getFullYear() === db.getFullYear() &&
+    da.getMonth() === db.getMonth() &&
+    da.getDate() === db.getDate()
+  );
+}
+
+export function dayOffsetFrom(
+  reference: string | Date,
+  target: string | Date,
+): number {
+  const ref = reference instanceof Date ? reference : new Date(reference);
+  const tgt = target instanceof Date ? target : new Date(target);
+  const diffMs = startOfLocalDay(tgt) - startOfLocalDay(ref);
+  return Math.round(diffMs / 86_400_000);
+}
+
 export function tripDayCount(startIso: string, endIso: string): number {
   const start = new Date(startIso);
   const end = new Date(endIso);

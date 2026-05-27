@@ -7,9 +7,25 @@ import type {
 } from './types';
 import { dayKey } from '@/lib/time/formatDate';
 
+function arrivalTimestamp(transport: TripItem): number {
+  return transport.endsAt
+    ? new Date(transport.endsAt).getTime()
+    : new Date(transport.startsAt).getTime() + 1;
+}
+
+function itemOverlapsDay(
+  item: TripItem,
+  dayStart: number,
+  dayEnd: number,
+): boolean {
+  const startTs = new Date(item.startsAt).getTime();
+  const endTs = item.endsAt ? new Date(item.endsAt).getTime() : startTs;
+  return startTs <= dayEnd && endTs >= dayStart;
+}
+
 function buildDaySegments(
   dayItems: TripItem[],
-  dayTransports: TripItem[],
+  cityChangeTransports: TripItem[],
   dayStart: number,
   dayEnd: number,
   initialCity: string,
@@ -24,14 +40,20 @@ function buildDaySegments(
   let segPlaceId = initialPlaceId;
   let prevCutoff = dayStart;
 
-  for (const transport of dayTransports) {
-    // +1ms so transport item itself (ts = departure) is included in the departure segment
-    const arrivalTs = transport.endsAt
-      ? new Date(transport.endsAt).getTime()
-      : new Date(transport.startsAt).getTime() + 1;
+  const effectiveTs = (item: TripItem): number => {
+    const startTs = new Date(item.startsAt).getTime();
+    return Math.max(startTs, dayStart);
+  };
+
+  const sortedCityChanges = [...cityChangeTransports].sort(
+    (a, b) => arrivalTimestamp(a) - arrivalTimestamp(b),
+  );
+
+  for (const transport of sortedCityChanges) {
+    const arrivalTs = arrivalTimestamp(transport);
 
     const segItems = dayItems.filter((item) => {
-      const ts = new Date(item.startsAt).getTime();
+      const ts = effectiveTs(item);
       return ts >= prevCutoff && ts < arrivalTs;
     });
 
@@ -47,7 +69,7 @@ function buildDaySegments(
   }
 
   const finalItems = dayItems.filter((item) => {
-    const ts = new Date(item.startsAt).getTime();
+    const ts = effectiveTs(item);
     return ts >= prevCutoff && ts <= dayEnd;
   });
 
@@ -92,16 +114,17 @@ export function deriveCitiesByDay(
       currentPlaceId = override.cityPlaceId;
     }
 
-    const dayItems = sortedItems.filter((i) => {
-      const ts = new Date(i.startsAt).getTime();
-      return ts >= dayStart && ts <= dayEnd;
-    });
-
-    const dayTransports = dayItems.filter(
-      (i) => i.kind === 'transport' && i.to?.label,
+    const dayItems = sortedItems.filter((i) =>
+      itemOverlapsDay(i, dayStart, dayEnd),
     );
 
-    if (dayTransports.length === 0) {
+    const cityChangeTransports = dayItems.filter((i) => {
+      if (i.kind !== 'transport' || !i.to?.label) return false;
+      const arrivalTs = arrivalTimestamp(i);
+      return arrivalTs >= dayStart && arrivalTs <= dayEnd;
+    });
+
+    if (cityChangeTransports.length === 0) {
       result.set(key, {
         key,
         date,
@@ -116,7 +139,7 @@ export function deriveCitiesByDay(
     } else {
       const { segments, finalCity, finalPlaceId } = buildDaySegments(
         dayItems,
-        dayTransports,
+        cityChangeTransports,
         dayStart,
         dayEnd,
         currentCity,
