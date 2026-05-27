@@ -61,6 +61,54 @@ function fromLocalInput(value: string): string {
   return new Date(value).toISOString();
 }
 
+function getDatePart(value: string): string {
+  if (!value) return '';
+  const idx = value.indexOf('T');
+  return idx === -1 ? value : value.slice(0, idx);
+}
+
+function getTimePart(value: string): string {
+  if (!value) return '';
+  const idx = value.indexOf('T');
+  return idx === -1 ? '' : value.slice(idx + 1, idx + 6);
+}
+
+function todayLocalDate(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function parseTimeInput(value: string): string | null {
+  const cleaned = value.trim();
+  if (!cleaned) return null;
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  const sepMatch = cleaned.match(/^(\d{1,2})[:.\- ](\d{1,2})$/);
+  if (sepMatch) {
+    const h = Number(sepMatch[1]);
+    const m = Number(sepMatch[2]);
+    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return `${pad(h)}:${pad(m)}`;
+    return null;
+  }
+
+  if (/^\d{1,2}$/.test(cleaned)) {
+    const h = Number(cleaned);
+    if (h >= 0 && h <= 23) return `${pad(h)}:00`;
+    return null;
+  }
+
+  if (/^\d{3,4}$/.test(cleaned)) {
+    const padded = cleaned.padStart(4, '0');
+    const h = Number(padded.slice(0, 2));
+    const m = Number(padded.slice(2));
+    if (h <= 23 && m <= 59) return `${pad(h)}:${pad(m)}`;
+    return null;
+  }
+
+  return null;
+}
+
 function initialStartsAt(
   item: TripItem | null | undefined,
   defaultDate: Date | null | undefined,
@@ -442,31 +490,78 @@ function ItemEditorBody({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="grid min-w-0 gap-1.5 overflow-hidden p-0.5">
-            <Label htmlFor="item-start">
+        <div className="grid gap-3">
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor="item-start-date">
               {kind === 'lodging' ? 'Check-in' : 'Starts'}
             </Label>
-            <Input
-              id="item-start"
-              type="datetime-local"
-              value={startsAt}
-              onChange={(e) => setStartsAt(e.target.value)}
-              className="max-w-full min-w-0"
-            />
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_88px] gap-2">
+              <Input
+                id="item-start-date"
+                type="date"
+                value={getDatePart(startsAt)}
+                onChange={(e) => {
+                  const date = e.target.value;
+                  if (!date) {
+                    setStartsAt('');
+                    return;
+                  }
+                  const time = getTimePart(startsAt) || '09:00';
+                  setStartsAt(`${date}T${time}`);
+                }}
+                className="min-w-0"
+              />
+              <TimeField
+                ariaLabel={kind === 'lodging' ? 'Check-in time' : 'Start time'}
+                value={getTimePart(startsAt)}
+                onCommit={(time) => {
+                  if (!time) {
+                    setStartsAt('');
+                    return;
+                  }
+                  const date = getDatePart(startsAt) || todayLocalDate();
+                  setStartsAt(`${date}T${time}`);
+                }}
+              />
+            </div>
           </div>
-          <div className="grid min-w-0 gap-1.5 overflow-hidden p-0.5">
-            <Label htmlFor="item-end">
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor="item-end-date">
               {kind === 'lodging' ? 'Check-out' : 'Ends'}
             </Label>
-            <Input
-              id="item-end"
-              type="datetime-local"
-              value={endsAt}
-              onChange={(e) => setEndsAt(e.target.value)}
-              min={startsAt}
-              className="max-w-full min-w-0"
-            />
+            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_88px] gap-2">
+              <Input
+                id="item-end-date"
+                type="date"
+                value={getDatePart(endsAt)}
+                min={getDatePart(startsAt) || undefined}
+                onChange={(e) => {
+                  const date = e.target.value;
+                  if (!date) {
+                    setEndsAt('');
+                    return;
+                  }
+                  const time = getTimePart(endsAt) || '10:00';
+                  setEndsAt(`${date}T${time}`);
+                }}
+                className="min-w-0"
+              />
+              <TimeField
+                ariaLabel={kind === 'lodging' ? 'Check-out time' : 'End time'}
+                value={getTimePart(endsAt)}
+                onCommit={(time) => {
+                  if (!time) {
+                    setEndsAt('');
+                    return;
+                  }
+                  const date =
+                    getDatePart(endsAt) ||
+                    getDatePart(startsAt) ||
+                    todayLocalDate();
+                  setEndsAt(`${date}T${time}`);
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -607,5 +702,53 @@ function ItemEditorBody({
         </Button>
       </SheetFooter>
     </>
+  );
+}
+
+interface TimeFieldProps {
+  value: string;
+  ariaLabel: string;
+  onCommit: (time: string) => void;
+}
+
+function TimeField({ value, ariaLabel, onCommit }: TimeFieldProps) {
+  const [draft, setDraft] = useState(value);
+  const [focused, setFocused] = useState(false);
+  const display = focused ? draft : value;
+
+  function commit() {
+    const trimmed = draft.trim();
+    if (!trimmed) {
+      onCommit('');
+    } else {
+      const parsed = parseTimeInput(trimmed);
+      if (parsed !== null) onCommit(parsed);
+    }
+    setFocused(false);
+  }
+
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      aria-label={ariaLabel}
+      placeholder="HH:MM"
+      value={display}
+      onFocus={(e) => {
+        setDraft(value);
+        setFocused(true);
+        e.currentTarget.select();
+      }}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          (e.currentTarget as HTMLInputElement).blur();
+        }
+      }}
+      className="text-center tabular-nums"
+    />
   );
 }

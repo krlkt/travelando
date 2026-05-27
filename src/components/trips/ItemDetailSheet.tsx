@@ -59,7 +59,7 @@ export function ItemDetailSheet({
           </span>
           <div className="min-w-0 flex-1">
             <Badge variant={meta.badge}>{meta.label}</Badge>
-            <SheetTitle className="mt-2">{item.title}</SheetTitle>
+            <SheetTitle className="mt-2 break-words">{item.title}</SheetTitle>
             <SheetDescription>{formatDateLong(item.startsAt)}</SheetDescription>
           </div>
         </div>
@@ -74,9 +74,9 @@ export function ItemDetailSheet({
 
           {(item.from || item.to) && (
             <Row icon={MapPin} label="Place">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 {item.from && (
-                  <span>
+                  <span className="break-words">
                     {item.from.label}
                     {item.from.address && (
                       <span className="text-muted-foreground">
@@ -87,10 +87,10 @@ export function ItemDetailSheet({
                   </span>
                 )}
                 {item.from && item.to && (
-                  <ArrowRight className="text-muted-foreground size-3.5" />
+                  <ArrowRight className="text-muted-foreground size-3.5 shrink-0" />
                 )}
                 {item.to && (
-                  <span>
+                  <span className="break-words">
                     {item.to.label}
                     {item.to.address && (
                       <span className="text-muted-foreground">
@@ -114,7 +114,7 @@ export function ItemDetailSheet({
 
           {item.notes && (
             <Row icon={Calendar} label="Notes">
-              <p className="text-foreground/90 text-sm leading-relaxed whitespace-pre-wrap">
+              <p className="text-foreground/90 text-sm leading-relaxed break-words whitespace-pre-wrap">
                 {item.notes}
               </p>
             </Row>
@@ -166,13 +166,13 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid grid-cols-[1.25rem_1fr] gap-3">
+    <div className="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-3">
       <Icon className="text-muted-foreground mt-0.5 size-4" />
-      <div>
+      <div className="min-w-0">
         <dt className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">
           {label}
         </dt>
-        <dd className="mt-1 text-sm leading-relaxed">{children}</dd>
+        <dd className="mt-1 text-sm leading-relaxed break-words">{children}</dd>
       </div>
     </div>
   );
