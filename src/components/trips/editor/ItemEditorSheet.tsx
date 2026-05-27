@@ -406,7 +406,7 @@ export function ItemEditorSheet({
           )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="grid min-w-0 gap-1.5 overflow-hidden">
+            <div className="grid min-w-0 gap-1.5 p-0.5 overflow-hidden">
               <Label htmlFor="item-start">
                 {kind === 'lodging' ? 'Check-in' : 'Starts'}
               </Label>
@@ -418,7 +418,7 @@ export function ItemEditorSheet({
                 className="max-w-full min-w-0"
               />
             </div>
-            <div className="grid min-w-0 gap-1.5 overflow-hidden">
+            <div className="grid min-w-0 gap-1.5 p-0.5 overflow-hidden">
               <Label htmlFor="item-end">
                 {kind === 'lodging' ? 'Check-out' : 'Ends'}
               </Label>
