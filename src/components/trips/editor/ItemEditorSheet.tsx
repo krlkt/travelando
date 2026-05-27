@@ -509,7 +509,7 @@ function ItemEditorBody({
                   const time = getTimePart(startsAt) || '09:00';
                   setStartsAt(`${date}T${time}`);
                 }}
-                className="min-w-0"
+                className="min-w-0 appearance-none [&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:min-h-[1.25em] [&::-webkit-date-and-time-value]:text-left [&::-webkit-date-and-time-value]:leading-none"
               />
               <TimeField
                 ariaLabel={kind === 'lodging' ? 'Check-in time' : 'Start time'}
@@ -544,7 +544,7 @@ function ItemEditorBody({
                   const time = getTimePart(endsAt) || '10:00';
                   setEndsAt(`${date}T${time}`);
                 }}
-                className="min-w-0"
+                className="min-w-0 appearance-none [&::-webkit-date-and-time-value]:m-0 [&::-webkit-date-and-time-value]:min-h-[1.25em] [&::-webkit-date-and-time-value]:text-left [&::-webkit-date-and-time-value]:leading-none"
               />
               <TimeField
                 ariaLabel={kind === 'lodging' ? 'Check-out time' : 'End time'}
