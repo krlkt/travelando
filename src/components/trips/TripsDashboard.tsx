@@ -15,7 +15,6 @@ import type { Trip } from '@/lib/trips/types';
 export function TripsDashboard() {
   const { trips } = useTrips();
   const [editorOpen, setEditorOpen] = useState(false);
-  const now = new Date();
 
   const visibleTrips = useMemo(
     () => trips.filter((t) => !isDemoTrip(t.id)),
@@ -23,6 +22,7 @@ export function TripsDashboard() {
   );
 
   const { ongoing, upcoming, past } = useMemo(() => {
+    const now = new Date();
     const o: Trip[] = [];
     const u: Trip[] = [];
     const p: Trip[] = [];
@@ -36,7 +36,7 @@ export function TripsDashboard() {
       else p.push(t);
     }
     return { ongoing: o, upcoming: u, past: p.reverse() };
-  }, [visibleTrips, now]);
+  }, [visibleTrips]);
 
   return (
     <div className="px-4 pt-6 pb-16 sm:px-6 md:px-10 md:pt-14">

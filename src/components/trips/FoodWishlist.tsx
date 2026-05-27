@@ -25,7 +25,9 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
     cityPlaceId?: string;
   } | null>(null);
 
-  const places = foodPlaces[tripId] ?? [];
+  const placesForTrip = foodPlaces[tripId];
+
+  const places = useMemo(() => placesForTrip ?? [], [placesForTrip]);
 
   const cities = useMemo(() => {
     if (dayKey) {

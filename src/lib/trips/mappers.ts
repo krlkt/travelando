@@ -9,6 +9,7 @@ import type {
   Trip,
   TripDraft,
   TripItem,
+  TripMember,
 } from './types';
 
 export interface TripRow {
@@ -20,7 +21,23 @@ export interface TripRow {
   cover_gradient: string;
   start_date: string;
   end_date: string;
-  travelers: string[];
+}
+
+type ProfileEmbed = {
+  avatar_url: string | null;
+  display_name: string | null;
+};
+
+export interface TripMemberRow {
+  id: string;
+  trip_id: string;
+  user_id: string | null;
+  display_name: string;
+  email: string | null;
+  invited_by: string | null;
+  // PostgREST can return either a single related row or an array depending on
+  // the inferred relationship cardinality. Accept both shapes.
+  profiles?: ProfileEmbed | ProfileEmbed[] | null;
 }
 
 export interface TripItemRow {
@@ -54,9 +71,26 @@ export function rowToItem(row: TripItemRow): TripItem {
   };
 }
 
+export function rowToMember(row: TripMemberRow): TripMember {
+  const profile = Array.isArray(row.profiles)
+    ? (row.profiles[0] ?? null)
+    : (row.profiles ?? null);
+  const profileName = profile?.display_name ?? undefined;
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    userId: row.user_id ?? undefined,
+    displayName: row.display_name || profileName || row.email || 'Member',
+    email: row.email ?? undefined,
+    avatarUrl: profile?.avatar_url ?? undefined,
+    invitedBy: row.invited_by ?? undefined,
+  };
+}
+
 export function rowToTrip(
   row: TripRow,
   items: TripItemRow[] | null | undefined,
+  members: TripMemberRow[] | null | undefined = [],
 ): Trip {
   return {
     id: row.id,
@@ -66,7 +100,8 @@ export function rowToTrip(
     coverGradient: row.cover_gradient,
     startDate: row.start_date,
     endDate: row.end_date,
-    travelers: row.travelers ?? [],
+    ownerId: row.owner_id,
+    members: (members ?? []).map(rowToMember),
     items: (items ?? [])
       .map(rowToItem)
       .sort(
@@ -86,7 +121,6 @@ export function tripDraftToInsert(
     cover_gradient: draft.coverGradient,
     start_date: draft.startDate,
     end_date: draft.endDate,
-    travelers: draft.travelers,
   };
 }
 
@@ -102,7 +136,6 @@ export function tripPatchToUpdate(
     out.cover_gradient = patch.coverGradient;
   if (patch.startDate !== undefined) out.start_date = patch.startDate;
   if (patch.endDate !== undefined) out.end_date = patch.endDate;
-  if (patch.travelers !== undefined) out.travelers = patch.travelers;
   return out;
 }
 

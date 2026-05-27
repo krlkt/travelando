@@ -23,7 +23,10 @@ export const mockTrips: Trip[] = [
       'linear-gradient(135deg, oklch(72% 0.13 38) 0%, oklch(58% 0.16 38) 60%, oklch(40% 0.10 295) 100%)',
     startDate: dateOnly(-1),
     endDate: dateOnly(2),
-    travelers: ['Karel', 'Marta'],
+    members: [
+      { id: 'm-l-1', tripId: 'trip-lisbon', displayName: 'Karel' },
+      { id: 'm-l-2', tripId: 'trip-lisbon', displayName: 'Marta' },
+    ],
     items: [
       {
         id: 'i-l-1',
@@ -134,7 +137,11 @@ export const mockTrips: Trip[] = [
       'linear-gradient(135deg, oklch(68% 0.15 220) 0%, oklch(48% 0.12 250) 50%, oklch(30% 0.08 295) 100%)',
     startDate: dateOnly(28),
     endDate: dateOnly(40),
-    travelers: ['Karel', 'Marta', 'Niels'],
+    members: [
+      { id: 'm-j-1', tripId: 'trip-japan', displayName: 'Karel' },
+      { id: 'm-j-2', tripId: 'trip-japan', displayName: 'Marta' },
+      { id: 'm-j-3', tripId: 'trip-japan', displayName: 'Niels' },
+    ],
     items: [
       {
         id: 'i-j-1',
@@ -190,7 +197,7 @@ export const mockTrips: Trip[] = [
       'linear-gradient(135deg, oklch(72% 0.08 220) 0%, oklch(48% 0.06 250) 100%)',
     startDate: dateOnly(-90),
     endDate: dateOnly(-80),
-    travelers: ['Karel'],
+    members: [{ id: 'm-i-1', tripId: 'trip-iceland', displayName: 'Karel' }],
     items: [
       {
         id: 'i-ic-1',

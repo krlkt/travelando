@@ -119,6 +119,39 @@ export function parseAmountInput(input: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+const BACKGROUND_MIN_HOURS = 4;
+
+export function isBackgroundItem(item: TripItem): boolean {
+  if (item.kind !== 'transport') return false;
+  if (!item.endsAt) return false;
+  const durationHours =
+    (new Date(item.endsAt).getTime() - new Date(item.startsAt).getTime()) /
+    3_600_000;
+  return durationHours >= BACKGROUND_MIN_HOURS;
+}
+
+export function findOverlappingItemIds(items: TripItem[]): Set<string> {
+  const overlapping = new Set<string>();
+  const ranges = items.map((item) => {
+    const start = new Date(item.startsAt).getTime();
+    const end = item.endsAt
+      ? new Date(item.endsAt).getTime()
+      : start + 60 * 60 * 1000;
+    return { id: item.id, start, end };
+  });
+  for (let i = 0; i < ranges.length; i++) {
+    for (let j = i + 1; j < ranges.length; j++) {
+      const a = ranges[i];
+      const b = ranges[j];
+      if (a.start < b.end && b.start < a.end) {
+        overlapping.add(a.id);
+        overlapping.add(b.id);
+      }
+    }
+  }
+  return overlapping;
+}
+
 export function findCurrentItem(items: TripItem[], now: Date): TripItem | null {
   return (
     items.find((i) => {

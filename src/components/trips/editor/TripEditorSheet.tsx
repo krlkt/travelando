@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
@@ -50,32 +50,44 @@ export function TripEditorSheet({
   open,
   onOpenChange,
 }: TripEditorSheetProps) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:w-[480px]">
+        {open && (
+          <TripEditorBody trip={trip} onClose={() => onOpenChange(false)} />
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function TripEditorBody({
+  trip,
+  onClose,
+}: {
+  trip?: Trip;
+  onClose: () => void;
+}) {
   const router = useRouter();
   const { createTrip, updateTrip } = useTrips();
   const isEdit = !!trip;
 
-  const [title, setTitle] = useState('');
-  const [destination, setDestination] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [travelers, setTravelers] = useState('');
-  const [gradient, setGradient] = useState(defaultGradients[0]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setTitle(trip?.title ?? '');
-    setDestination(trip?.destination ?? '');
-    setStartDate(trip ? toLocalInputDate(trip.startDate) : '');
-    setEndDate(trip ? toLocalInputDate(trip.endDate) : '');
-    setTravelers(trip?.travelers.join(', ') ?? '');
-    setGradient(
+  const [title, setTitle] = useState<string>(trip?.title ?? '');
+  const [destination, setDestination] = useState<string>(
+    trip?.destination ?? '',
+  );
+  const [startDate, setStartDate] = useState<string>(
+    trip ? toLocalInputDate(trip.startDate) : '',
+  );
+  const [endDate, setEndDate] = useState<string>(
+    trip ? toLocalInputDate(trip.endDate) : '',
+  );
+  const [gradient, setGradient] = useState<string>(
+    () =>
       trip?.coverGradient ??
-        defaultGradients[Math.floor(Math.random() * defaultGradients.length)],
-    );
-    setError(null);
-  }, [open, trip]);
-
+      defaultGradients[Math.floor(Math.random() * defaultGradients.length)],
+  );
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -101,10 +113,6 @@ export function TripEditorSheet({
       destination: destination.trim(),
       startDate: fromLocalInputDate(startDate),
       endDate: fromLocalInputDate(endDate),
-      travelers: travelers
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
       coverGradient: gradient,
     };
 
@@ -113,11 +121,11 @@ export function TripEditorSheet({
       if (isEdit && trip) {
         await updateTrip(trip.id, draft);
         toast.success('Trip updated');
-        onOpenChange(false);
+        onClose();
       } else {
         const created = await createTrip(draft);
         toast.success('Trip created');
-        onOpenChange(false);
+        onClose();
         router.push(`/trips/${created.id}`);
       }
     } catch (err) {
@@ -130,109 +138,94 @@ export function TripEditorSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="sm:w-[480px]">
-        <div>
-          <SheetTitle>{isEdit ? 'Edit trip' : 'New trip'}</SheetTitle>
-          <SheetDescription>
-            Give it bones now, fill in the days later.
-          </SheetDescription>
+    <>
+      <div>
+        <SheetTitle>{isEdit ? 'Edit trip' : 'New trip'}</SheetTitle>
+        <SheetDescription>
+          Give it bones now, fill in the days later.
+        </SheetDescription>
+      </div>
+
+      <div className="grid gap-4">
+        <div className="grid gap-1.5">
+          <Label htmlFor="trip-title">Title</Label>
+          <Input
+            id="trip-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Lisbon Long Weekend"
+            autoFocus
+          />
         </div>
 
-        <div className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="trip-title">Title</Label>
-            <Input
-              id="trip-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Lisbon Long Weekend"
-              autoFocus
-            />
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="trip-dest">Destination</Label>
-            <Input
-              id="trip-dest"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              placeholder="Lisbon, Portugal"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="grid min-w-0 gap-1.5">
-              <Label htmlFor="trip-start">Start</Label>
-              <Input
-                id="trip-start"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="min-w-0"
-              />
-            </div>
-            <div className="grid min-w-0 gap-1.5">
-              <Label htmlFor="trip-end">End</Label>
-              <Input
-                id="trip-end"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                min={startDate}
-                className="min-w-0"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="trip-travelers">Travelers</Label>
-            <Input
-              id="trip-travelers"
-              value={travelers}
-              onChange={(e) => setTravelers(e.target.value)}
-              placeholder="Karel, Marta"
-            />
-            <p className="text-muted-foreground text-xs">
-              Comma-separated. Optional.
-            </p>
-          </div>
-
-          <Separator />
-
-          <div className="grid gap-2">
-            <Label>Cover</Label>
-            <div className="grid grid-cols-5 gap-2">
-              {defaultGradients.map((g) => (
-                <button
-                  type="button"
-                  key={g}
-                  onClick={() => setGradient(g)}
-                  aria-label="Choose cover"
-                  aria-pressed={g === gradient}
-                  className={`aspect-square rounded-[var(--radius)] transition-transform ${g === gradient ? 'ring-foreground/80 ring-offset-card ring-2 ring-offset-2' : 'hover:scale-[0.97]'}`}
-                  style={{ background: g }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {error && (
-            <p role="alert" className="text-destructive text-sm">
-              {error}
-            </p>
-          )}
+        <div className="grid gap-1.5">
+          <Label htmlFor="trip-dest">Destination</Label>
+          <Input
+            id="trip-dest"
+            value={destination}
+            onChange={(e) => setDestination(e.target.value)}
+            placeholder="Lisbon, Portugal"
+          />
         </div>
 
-        <SheetFooter>
-          <SheetClose asChild>
-            <Button variant="ghost">Cancel</Button>
-          </SheetClose>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create trip'}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor="trip-start">Start</Label>
+            <Input
+              id="trip-start"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="min-w-0"
+            />
+          </div>
+          <div className="grid min-w-0 gap-1.5">
+            <Label htmlFor="trip-end">End</Label>
+            <Input
+              id="trip-end"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              min={startDate}
+              className="min-w-0"
+            />
+          </div>
+        </div>
+
+        <Separator />
+
+        <div className="grid gap-2">
+          <Label>Cover</Label>
+          <div className="grid grid-cols-5 gap-2">
+            {defaultGradients.map((g) => (
+              <button
+                type="button"
+                key={g}
+                onClick={() => setGradient(g)}
+                aria-label="Choose cover"
+                aria-pressed={g === gradient}
+                className={`aspect-square rounded-[var(--radius)] transition-transform ${g === gradient ? 'ring-foreground/80 ring-offset-card ring-2 ring-offset-2' : 'hover:scale-[0.97]'}`}
+                style={{ background: g }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {error && (
+          <p role="alert" className="text-destructive text-sm">
+            {error}
+          </p>
+        )}
+      </div>
+
+      <SheetFooter>
+        <SheetClose asChild>
+          <Button variant="ghost">Cancel</Button>
+        </SheetClose>
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Create trip'}
+        </Button>
+      </SheetFooter>
+    </>
   );
 }

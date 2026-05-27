@@ -94,7 +94,7 @@ export const googleProvider: PlacesProvider = {
     }
   },
 
-  async getDetails(placeId, _sessionToken) {
+  async getDetails(placeId) {
     try {
       const res = await fetch(
         `/api/places/details?placeId=${encodeURIComponent(placeId)}`,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import {
   Sheet,
@@ -35,21 +35,52 @@ export function CityOverrideSheet({
   open,
   onOpenChange,
 }: CityOverrideSheetProps) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:w-[380px]">
+        {open && (
+          <CityOverrideBody
+            tripId={tripId}
+            dayKey={dayKey}
+            dayLabel={dayLabel}
+            currentCity={currentCity}
+            existing={existing}
+            onClose={() => onOpenChange(false)}
+          />
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+interface CityOverrideBodyProps {
+  tripId: string;
+  dayKey: string;
+  dayLabel: string;
+  currentCity: string;
+  existing?: CityOverride | null;
+  onClose: () => void;
+}
+
+function CityOverrideBody({
+  tripId,
+  dayKey,
+  dayLabel,
+  currentCity,
+  existing,
+  onClose,
+}: CityOverrideBodyProps) {
   const { upsertCityOverride, removeCityOverride } = useTrips();
 
-  const [cityValue, setCityValue] = useState('');
-  const [cityPlace, setCityPlace] = useState<Place | undefined>();
+  const [cityValue, setCityValue] = useState<string>(
+    existing?.cityLabel ?? currentCity,
+  );
+  const [cityPlace, setCityPlace] = useState<Place | undefined>(
+    existing
+      ? { label: existing.cityLabel, placeId: existing.cityPlaceId }
+      : undefined,
+  );
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setCityValue(existing?.cityLabel ?? currentCity);
-    setCityPlace(
-      existing
-        ? { label: existing.cityLabel, placeId: existing.cityPlaceId }
-        : undefined,
-    );
-  }, [open, existing, currentCity]);
 
   const handleSave = async () => {
     if (!cityValue.trim()) return;
@@ -62,7 +93,7 @@ export function CityOverrideSheet({
         cityPlaceId: cityPlace?.placeId,
       });
       toast.success('City updated');
-      onOpenChange(false);
+      onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Save failed';
       toast.error(`Couldn't update city: ${message}`);
@@ -77,7 +108,7 @@ export function CityOverrideSheet({
     try {
       await removeCityOverride(tripId, existing.id);
       toast.success('City reset to auto-detected');
-      onOpenChange(false);
+      onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Reset failed';
       toast.error(`Couldn't reset city: ${message}`);
@@ -87,52 +118,50 @@ export function CityOverrideSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="sm:w-[380px]">
-        <div>
-          <SheetTitle>Set city for {dayLabel}</SheetTitle>
-          <SheetDescription>
-            Override the auto-detected city for this day.
-          </SheetDescription>
-        </div>
+    <>
+      <div>
+        <SheetTitle>Set city for {dayLabel}</SheetTitle>
+        <SheetDescription>
+          Override the auto-detected city for this day.
+        </SheetDescription>
+      </div>
 
-        <div className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label>City</Label>
-            <PlaceAutocomplete
-              value={cityValue}
-              onChange={(v) => {
-                setCityValue(v);
-                setCityPlace(undefined);
-              }}
-              onSelect={(place) => {
-                setCityValue(place.label);
-                setCityPlace(place);
-              }}
-              placeholder="Lisbon, Portugal"
-            />
-          </div>
+      <div className="grid gap-4">
+        <div className="grid gap-1.5">
+          <Label>City</Label>
+          <PlaceAutocomplete
+            value={cityValue}
+            onChange={(v) => {
+              setCityValue(v);
+              setCityPlace(undefined);
+            }}
+            onSelect={(place) => {
+              setCityValue(place.label);
+              setCityPlace(place);
+            }}
+            placeholder="Lisbon, Portugal"
+          />
         </div>
+      </div>
 
-        <SheetFooter className="flex-col gap-2 sm:flex-row">
-          {existing && (
-            <Button
-              variant="ghost"
-              onClick={handleReset}
-              disabled={saving}
-              className="text-muted-foreground"
-            >
-              Reset to auto
-            </Button>
-          )}
-          <SheetClose asChild>
-            <Button variant="ghost">Cancel</Button>
-          </SheetClose>
-          <Button onClick={handleSave} disabled={saving || !cityValue.trim()}>
-            {saving ? 'Saving…' : 'Set city'}
+      <SheetFooter className="flex-col gap-2 sm:flex-row">
+        {existing && (
+          <Button
+            variant="ghost"
+            onClick={handleReset}
+            disabled={saving}
+            className="text-muted-foreground"
+          >
+            Reset to auto
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        )}
+        <SheetClose asChild>
+          <Button variant="ghost">Cancel</Button>
+        </SheetClose>
+        <Button onClick={handleSave} disabled={saving || !cityValue.trim()}>
+          {saving ? 'Saving…' : 'Set city'}
+        </Button>
+      </SheetFooter>
+    </>
   );
 }

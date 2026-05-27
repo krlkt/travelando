@@ -25,7 +25,7 @@ export function listDemoTrips(): Trip[] {
 function cloneTrip(trip: Trip): Trip {
   return {
     ...trip,
-    travelers: [...trip.travelers],
+    members: trip.members.map((m) => ({ ...m })),
     items: trip.items.map((i) => ({ ...i })),
   };
 }

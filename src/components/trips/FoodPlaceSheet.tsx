@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import {
   Sheet,
@@ -56,36 +56,60 @@ export function FoodPlaceSheet({
   open,
   onOpenChange,
 }: FoodPlaceSheetProps) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:w-[420px]">
+        {open && (
+          <FoodPlaceBody
+            tripId={tripId}
+            cityLabel={cityLabel}
+            cityPlaceId={cityPlaceId}
+            item={item}
+            onClose={() => onOpenChange(false)}
+          />
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+interface FoodPlaceBodyProps {
+  tripId: string;
+  cityLabel: string;
+  cityPlaceId?: string;
+  item?: FoodPlace | null;
+  onClose: () => void;
+}
+
+function FoodPlaceBody({
+  tripId,
+  cityLabel,
+  cityPlaceId,
+  item,
+  onClose,
+}: FoodPlaceBodyProps) {
   const { addFoodPlace, updateFoodPlace } = useTrips();
   const isEdit = !!item;
 
-  const [name, setName] = useState('');
-  const [addressValue, setAddressValue] = useState('');
-  const [addressPlace, setAddressPlace] = useState<Place | undefined>();
-  const [category, setCategory] = useState<FoodPlaceCategory>('restaurant');
-  const [notes, setNotes] = useState('');
+  const [name, setName] = useState<string>(item?.name ?? '');
+  const [addressValue, setAddressValue] = useState<string>(item?.address ?? '');
+  const [addressPlace, setAddressPlace] = useState<Place | undefined>(
+    item?.address
+      ? {
+          label: item.name,
+          address: item.address,
+          lat: item.lat,
+          lng: item.lng,
+          placeId: item.placeId,
+        }
+      : undefined,
+  );
+  const [category, setCategory] = useState<FoodPlaceCategory>(
+    item?.category ?? 'restaurant',
+  );
+  const [notes, setNotes] = useState<string>(item?.notes ?? '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    setName(item?.name ?? '');
-    setAddressValue(item?.address ?? '');
-    setAddressPlace(
-      item?.address
-        ? {
-            label: item.name,
-            address: item.address,
-            lat: item.lat,
-            lng: item.lng,
-            placeId: item.placeId,
-          }
-        : undefined,
-    );
-    setCategory(item?.category ?? 'restaurant');
-    setNotes(item?.notes ?? '');
-    setError(null);
-  }, [open, item]);
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -115,7 +139,7 @@ export function FoodPlaceSheet({
         await addFoodPlace(draft);
         toast.success('Place added to wishlist');
       }
-      onOpenChange(false);
+      onClose();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Save failed';
       setError(message);
@@ -126,90 +150,88 @@ export function FoodPlaceSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="sm:w-[420px]">
-        <div>
-          <SheetTitle>{isEdit ? 'Edit place' : 'Add to wishlist'}</SheetTitle>
-          <SheetDescription>
-            {cityLabel} · Places you want to try
-          </SheetDescription>
+    <>
+      <div>
+        <SheetTitle>{isEdit ? 'Edit place' : 'Add to wishlist'}</SheetTitle>
+        <SheetDescription>
+          {cityLabel} · Places you want to try
+        </SheetDescription>
+      </div>
+
+      <div className="grid gap-4">
+        <div className="grid gap-1.5">
+          <Label htmlFor="fp-name">Name</Label>
+          <Input
+            id="fp-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Cervejaria Ramiro"
+            autoFocus
+          />
         </div>
 
-        <div className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="fp-name">Name</Label>
-            <Input
-              id="fp-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Cervejaria Ramiro"
-              autoFocus
-            />
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label>Address</Label>
-            <PlaceAutocomplete
-              value={addressValue}
-              onChange={(v) => {
-                setAddressValue(v);
-                setAddressPlace(undefined);
-              }}
-              onSelect={(place) => {
-                setAddressValue(place.address ?? place.label);
-                if (!name.trim()) setName(place.label);
-                setAddressPlace(place);
-              }}
-              placeholder="Search or type address"
-            />
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label>Category</Label>
-            <Select
-              value={category}
-              onValueChange={(v) => setCategory(v as FoodPlaceCategory)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="fp-notes">Notes</Label>
-            <Textarea
-              id="fp-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Reservation needed · Best bacalhau in town"
-              rows={3}
-            />
-          </div>
-
-          {error && (
-            <p role="alert" className="text-destructive text-sm">
-              {error}
-            </p>
-          )}
+        <div className="grid gap-1.5">
+          <Label>Address</Label>
+          <PlaceAutocomplete
+            value={addressValue}
+            onChange={(v) => {
+              setAddressValue(v);
+              setAddressPlace(undefined);
+            }}
+            onSelect={(place) => {
+              setAddressValue(place.address ?? place.label);
+              if (!name.trim()) setName(place.label);
+              setAddressPlace(place);
+            }}
+            placeholder="Search or type address"
+          />
         </div>
 
-        <SheetFooter>
-          <SheetClose asChild>
-            <Button variant="ghost">Cancel</Button>
-          </SheetClose>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add place'}
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        <div className="grid gap-1.5">
+          <Label>Category</Label>
+          <Select
+            value={category}
+            onValueChange={(v) => setCategory(v as FoodPlaceCategory)}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CATEGORIES.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label htmlFor="fp-notes">Notes</Label>
+          <Textarea
+            id="fp-notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Reservation needed · Best bacalhau in town"
+            rows={3}
+          />
+        </div>
+
+        {error && (
+          <p role="alert" className="text-destructive text-sm">
+            {error}
+          </p>
+        )}
+      </div>
+
+      <SheetFooter>
+        <SheetClose asChild>
+          <Button variant="ghost">Cancel</Button>
+        </SheetClose>
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add place'}
+        </Button>
+      </SheetFooter>
+    </>
   );
 }

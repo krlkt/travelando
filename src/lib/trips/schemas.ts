@@ -20,10 +20,22 @@ export const tripDraftSchema = z.object({
   coverGradient: z.string().min(1),
   startDate: z.string().min(1),
   endDate: z.string().min(1),
-  travelers: z.array(z.string()).default([]),
 });
 
 export const tripPatchSchema = tripDraftSchema.partial();
+
+export const tripMemberDraftSchema = z
+  .object({
+    email: z.string().email().optional(),
+    displayName: z.string().min(1).max(80).optional(),
+  })
+  .refine((v) => Boolean(v.email) || Boolean(v.displayName), {
+    message: 'email or displayName is required',
+  });
+
+export const tripMemberPatchSchema = z.object({
+  displayName: z.string().min(1).max(80).optional(),
+});
 
 export const itemKindSchema = z.enum([
   'transport',

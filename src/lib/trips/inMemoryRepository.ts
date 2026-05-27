@@ -10,11 +10,14 @@ import type {
   Trip,
   TripDraft,
   TripItem,
+  TripMember,
+  TripMemberDraft,
+  TripMemberPatch,
 } from './types';
 
 const cloneTrip = (trip: Trip): Trip => ({
   ...trip,
-  travelers: [...trip.travelers],
+  members: trip.members.map((m) => ({ ...m })),
   items: trip.items.map((i) => ({ ...i })),
 });
 
@@ -37,7 +40,12 @@ export function createInMemoryRepository(
       return found ? cloneTrip(found) : null;
     },
     async create(draft: TripDraft) {
-      const trip: Trip = { ...draft, id: randomId('trip'), items: [] };
+      const trip: Trip = {
+        ...draft,
+        id: randomId('trip'),
+        items: [],
+        members: [],
+      };
       store = [...store, trip];
       return cloneTrip(trip);
     },
@@ -154,6 +162,52 @@ export function createInMemoryRepository(
     },
     async removeCityOverride(id) {
       cityOverrides = cityOverrides.filter((o) => o.id !== id);
+    },
+
+    async listMembers(tripId) {
+      const trip = store.find((t) => t.id === tripId);
+      return (trip?.members ?? []).map((m) => ({ ...m }));
+    },
+    async addMember(tripId, draft: TripMemberDraft) {
+      const trip = store.find((t) => t.id === tripId);
+      if (!trip) throw new Error(`Trip ${tripId} not found`);
+      const member: TripMember = {
+        id: randomId('mem'),
+        tripId,
+        displayName: draft.displayName ?? draft.email ?? 'Member',
+        email: draft.email,
+      };
+      store = store.map((t) =>
+        t.id === tripId ? { ...t, members: [...t.members, member] } : t,
+      );
+      return { ...member };
+    },
+    async updateMember(tripId, memberId, patch: TripMemberPatch) {
+      let updated: TripMember | null = null;
+      store = store.map((t) => {
+        if (t.id !== tripId) return t;
+        return {
+          ...t,
+          members: t.members.map((m) => {
+            if (m.id !== memberId) return m;
+            updated =
+              patch.displayName !== undefined
+                ? { ...m, displayName: patch.displayName }
+                : m;
+            return updated;
+          }),
+        };
+      });
+      if (!updated)
+        throw new Error(`Member ${memberId} not found in trip ${tripId}`);
+      return { ...(updated as TripMember) };
+    },
+    async removeMember(tripId, memberId) {
+      store = store.map((t) =>
+        t.id === tripId
+          ? { ...t, members: t.members.filter((m) => m.id !== memberId) }
+          : t,
+      );
     },
   };
 }

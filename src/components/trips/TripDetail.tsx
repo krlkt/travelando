@@ -9,14 +9,20 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TimelineItem } from './TimelineItem';
+import { DayBackgroundStrip } from './DayBackgroundStrip';
 import { ItemDetailSheet } from './ItemDetailSheet';
 import { ExpensesPanel } from './ExpensesPanel';
 import { FoodWishlist } from './FoodWishlist';
 import { CityOverrideSheet } from './CityOverrideSheet';
 import { ItemEditorSheet } from './editor/ItemEditorSheet';
 import { TripEditorSheet } from './editor/TripEditorSheet';
+import { MembersSheet } from './MembersSheet';
 import { useTrips } from '@/lib/trips/context';
-import { findCurrentItem } from '@/lib/trips/grouping';
+import {
+  findCurrentItem,
+  findOverlappingItemIds,
+  isBackgroundItem,
+} from '@/lib/trips/grouping';
 import { deriveCitiesByDay, lodgingForDay } from '@/lib/trips/cities';
 import {
   formatDateRange,
@@ -68,6 +74,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
   const [editingItem, setEditingItem] = useState<TripItem | null>(null);
   const [defaultDayDate, setDefaultDayDate] = useState<Date | null>(null);
   const [cityOverrideOpen, setCityOverrideOpen] = useState(false);
+  const [membersOpen, setMembersOpen] = useState(false);
 
   const activeBucket =
     dayCityBuckets.find((b) => b.key === activeDay) ?? dayCityBuckets[0];
@@ -131,7 +138,8 @@ export function TripDetail({ tripId }: TripDetailProps) {
                 variant="ghost"
                 size="icon-sm"
                 className="bg-background/60 backdrop-blur-md"
-                aria-label="Share"
+                aria-label="Members"
+                onClick={() => setMembersOpen(true)}
               >
                 <Share2 className="size-4" />
               </Button>
@@ -165,10 +173,16 @@ export function TripDetail({ tripId }: TripDetailProps) {
               <span>
                 {totalDays} {totalDays === 1 ? 'day' : 'days'}
               </span>
-              {trip.travelers.length > 0 && (
+              {trip.members.length > 0 && (
                 <>
                   <span className="opacity-60">·</span>
-                  <span className="truncate">{trip.travelers.join(', ')}</span>
+                  <button
+                    type="button"
+                    onClick={() => setMembersOpen(true)}
+                    className="truncate text-left hover:underline"
+                  >
+                    {trip.members.map((m) => m.displayName).join(', ')}
+                  </button>
                 </>
               )}
             </motion.div>
@@ -318,6 +332,12 @@ export function TripDetail({ tripId }: TripDetailProps) {
         onOpenChange={setTripEditorOpen}
       />
 
+      <MembersSheet
+        trip={trip}
+        open={membersOpen}
+        onOpenChange={setMembersOpen}
+      />
+
       {activeBucket && (
         <CityOverrideSheet
           tripId={tripId}
@@ -344,7 +364,23 @@ function DayContent({
   onSelect: (item: TripItem) => void;
   onAdd: (dayDate: Date) => void;
 }) {
-  const hasItems = bucket.segments.some((s) => s.items.length > 0);
+  const partitionedSegments = bucket.segments.map((seg) => {
+    const background: TripItem[] = [];
+    const events: TripItem[] = [];
+    for (const item of seg.items) {
+      if (isBackgroundItem(item)) background.push(item);
+      else events.push(item);
+    }
+    return {
+      cityLabel: seg.cityLabel,
+      background,
+      events,
+      overlappingIds: findOverlappingItemIds(events),
+    };
+  });
+  const hasItems = partitionedSegments.some(
+    (s) => s.background.length > 0 || s.events.length > 0,
+  );
   const multiCity = bucket.segments.length > 1;
 
   return (
@@ -375,7 +411,7 @@ function DayContent({
           </div>
         ) : (
           <>
-            {bucket.segments.map((seg, segIdx) => (
+            {partitionedSegments.map((seg, segIdx) => (
               <div key={segIdx}>
                 {multiCity && (
                   <div className="mt-4 mb-1 flex items-center gap-2 first:mt-2">
@@ -385,19 +421,27 @@ function DayContent({
                     <span className="border-border/30 flex-1 border-t" />
                   </div>
                 )}
-                {seg.items.length > 0 && (
+                {seg.background.length > 0 && (
+                  <DayBackgroundStrip
+                    items={seg.background}
+                    bucketDate={bucket.date}
+                    onSelect={onSelect}
+                  />
+                )}
+                {seg.events.length > 0 && (
                   <motion.ol
                     initial="hidden"
                     animate="show"
                     variants={stagger(0, 0.05)}
                     className={multiCity ? undefined : 'mt-2'}
                   >
-                    {seg.items.map((item, idx) => (
+                    {seg.events.map((item, idx) => (
                       <TimelineItem
                         key={item.id}
                         item={item}
-                        isLast={idx === seg.items.length - 1}
+                        isLast={idx === seg.events.length - 1}
                         isCurrent={item.id === currentItemId}
+                        isOverlapping={seg.overlappingIds.has(item.id)}
                         bucketDate={bucket.date}
                         onSelect={() => onSelect(item)}
                       />

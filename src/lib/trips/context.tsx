@@ -18,6 +18,9 @@ import type {
   Trip,
   TripDraft,
   TripItem,
+  TripMember,
+  TripMemberDraft,
+  TripMemberPatch,
 } from './types';
 import { DEMO_TRIP_PROTECTED_ERROR, isDemoTrip } from './demoTrips';
 
@@ -46,6 +49,14 @@ interface TripsState {
   removeFoodPlace: (tripId: string, id: string) => Promise<void>;
   upsertCityOverride: (draft: CityOverrideDraft) => Promise<void>;
   removeCityOverride: (tripId: string, id: string) => Promise<void>;
+
+  addMember: (tripId: string, draft: TripMemberDraft) => Promise<TripMember>;
+  updateMember: (
+    tripId: string,
+    memberId: string,
+    patch: TripMemberPatch,
+  ) => Promise<void>;
+  removeMember: (tripId: string, memberId: string) => Promise<void>;
 }
 
 const TripsContext = createContext<TripsState | null>(null);
@@ -110,7 +121,12 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   );
 
   const createTrip = useCallback(async (draft: TripDraft): Promise<Trip> => {
-    const optimistic: Trip = { ...draft, id: tempId('trip'), items: [] };
+    const optimistic: Trip = {
+      ...draft,
+      id: tempId('trip'),
+      items: [],
+      members: [],
+    };
     setTrips((prev) => [...prev, optimistic]);
 
     try {
@@ -385,6 +401,125 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
     [loadTripExtras],
   );
 
+  const addMember = useCallback(
+    async (tripId: string, draft: TripMemberDraft): Promise<TripMember> => {
+      const created = await callApi<TripMember>(
+        `/api/trips/${tripId}/members`,
+        {
+          method: 'POST',
+          body: JSON.stringify(draft),
+        },
+      );
+      if (!created) throw new Error('Member not returned');
+      setTrips((prev) =>
+        prev.map((t) =>
+          t.id === tripId ? { ...t, members: [...t.members, created] } : t,
+        ),
+      );
+      return created;
+    },
+    [],
+  );
+
+  const updateMember = useCallback(
+    async (
+      tripId: string,
+      memberId: string,
+      patch: TripMemberPatch,
+    ): Promise<void> => {
+      let snapshot: TripMember | undefined;
+      setTrips((prev) =>
+        prev.map((t) =>
+          t.id === tripId
+            ? {
+                ...t,
+                members: t.members.map((m) => {
+                  if (m.id !== memberId) return m;
+                  snapshot = m;
+                  return patch.displayName !== undefined
+                    ? { ...m, displayName: patch.displayName }
+                    : m;
+                }),
+              }
+            : t,
+        ),
+      );
+      try {
+        const updated = await callApi<TripMember>(
+          `/api/trips/${tripId}/members/${memberId}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify(patch),
+          },
+        );
+        if (updated) {
+          setTrips((prev) =>
+            prev.map((t) =>
+              t.id === tripId
+                ? {
+                    ...t,
+                    members: t.members.map((m) =>
+                      m.id === memberId ? updated : m,
+                    ),
+                  }
+                : t,
+            ),
+          );
+        }
+      } catch (err) {
+        if (snapshot) {
+          const restored = snapshot;
+          setTrips((prev) =>
+            prev.map((t) =>
+              t.id === tripId
+                ? {
+                    ...t,
+                    members: t.members.map((m) =>
+                      m.id === memberId ? restored : m,
+                    ),
+                  }
+                : t,
+            ),
+          );
+        }
+        throw err;
+      }
+    },
+    [],
+  );
+
+  const removeMember = useCallback(
+    async (tripId: string, memberId: string): Promise<void> => {
+      let snapshot: TripMember | undefined;
+      setTrips((prev) =>
+        prev.map((t) => {
+          if (t.id !== tripId) return t;
+          snapshot = t.members.find((m) => m.id === memberId);
+          return {
+            ...t,
+            members: t.members.filter((m) => m.id !== memberId),
+          };
+        }),
+      );
+      try {
+        await callApi<null>(`/api/trips/${tripId}/members/${memberId}`, {
+          method: 'DELETE',
+        });
+      } catch (err) {
+        if (snapshot) {
+          const restored = snapshot;
+          setTrips((prev) =>
+            prev.map((t) =>
+              t.id === tripId ? { ...t, members: [...t.members, restored] } : t,
+            ),
+          );
+        }
+        throw err;
+      }
+    },
+    [],
+  );
+
   const removeItem = useCallback(
     async (tripId: string, itemId: string): Promise<void> => {
       let snapshot: TripItem | undefined;
@@ -433,6 +568,9 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       removeFoodPlace,
       upsertCityOverride,
       removeCityOverride,
+      addMember,
+      updateMember,
+      removeMember,
     }),
     [
       trips,
@@ -451,6 +589,9 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       removeFoodPlace,
       upsertCityOverride,
       removeCityOverride,
+      addMember,
+      updateMember,
+      removeMember,
     ],
   );
 

@@ -29,12 +29,13 @@ const MAX_RECENT = 5;
 export function MobileMenu({ open, onOpenChange, pathname }: MobileMenuProps) {
   const { user, loading, signOut } = useAuth();
   const tripsCtx = useTripsOptional();
-  const trips = tripsCtx?.trips ?? [];
+  const tripsList = tripsCtx?.trips;
   const [pending, setPending] = useState(false);
   const isPermanent = !!user && !user.isAnonymous;
   const nextParam = encodeURIComponent(pathname || '/trips');
 
   const recentTrips = useMemo<Trip[]>(() => {
+    const trips = tripsList ?? [];
     const now = new Date();
     const sorted = [...trips].sort((a, b) => {
       const aOngoing = isOngoing(a.startDate, a.endDate, now);
@@ -51,7 +52,7 @@ export function MobileMenu({ open, onOpenChange, pathname }: MobileMenuProps) {
       return bStart - aStart;
     });
     return sorted.slice(0, MAX_RECENT);
-  }, [trips]);
+  }, [tripsList]);
 
   const close = (): void => onOpenChange(false);
 

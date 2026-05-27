@@ -14,6 +14,7 @@ interface TimelineItemProps {
   item: TripItem;
   isLast?: boolean;
   isCurrent?: boolean;
+  isOverlapping?: boolean;
   bucketDate?: Date;
   onSelect?: () => void;
 }
@@ -28,6 +29,7 @@ export function TimelineItem({
   item,
   isLast,
   isCurrent,
+  isOverlapping,
   bucketDate,
   onSelect,
 }: TimelineItemProps) {
@@ -124,6 +126,11 @@ export function TimelineItem({
                   <Badge variant="primary" className="gap-1">
                     <span className="bg-primary size-1.5 animate-pulse rounded-full" />
                     Now
+                  </Badge>
+                )}
+                {isOverlapping && !isCurrent && (
+                  <Badge variant="muted" className="text-[10px]">
+                    overlaps
                   </Badge>
                 )}
                 {item.expense && (

@@ -37,6 +37,16 @@ export interface TripItem {
   expense?: Money;
 }
 
+export interface TripMember {
+  id: string;
+  tripId: string;
+  userId?: string;
+  displayName: string;
+  email?: string;
+  avatarUrl?: string;
+  invitedBy?: string;
+}
+
 export interface Trip {
   id: string;
   title: string;
@@ -45,12 +55,22 @@ export interface Trip {
   coverGradient: string;
   startDate: string;
   endDate: string;
-  travelers: string[];
+  ownerId?: string;
+  members: TripMember[];
   items: TripItem[];
 }
 
 export type ItemDraft = Omit<TripItem, 'id' | 'tripId'>;
-export type TripDraft = Omit<Trip, 'id' | 'items'>;
+export type TripDraft = Omit<Trip, 'id' | 'items' | 'members' | 'ownerId'>;
+
+export interface TripMemberDraft {
+  email?: string;
+  displayName?: string;
+}
+
+export interface TripMemberPatch {
+  displayName?: string;
+}
 
 export interface ItemPatch {
   kind?: ItemKind;

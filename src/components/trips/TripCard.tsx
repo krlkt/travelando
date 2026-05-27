@@ -168,18 +168,27 @@ export function TripCard({ trip, highlight }: TripCardProps) {
                 : 'Past trip'}
             </span>
             <div className="flex -space-x-1.5">
-              {trip.travelers.slice(0, 3).map((t) => (
+              {trip.members.slice(0, 3).map((m) => (
                 <span
-                  key={t}
-                  className="border-card bg-secondary text-secondary-foreground grid size-6 place-items-center rounded-full border-2 text-[10px] font-medium uppercase"
-                  title={t}
+                  key={m.id}
+                  className="border-card bg-secondary text-secondary-foreground grid size-6 place-items-center overflow-hidden rounded-full border-2 text-[10px] font-medium uppercase"
+                  title={m.displayName}
                 >
-                  {t.slice(0, 1)}
+                  {m.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={m.avatarUrl}
+                      alt=""
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    m.displayName.slice(0, 1)
+                  )}
                 </span>
               ))}
-              {trip.travelers.length > 3 && (
+              {trip.members.length > 3 && (
                 <span className="border-card bg-muted text-muted-foreground grid size-6 place-items-center rounded-full border-2 text-[10px] font-medium">
-                  +{trip.travelers.length - 3}
+                  +{trip.members.length - 3}
                 </span>
               )}
             </div>

@@ -8,6 +8,9 @@ import type {
   Trip,
   TripDraft,
   TripItem,
+  TripMember,
+  TripMemberDraft,
+  TripMemberPatch,
 } from './types';
 
 export interface TripsRepository {
@@ -35,4 +38,13 @@ export interface TripsRepository {
   listCityOverrides(tripId: string): Promise<CityOverride[]>;
   upsertCityOverride(draft: CityOverrideDraft): Promise<CityOverride>;
   removeCityOverride(id: string): Promise<void>;
+
+  listMembers(tripId: string): Promise<TripMember[]>;
+  addMember(tripId: string, draft: TripMemberDraft): Promise<TripMember>;
+  updateMember(
+    tripId: string,
+    memberId: string,
+    patch: TripMemberPatch,
+  ): Promise<TripMember>;
+  removeMember(tripId: string, memberId: string): Promise<void>;
 }
