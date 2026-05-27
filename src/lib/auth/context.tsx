@@ -140,11 +140,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 
   const signOut = useCallback(async () => {
-    const res = await fetch('/auth/signout', { method: 'POST' });
-    if (!res.ok) {
+    try {
+      await fetch('/auth/signout', { method: 'POST' });
+    } finally {
       await client.auth.signOut();
+      router.refresh();
     }
-    router.refresh();
   }, [client, router]);
 
   const resetPassword = useCallback(

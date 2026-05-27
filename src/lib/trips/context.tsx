@@ -8,7 +8,17 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import type { ItemDraft, Trip, TripDraft, TripItem } from './types';
+import type {
+  CityOverride,
+  CityOverrideDraft,
+  FoodPlace,
+  FoodPlaceDraft,
+  ItemDraft,
+  ItemPatch,
+  Trip,
+  TripDraft,
+  TripItem,
+} from './types';
 import { DEMO_TRIP_PROTECTED_ERROR, isDemoTrip } from './demoTrips';
 
 interface TripsState {
@@ -21,15 +31,42 @@ interface TripsState {
   updateItem: (
     tripId: string,
     itemId: string,
-    patch: Partial<ItemDraft>,
+    patch: ItemPatch,
   ) => Promise<void>;
   removeItem: (tripId: string, itemId: string) => Promise<void>;
+
+  foodPlaces: Record<string, FoodPlace[]>;
+  cityOverrides: Record<string, CityOverride[]>;
+  loadTripExtras: (tripId: string) => Promise<void>;
+  addFoodPlace: (draft: FoodPlaceDraft) => Promise<FoodPlace>;
+  updateFoodPlace: (
+    id: string,
+    patch: Partial<FoodPlaceDraft>,
+  ) => Promise<void>;
+  removeFoodPlace: (tripId: string, id: string) => Promise<void>;
+  upsertCityOverride: (draft: CityOverrideDraft) => Promise<void>;
+  removeCityOverride: (tripId: string, id: string) => Promise<void>;
 }
 
 const TripsContext = createContext<TripsState | null>(null);
 
 const tempId = (prefix: string): string =>
   `${prefix}-tmp-${Math.random().toString(36).slice(2, 9)}`;
+
+function applyItemPatch(item: TripItem, patch: ItemPatch): TripItem {
+  const next: TripItem = { ...item };
+  if (patch.kind !== undefined) next.kind = patch.kind;
+  if (patch.title !== undefined) next.title = patch.title;
+  if (patch.startsAt !== undefined) next.startsAt = patch.startsAt;
+  if (patch.endsAt !== undefined) next.endsAt = patch.endsAt ?? undefined;
+  if (patch.from !== undefined) next.from = patch.from ?? undefined;
+  if (patch.to !== undefined) next.to = patch.to ?? undefined;
+  if (patch.transportMode !== undefined)
+    next.transportMode = patch.transportMode ?? undefined;
+  if (patch.notes !== undefined) next.notes = patch.notes ?? undefined;
+  if (patch.expense !== undefined) next.expense = patch.expense ?? undefined;
+  return next;
+}
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -62,6 +99,10 @@ interface TripsProviderProps {
 
 export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   const [trips, setTrips] = useState<Trip[]>(initialTrips);
+  const [foodPlaces, setFoodPlaces] = useState<Record<string, FoodPlace[]>>({});
+  const [cityOverrides, setCityOverrides] = useState<
+    Record<string, CityOverride[]>
+  >({});
 
   const getTrip = useCallback(
     (id: string) => trips.find((t) => t.id === id),
@@ -183,11 +224,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   );
 
   const updateItem = useCallback(
-    async (
-      tripId: string,
-      itemId: string,
-      patch: Partial<ItemDraft>,
-    ): Promise<void> => {
+    async (tripId: string, itemId: string, patch: ItemPatch): Promise<void> => {
       let snapshot: TripItem | undefined;
       setTrips((prev) =>
         prev.map((t) =>
@@ -197,7 +234,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
                 items: t.items.map((i) => {
                   if (i.id !== itemId) return i;
                   snapshot = i;
-                  return { ...i, ...patch };
+                  return applyItemPatch(i, patch);
                 }),
               }
             : t,
@@ -244,6 +281,110 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
     [],
   );
 
+  const loadTripExtras = useCallback(async (tripId: string): Promise<void> => {
+    const [fp, co] = await Promise.all([
+      callApi<FoodPlace[]>(`/api/trips/${tripId}/food-places`),
+      callApi<CityOverride[]>(`/api/trips/${tripId}/city-overrides`),
+    ]);
+    setFoodPlaces((prev) => ({ ...prev, [tripId]: fp ?? [] }));
+    setCityOverrides((prev) => ({ ...prev, [tripId]: co ?? [] }));
+  }, []);
+
+  const addFoodPlace = useCallback(
+    async (draft: FoodPlaceDraft): Promise<FoodPlace> => {
+      const created = await callApi<FoodPlace>(
+        `/api/trips/${draft.tripId}/food-places`,
+        {
+          method: 'POST',
+          body: JSON.stringify(draft),
+        },
+      );
+      if (!created) throw new Error('FoodPlace not returned');
+      setFoodPlaces((prev) => ({
+        ...prev,
+        [draft.tripId]: [...(prev[draft.tripId] ?? []), created],
+      }));
+      return created;
+    },
+    [],
+  );
+
+  const updateFoodPlace = useCallback(
+    async (id: string, patch: Partial<FoodPlaceDraft>): Promise<void> => {
+      const tripId =
+        patch.tripId ??
+        Object.keys(foodPlaces).find((tid) =>
+          foodPlaces[tid]?.some((p) => p.id === id),
+        );
+      if (!tripId) throw new Error(`FoodPlace ${id} not found in context`);
+      const updated = await callApi<FoodPlace>(`/api/food-places/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      });
+      if (updated) {
+        setFoodPlaces((prev) => ({
+          ...prev,
+          [tripId]: (prev[tripId] ?? []).map((p) =>
+            p.id === id ? updated : p,
+          ),
+        }));
+      }
+    },
+    [foodPlaces],
+  );
+
+  const removeFoodPlace = useCallback(
+    async (tripId: string, id: string): Promise<void> => {
+      setFoodPlaces((prev) => ({
+        ...prev,
+        [tripId]: (prev[tripId] ?? []).filter((p) => p.id !== id),
+      }));
+      try {
+        await callApi<null>(`/api/food-places/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        await loadTripExtras(tripId);
+        throw err;
+      }
+    },
+    [loadTripExtras],
+  );
+
+  const upsertCityOverride = useCallback(
+    async (draft: CityOverrideDraft): Promise<void> => {
+      const result = await callApi<CityOverride>(
+        `/api/trips/${draft.tripId}/city-overrides`,
+        {
+          method: 'POST',
+          body: JSON.stringify(draft),
+        },
+      );
+      if (result) {
+        setCityOverrides((prev) => {
+          const existing = prev[draft.tripId] ?? [];
+          const filtered = existing.filter((o) => o.dayKey !== draft.dayKey);
+          return { ...prev, [draft.tripId]: [...filtered, result] };
+        });
+      }
+    },
+    [],
+  );
+
+  const removeCityOverride = useCallback(
+    async (tripId: string, id: string): Promise<void> => {
+      setCityOverrides((prev) => ({
+        ...prev,
+        [tripId]: (prev[tripId] ?? []).filter((o) => o.id !== id),
+      }));
+      try {
+        await callApi<null>(`/api/city-overrides/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        await loadTripExtras(tripId);
+        throw err;
+      }
+    },
+    [loadTripExtras],
+  );
+
   const removeItem = useCallback(
     async (tripId: string, itemId: string): Promise<void> => {
       let snapshot: TripItem | undefined;
@@ -284,6 +425,14 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       addItem,
       updateItem,
       removeItem,
+      foodPlaces,
+      cityOverrides,
+      loadTripExtras,
+      addFoodPlace,
+      updateFoodPlace,
+      removeFoodPlace,
+      upsertCityOverride,
+      removeCityOverride,
     }),
     [
       trips,
@@ -294,6 +443,14 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       addItem,
       updateItem,
       removeItem,
+      foodPlaces,
+      cityOverrides,
+      loadTripExtras,
+      addFoodPlace,
+      updateFoodPlace,
+      removeFoodPlace,
+      upsertCityOverride,
+      removeCityOverride,
     ],
   );
 

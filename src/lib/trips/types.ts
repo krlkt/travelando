@@ -20,6 +20,7 @@ export interface Place {
   address?: string;
   lat?: number;
   lng?: number;
+  placeId?: string;
 }
 
 export interface TripItem {
@@ -50,3 +51,62 @@ export interface Trip {
 
 export type ItemDraft = Omit<TripItem, 'id' | 'tripId'>;
 export type TripDraft = Omit<Trip, 'id' | 'items'>;
+
+export interface ItemPatch {
+  kind?: ItemKind;
+  title?: string;
+  startsAt?: string;
+  endsAt?: string | null;
+  from?: Place | null;
+  to?: Place | null;
+  transportMode?: TransportMode | null;
+  notes?: string | null;
+  expense?: Money | null;
+}
+
+export type FoodPlaceCategory =
+  | 'restaurant'
+  | 'cafe'
+  | 'bar'
+  | 'food'
+  | 'drink'
+  | 'other';
+
+export interface FoodPlace {
+  id: string;
+  tripId: string;
+  cityLabel: string;
+  cityPlaceId?: string;
+  name: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+  notes?: string;
+  category?: FoodPlaceCategory;
+}
+
+export interface CityOverride {
+  id: string;
+  tripId: string;
+  dayKey: string;
+  cityLabel: string;
+  cityPlaceId?: string;
+}
+
+export interface CitySegment {
+  cityLabel: string;
+  cityPlaceId?: string;
+  startsAt?: string;
+  endsAt?: string;
+  items: TripItem[];
+}
+
+export interface DayCityBucket {
+  key: string;
+  date: Date;
+  segments: CitySegment[];
+}
+
+export type FoodPlaceDraft = Omit<FoodPlace, 'id'>;
+export type CityOverrideDraft = Omit<CityOverride, 'id'>;

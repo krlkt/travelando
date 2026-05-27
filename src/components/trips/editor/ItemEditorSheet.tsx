@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   Sheet,
@@ -21,17 +21,23 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
+import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
 import { useTrips } from '@/lib/trips/context';
 import { itemKinds, transportModes, kindMeta } from '@/lib/trips/kindMeta';
+import { latestCityBefore } from '@/lib/trips/cities';
 import type {
+  FoodPlace,
   ItemDraft,
   ItemKind,
+  ItemPatch,
+  Place,
   TransportMode,
+  Trip,
   TripItem,
 } from '@/lib/trips/types';
 
 interface ItemEditorSheetProps {
-  tripId: string;
+  trip: Trip;
   item?: TripItem | null;
   defaultDate?: Date | null;
   open: boolean;
@@ -50,26 +56,30 @@ function fromLocalInput(value: string): string {
 }
 
 export function ItemEditorSheet({
-  tripId,
+  trip,
   item,
   defaultDate,
   open,
   onOpenChange,
 }: ItemEditorSheetProps) {
-  const { addItem, updateItem } = useTrips();
+  const { addItem, updateItem, foodPlaces, cityOverrides } = useTrips();
+  const tripId = trip.id;
   const isEdit = !!item;
 
   const [kind, setKind] = useState<ItemKind>('activity');
   const [title, setTitle] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
-  const [fromLabel, setFromLabel] = useState('');
-  const [toLabel, setToLabel] = useState('');
+  const [fromValue, setFromValue] = useState('');
+  const [fromPlace, setFromPlace] = useState<Place | undefined>();
+  const [toValue, setToValue] = useState('');
+  const [toPlace, setToPlace] = useState<Place | undefined>();
   const [transportMode, setTransportMode] = useState<TransportMode>('flight');
   const [notes, setNotes] = useState('');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseCurrency, setExpenseCurrency] = useState('EUR');
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -89,8 +99,10 @@ export function ItemEditorSheet({
       setStartsAt('');
       setEndsAt('');
     }
-    setFromLabel(item?.from?.label ?? '');
-    setToLabel(item?.to?.label ?? '');
+    setFromValue(item?.from?.label ?? '');
+    setFromPlace(item?.from ?? undefined);
+    setToValue(item?.to?.label ?? '');
+    setToPlace(item?.to ?? undefined);
     setTransportMode((item?.transportMode as TransportMode) ?? 'flight');
     setNotes(item?.notes ?? '');
     setExpenseAmount(item?.expense ? String(item.expense.amount) : '');
@@ -98,7 +110,48 @@ export function ItemEditorSheet({
     setError(null);
   }, [open, item, defaultDate]);
 
-  const [saving, setSaving] = useState(false);
+  function handleKindChange(newKind: ItemKind) {
+    setKind(newKind);
+    if (newKind === 'transport' && !isEdit) {
+      const isoTs = startsAt
+        ? fromLocalInput(startsAt)
+        : new Date().toISOString();
+      const city = latestCityBefore(trip, cityOverrides[tripId] ?? [], isoTs);
+      setFromValue(city.cityLabel);
+      setFromPlace({ label: city.cityLabel, placeId: city.cityPlaceId });
+    }
+  }
+
+  const currentCity = useMemo(() => {
+    if (!startsAt) return null;
+    return latestCityBefore(
+      trip,
+      cityOverrides[tripId] ?? [],
+      fromLocalInput(startsAt),
+    );
+  }, [startsAt, cityOverrides, tripId, trip]);
+
+  const wishlistPlaces = useMemo((): FoodPlace[] => {
+    const all = foodPlaces[tripId] ?? [];
+    if (!currentCity) return all;
+    return all.filter((fp) =>
+      fp.cityPlaceId && currentCity.cityPlaceId
+        ? fp.cityPlaceId === currentCity.cityPlaceId
+        : fp.cityLabel === currentCity.cityLabel,
+    );
+  }, [foodPlaces, tripId, currentCity]);
+
+  function handleWishlistSelect(fp: FoodPlace) {
+    setTitle(fp.name);
+    setToValue(fp.address ?? fp.name);
+    setToPlace({
+      label: fp.name,
+      address: fp.address,
+      lat: fp.lat,
+      lng: fp.lng,
+      placeId: fp.placeId,
+    });
+  }
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -114,30 +167,46 @@ export function ItemEditorSheet({
       return;
     }
 
-    const draft: ItemDraft = {
-      kind,
-      title: title.trim(),
-      startsAt: fromLocalInput(startsAt),
-      endsAt: endsAt ? fromLocalInput(endsAt) : undefined,
-      from: fromLabel.trim() ? { label: fromLabel.trim() } : undefined,
-      to: toLabel.trim() ? { label: toLabel.trim() } : undefined,
-      transportMode: kind === 'transport' ? transportMode : undefined,
-      notes: notes.trim() || undefined,
-      expense:
-        expenseAmount && !Number.isNaN(Number(expenseAmount))
-          ? {
-              amount: Number(expenseAmount),
-              currency: expenseCurrency.toUpperCase(),
-            }
-          : undefined,
-    };
+    const resolvedFrom: Place | undefined =
+      fromPlace ?? (fromValue.trim() ? { label: fromValue.trim() } : undefined);
+    const resolvedTo: Place | undefined =
+      toPlace ?? (toValue.trim() ? { label: toValue.trim() } : undefined);
+    const resolvedExpense =
+      expenseAmount && !Number.isNaN(Number(expenseAmount))
+        ? {
+            amount: Number(expenseAmount),
+            currency: expenseCurrency.toUpperCase(),
+          }
+        : undefined;
 
     setSaving(true);
     try {
       if (isEdit && item) {
-        await updateItem(tripId, item.id, draft);
+        const patch: ItemPatch = {
+          kind,
+          title: title.trim(),
+          startsAt: fromLocalInput(startsAt),
+          endsAt: endsAt ? fromLocalInput(endsAt) : null,
+          from: resolvedFrom ?? null,
+          to: resolvedTo ?? null,
+          transportMode: kind === 'transport' ? transportMode : null,
+          notes: notes.trim() || null,
+          expense: resolvedExpense ?? null,
+        };
+        await updateItem(tripId, item.id, patch);
         toast.success('Item updated');
       } else {
+        const draft: ItemDraft = {
+          kind,
+          title: title.trim(),
+          startsAt: fromLocalInput(startsAt),
+          endsAt: endsAt ? fromLocalInput(endsAt) : undefined,
+          from: resolvedFrom,
+          to: resolvedTo,
+          transportMode: kind === 'transport' ? transportMode : undefined,
+          notes: notes.trim() || undefined,
+          expense: resolvedExpense,
+        };
         await addItem(tripId, draft);
         toast.success('Item added');
       }
@@ -173,7 +242,7 @@ export function ItemEditorSheet({
                   <button
                     type="button"
                     key={k}
-                    onClick={() => setKind(k)}
+                    onClick={() => handleKindChange(k)}
                     aria-pressed={active}
                     className={`flex flex-col items-center gap-1 rounded-[var(--radius)] border px-2 py-2.5 text-[11px] transition ${
                       active
@@ -204,6 +273,33 @@ export function ItemEditorSheet({
               autoFocus
             />
           </div>
+
+          {kind === 'meal' && wishlistPlaces.length > 0 && (
+            <div className="grid gap-1.5">
+              <Label className="text-muted-foreground text-xs">
+                {currentCity
+                  ? `Wishlist · ${currentCity.cityLabel}`
+                  : 'Wishlist'}
+              </Label>
+              <div className="border-border/60 bg-background/40 flex max-h-36 flex-col gap-0.5 overflow-y-auto rounded-md border p-1">
+                {wishlistPlaces.map((fp) => (
+                  <button
+                    key={fp.id}
+                    type="button"
+                    onClick={() => handleWishlistSelect(fp)}
+                    className="flex flex-col rounded px-2 py-1.5 text-left hover:bg-white/5 focus:bg-white/5 focus:outline-none"
+                  >
+                    <span className="text-sm font-medium">{fp.name}</span>
+                    {fp.address && (
+                      <span className="text-muted-foreground text-xs">
+                        {fp.address}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid min-w-0 gap-1.5">
@@ -252,24 +348,34 @@ export function ItemEditorSheet({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="item-from">From</Label>
-              <Input
-                id="item-from"
-                value={fromLabel}
-                onChange={(e) => setFromLabel(e.target.value)}
+              <Label>From</Label>
+              <PlaceAutocomplete
+                value={fromValue}
+                onChange={(v) => {
+                  setFromValue(v);
+                  setFromPlace(undefined);
+                }}
+                onSelect={(place) => {
+                  setFromValue(place.label);
+                  setFromPlace(place);
+                }}
                 placeholder={
                   kind === 'transport' ? 'AMS Schiphol' : '(optional)'
                 }
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="item-to">
-                {kind === 'transport' ? 'To' : 'Place'}
-              </Label>
-              <Input
-                id="item-to"
-                value={toLabel}
-                onChange={(e) => setToLabel(e.target.value)}
+              <Label>{kind === 'transport' ? 'To' : 'Place'}</Label>
+              <PlaceAutocomplete
+                value={toValue}
+                onChange={(v) => {
+                  setToValue(v);
+                  setToPlace(undefined);
+                }}
+                onSelect={(place) => {
+                  setToValue(place.label);
+                  setToPlace(place);
+                }}
                 placeholder={
                   kind === 'transport' ? 'LIS Lisbon' : 'Cervejaria Ramiro'
                 }

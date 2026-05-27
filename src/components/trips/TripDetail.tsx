@@ -1,20 +1,23 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, Plus, Radio, Share2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Plus, Radio, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TimelineItem } from './TimelineItem';
 import { ItemDetailSheet } from './ItemDetailSheet';
 import { ExpensesPanel } from './ExpensesPanel';
+import { FoodWishlist } from './FoodWishlist';
+import { CityOverrideSheet } from './CityOverrideSheet';
 import { ItemEditorSheet } from './editor/ItemEditorSheet';
 import { TripEditorSheet } from './editor/TripEditorSheet';
 import { useTrips } from '@/lib/trips/context';
-import { groupItemsByDay, findCurrentItem } from '@/lib/trips/grouping';
+import { findCurrentItem } from '@/lib/trips/grouping';
+import { cityForDay, deriveCitiesByDay } from '@/lib/trips/cities';
 import {
   formatDateRange,
   formatDate,
@@ -22,29 +25,41 @@ import {
   isOngoing,
 } from '@/lib/time/formatDate';
 import { fadeUp, stagger } from '@/lib/motion/presets';
-import type { TripItem } from '@/lib/trips/types';
+import type { CityOverride, DayCityBucket, TripItem } from '@/lib/trips/types';
 
 interface TripDetailProps {
   tripId: string;
 }
 
 export function TripDetail({ tripId }: TripDetailProps) {
-  const { getTrip } = useTrips();
+  const { getTrip, loadTripExtras, cityOverrides } = useTrips();
   const trip = getTrip(tripId);
+
+  useEffect(() => {
+    loadTripExtras(tripId);
+  }, [tripId, loadTripExtras]);
   if (!trip) notFound();
 
   const now = new Date();
-  const days = useMemo(() => groupItemsByDay(trip), [trip]);
   const ongoing = isOngoing(trip.startDate, trip.endDate, now);
   const current = ongoing ? findCurrentItem(trip.items, now) : null;
 
+  const dayCityBuckets = useMemo(() => {
+    const map = deriveCitiesByDay(trip, cityOverrides[tripId] ?? []);
+    return [...map.values()].sort(
+      (a, b) => a.date.getTime() - b.date.getTime(),
+    );
+  }, [trip, cityOverrides, tripId]);
+
   const defaultDay = useMemo(() => {
     if (current) {
-      const found = days.find((d) => d.items.some((i) => i.id === current.id));
+      const found = dayCityBuckets.find((b) =>
+        b.segments.some((s) => s.items.some((i) => i.id === current.id)),
+      );
       if (found) return found.key;
     }
-    return days[0]?.key ?? '';
-  }, [days, current]);
+    return dayCityBuckets[0]?.key ?? '';
+  }, [dayCityBuckets, current]);
 
   const [activeDay, setActiveDay] = useState(defaultDay);
   const [selectedItem, setSelectedItem] = useState<TripItem | null>(null);
@@ -52,6 +67,18 @@ export function TripDetail({ tripId }: TripDetailProps) {
   const [tripEditorOpen, setTripEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<TripItem | null>(null);
   const [defaultDayDate, setDefaultDayDate] = useState<Date | null>(null);
+  const [cityOverrideOpen, setCityOverrideOpen] = useState(false);
+
+  const activeBucket =
+    dayCityBuckets.find((b) => b.key === activeDay) ?? dayCityBuckets[0];
+  const activeBucketIdx = activeBucket
+    ? dayCityBuckets.indexOf(activeBucket)
+    : 0;
+  const activeCityLabel =
+    activeBucket?.segments[0]?.cityLabel ?? trip.destination;
+  const existingOverride: CityOverride | undefined = (
+    cityOverrides[tripId] ?? []
+  ).find((o) => o.dayKey === activeDay);
 
   const totalDays = tripDayCount(trip.startDate, trip.endDate);
 
@@ -157,34 +184,57 @@ export function TripDetail({ tripId }: TripDetailProps) {
               <div className="bg-background/85 border-border/40 lg:backdrop-blur-0 sticky top-0 z-20 -mx-4 -mt-4 mb-2 border-b px-4 pt-3 pb-3 backdrop-blur-xl sm:-mx-6 sm:px-6 md:top-16 md:-mx-10 md:-mt-6 md:px-10 lg:relative lg:top-auto lg:mx-0 lg:mt-0 lg:border-b-0 lg:bg-transparent lg:px-0 lg:pt-0">
                 <div className="no-scrollbar -mx-1 overflow-x-auto px-1">
                   <TabsList className="w-max min-w-full justify-start">
-                    {days.map((day, idx) => (
-                      <TabsTrigger
-                        key={day.key}
-                        value={day.key}
-                        className="shrink-0"
-                      >
-                        <span className="text-muted-foreground/80 mr-2 text-[10px] tracking-[0.14em] uppercase">
-                          Day {idx + 1}
-                        </span>
-                        {formatDate(day.date.toISOString())}
-                        {day.items.length > 0 && (
-                          <Badge
-                            variant="muted"
-                            className="ml-2 hidden sm:inline-flex"
-                          >
-                            {day.items.length}
-                          </Badge>
-                        )}
-                      </TabsTrigger>
-                    ))}
+                    {dayCityBuckets.map((bucket, idx) => {
+                      const itemCount = bucket.segments.reduce(
+                        (sum, s) => sum + s.items.length,
+                        0,
+                      );
+                      return (
+                        <TabsTrigger
+                          key={bucket.key}
+                          value={bucket.key}
+                          className="shrink-0"
+                        >
+                          <span className="text-muted-foreground/80 mr-2 text-[10px] tracking-[0.14em] uppercase">
+                            Day {idx + 1}
+                          </span>
+                          {formatDate(bucket.date.toISOString())}
+                          {itemCount > 0 && (
+                            <Badge
+                              variant="muted"
+                              className="ml-2 hidden sm:inline-flex"
+                            >
+                              {itemCount}
+                            </Badge>
+                          )}
+                        </TabsTrigger>
+                      );
+                    })}
                   </TabsList>
                 </div>
               </div>
 
-              {days.map((day) => (
-                <TabsContent key={day.key} value={day.key}>
+              {/* City indicator for active day */}
+              {activeBucket && (
+                <div className="mb-2 flex items-center gap-1.5">
+                  <MapPin className="text-muted-foreground/60 size-3" />
+                  <span className="text-muted-foreground text-xs">
+                    {activeCityLabel}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCityOverrideOpen(true)}
+                    className="text-muted-foreground/50 hover:text-muted-foreground text-[10px] underline-offset-2 hover:underline"
+                  >
+                    change
+                  </button>
+                </div>
+              )}
+
+              {dayCityBuckets.map((bucket) => (
+                <TabsContent key={bucket.key} value={bucket.key}>
                   <DayContent
-                    bucket={day}
+                    bucket={bucket}
                     currentItemId={current?.id ?? null}
                     onSelect={(item) => setSelectedItem(item)}
                     onAdd={(dayDate) => {
@@ -201,6 +251,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
           {/* Aside */}
           <aside className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
             <ExpensesPanel trip={trip} />
+            <FoodWishlist trip={trip} />
             <Button
               variant="outline"
               className="w-full"
@@ -226,7 +277,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
       />
 
       <ItemEditorSheet
-        tripId={trip.id}
+        trip={trip}
         item={editingItem}
         defaultDate={editingItem ? null : defaultDayDate}
         open={itemEditorOpen}
@@ -244,6 +295,18 @@ export function TripDetail({ tripId }: TripDetailProps) {
         open={tripEditorOpen}
         onOpenChange={setTripEditorOpen}
       />
+
+      {activeBucket && (
+        <CityOverrideSheet
+          tripId={tripId}
+          dayKey={activeDay}
+          dayLabel={`Day ${activeBucketIdx + 1} · ${formatDate(activeBucket.date.toISOString())}`}
+          currentCity={activeCityLabel}
+          existing={existingOverride}
+          open={cityOverrideOpen}
+          onOpenChange={setCityOverrideOpen}
+        />
+      )}
     </div>
   );
 }
@@ -254,11 +317,14 @@ function DayContent({
   onSelect,
   onAdd,
 }: {
-  bucket: ReturnType<typeof groupItemsByDay>[number];
+  bucket: DayCityBucket;
   currentItemId: string | null;
   onSelect: (item: TripItem) => void;
   onAdd: (dayDate: Date) => void;
 }) {
+  const hasItems = bucket.segments.some((s) => s.items.length > 0);
+  const multiCity = bucket.segments.length > 1;
+
   return (
     <AnimatePresence mode="wait">
       <motion.div
@@ -269,7 +335,7 @@ function DayContent({
         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
         className="pt-4"
       >
-        {bucket.items.length === 0 ? (
+        {!hasItems ? (
           <div className="border-border/70 bg-secondary/20 grid place-items-center rounded-[var(--radius-lg)] border border-dashed px-6 py-16 text-center">
             <p className="text-muted-foreground max-w-sm text-sm">
               Nothing planned for this day. Add a flight, a meal, a museum —
@@ -287,22 +353,36 @@ function DayContent({
           </div>
         ) : (
           <>
-            <motion.ol
-              initial="hidden"
-              animate="show"
-              variants={stagger(0, 0.05)}
-              className="mt-2"
-            >
-              {bucket.items.map((item, idx) => (
-                <TimelineItem
-                  key={item.id}
-                  item={item}
-                  isLast={idx === bucket.items.length - 1}
-                  isCurrent={item.id === currentItemId}
-                  onSelect={() => onSelect(item)}
-                />
-              ))}
-            </motion.ol>
+            {bucket.segments.map((seg, segIdx) => (
+              <div key={segIdx}>
+                {multiCity && (
+                  <div className="mt-4 mb-1 flex items-center gap-2 first:mt-2">
+                    <span className="text-muted-foreground/60 text-[10px] tracking-[0.14em] uppercase">
+                      {seg.cityLabel}
+                    </span>
+                    <span className="border-border/30 flex-1 border-t" />
+                  </div>
+                )}
+                {seg.items.length > 0 && (
+                  <motion.ol
+                    initial="hidden"
+                    animate="show"
+                    variants={stagger(0, 0.05)}
+                    className={multiCity ? undefined : 'mt-2'}
+                  >
+                    {seg.items.map((item, idx) => (
+                      <TimelineItem
+                        key={item.id}
+                        item={item}
+                        isLast={idx === seg.items.length - 1}
+                        isCurrent={item.id === currentItemId}
+                        onSelect={() => onSelect(item)}
+                      />
+                    ))}
+                  </motion.ol>
+                )}
+              </div>
+            ))}
             <div className="ml-[3.75rem] sm:ml-[4.5rem]">
               <Button
                 variant="ghost"

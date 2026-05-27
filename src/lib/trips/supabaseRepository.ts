@@ -1,16 +1,33 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  cityOverrideDraftToInsert,
+  foodPlaceDraftToInsert,
+  foodPlacePatchToUpdate,
   itemDraftToInsert,
   itemPatchToUpdate,
+  rowToCityOverride,
+  rowToFoodPlace,
   rowToItem,
   rowToTrip,
   tripDraftToInsert,
   tripPatchToUpdate,
+  type CityOverrideRow,
+  type FoodPlaceRow,
   type TripItemRow,
   type TripRow,
 } from './mappers';
 import type { TripsRepository } from './repository';
-import type { ItemDraft, Trip, TripDraft, TripItem } from './types';
+import type {
+  CityOverride,
+  CityOverrideDraft,
+  FoodPlace,
+  FoodPlaceDraft,
+  ItemDraft,
+  ItemPatch,
+  Trip,
+  TripDraft,
+  TripItem,
+} from './types';
 import {
   DEMO_TRIP_PROTECTED_ERROR,
   getDemoTrip,
@@ -128,7 +145,7 @@ export function createSupabaseRepository(
     async updateItem(
       tripId: string,
       itemId: string,
-      patch: Partial<ItemDraft>,
+      patch: ItemPatch,
     ): Promise<TripItem> {
       if (isDemoTrip(tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
       const update = itemPatchToUpdate(patch);
@@ -155,6 +172,85 @@ export function createSupabaseRepository(
         .eq('id', itemId)
         .eq('trip_id', tripId);
       if (error) throw new Error(`remove item ${itemId}: ${error.message}`);
+    },
+
+    async listFoodPlaces(tripId: string): Promise<FoodPlace[]> {
+      const { data, error } = await client
+        .from('food_places')
+        .select('*')
+        .eq('trip_id', tripId)
+        .order('created_at', { ascending: true });
+      if (error) throw new Error(`listFoodPlaces: ${error.message}`);
+      return (data ?? []).map((r) => rowToFoodPlace(r as FoodPlaceRow));
+    },
+
+    async addFoodPlace(draft: FoodPlaceDraft): Promise<FoodPlace> {
+      if (isDemoTrip(draft.tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
+      const insert = foodPlaceDraftToInsert(draft);
+      const { data, error } = await client
+        .from('food_places')
+        .insert(insert)
+        .select('*')
+        .single();
+      const row = unwrap(data as FoodPlaceRow | null, error, 'addFoodPlace');
+      return rowToFoodPlace(row);
+    },
+
+    async updateFoodPlace(
+      id: string,
+      patch: Partial<FoodPlaceDraft>,
+    ): Promise<FoodPlace> {
+      const update = foodPlacePatchToUpdate(patch);
+      const { data, error } = await client
+        .from('food_places')
+        .update(update)
+        .eq('id', id)
+        .select('*')
+        .single();
+      const row = unwrap(
+        data as FoodPlaceRow | null,
+        error,
+        `updateFoodPlace ${id}`,
+      );
+      return rowToFoodPlace(row);
+    },
+
+    async removeFoodPlace(id: string): Promise<void> {
+      const { error } = await client.from('food_places').delete().eq('id', id);
+      if (error) throw new Error(`removeFoodPlace ${id}: ${error.message}`);
+    },
+
+    async listCityOverrides(tripId: string): Promise<CityOverride[]> {
+      const { data, error } = await client
+        .from('city_overrides')
+        .select('*')
+        .eq('trip_id', tripId);
+      if (error) throw new Error(`listCityOverrides: ${error.message}`);
+      return (data ?? []).map((r) => rowToCityOverride(r as CityOverrideRow));
+    },
+
+    async upsertCityOverride(draft: CityOverrideDraft): Promise<CityOverride> {
+      if (isDemoTrip(draft.tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
+      const insert = cityOverrideDraftToInsert(draft);
+      const { data, error } = await client
+        .from('city_overrides')
+        .upsert(insert, { onConflict: 'trip_id,day_key' })
+        .select('*')
+        .single();
+      const row = unwrap(
+        data as CityOverrideRow | null,
+        error,
+        'upsertCityOverride',
+      );
+      return rowToCityOverride(row);
+    },
+
+    async removeCityOverride(id: string): Promise<void> {
+      const { error } = await client
+        .from('city_overrides')
+        .delete()
+        .eq('id', id);
+      if (error) throw new Error(`removeCityOverride ${id}: ${error.message}`);
     },
   };
 }

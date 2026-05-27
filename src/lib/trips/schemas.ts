@@ -5,6 +5,7 @@ const placeSchema = z.object({
   address: z.string().optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
+  placeId: z.string().optional(),
 });
 
 const moneySchema = z.object({
@@ -55,4 +56,45 @@ export const itemDraftSchema = z.object({
   expense: moneySchema.optional(),
 });
 
-export const itemPatchSchema = itemDraftSchema.partial();
+export const itemPatchSchema = z.object({
+  kind: itemKindSchema.optional(),
+  title: z.string().min(1).optional(),
+  startsAt: z.string().min(1).optional(),
+  endsAt: z.string().nullish(),
+  from: placeSchema.nullish(),
+  to: placeSchema.nullish(),
+  transportMode: transportModeSchema.nullish(),
+  notes: z.string().nullish(),
+  expense: moneySchema.nullish(),
+});
+
+export const foodPlaceCategorySchema = z.enum([
+  'restaurant',
+  'cafe',
+  'bar',
+  'food',
+  'drink',
+  'other',
+]);
+
+export const foodPlaceDraftSchema = z.object({
+  tripId: z.string().min(1),
+  cityLabel: z.string().min(1),
+  cityPlaceId: z.string().optional(),
+  name: z.string().min(1),
+  address: z.string().optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  placeId: z.string().optional(),
+  notes: z.string().optional(),
+  category: foodPlaceCategorySchema.optional(),
+});
+
+export const foodPlacePatchSchema = foodPlaceDraftSchema.partial();
+
+export const cityOverrideDraftSchema = z.object({
+  tripId: z.string().min(1),
+  dayKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  cityLabel: z.string().min(1),
+  cityPlaceId: z.string().optional(),
+});

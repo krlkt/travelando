@@ -1,4 +1,15 @@
-import type { ItemDraft, Place, Trip, TripDraft, TripItem } from './types';
+import type {
+  CityOverride,
+  CityOverrideDraft,
+  FoodPlace,
+  FoodPlaceDraft,
+  ItemDraft,
+  ItemPatch,
+  Place,
+  Trip,
+  TripDraft,
+  TripItem,
+} from './types';
 
 export interface TripRow {
   id: string;
@@ -113,8 +124,101 @@ export function itemDraftToInsert(
   };
 }
 
+export interface FoodPlaceRow {
+  id: string;
+  trip_id: string;
+  city_label: string;
+  city_place_id: string | null;
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  place_id: string | null;
+  notes: string | null;
+  category: string | null;
+}
+
+export interface CityOverrideRow {
+  id: string;
+  trip_id: string;
+  day_key: string;
+  city_label: string;
+  city_place_id: string | null;
+}
+
+export function rowToFoodPlace(row: FoodPlaceRow): FoodPlace {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    cityLabel: row.city_label,
+    cityPlaceId: row.city_place_id ?? undefined,
+    name: row.name,
+    address: row.address ?? undefined,
+    lat: row.lat ?? undefined,
+    lng: row.lng ?? undefined,
+    placeId: row.place_id ?? undefined,
+    notes: row.notes ?? undefined,
+    category: (row.category as FoodPlace['category']) ?? undefined,
+  };
+}
+
+export function foodPlaceDraftToInsert(
+  draft: FoodPlaceDraft,
+): Omit<FoodPlaceRow, 'id'> {
+  return {
+    trip_id: draft.tripId,
+    city_label: draft.cityLabel,
+    city_place_id: draft.cityPlaceId ?? null,
+    name: draft.name,
+    address: draft.address ?? null,
+    lat: draft.lat ?? null,
+    lng: draft.lng ?? null,
+    place_id: draft.placeId ?? null,
+    notes: draft.notes ?? null,
+    category: draft.category ?? null,
+  };
+}
+
+export function foodPlacePatchToUpdate(
+  patch: Partial<FoodPlaceDraft>,
+): Partial<Omit<FoodPlaceRow, 'id' | 'trip_id'>> {
+  const out: Partial<Omit<FoodPlaceRow, 'id' | 'trip_id'>> = {};
+  if (patch.cityLabel !== undefined) out.city_label = patch.cityLabel;
+  if (patch.cityPlaceId !== undefined)
+    out.city_place_id = patch.cityPlaceId ?? null;
+  if (patch.name !== undefined) out.name = patch.name;
+  if (patch.address !== undefined) out.address = patch.address ?? null;
+  if (patch.lat !== undefined) out.lat = patch.lat ?? null;
+  if (patch.lng !== undefined) out.lng = patch.lng ?? null;
+  if (patch.placeId !== undefined) out.place_id = patch.placeId ?? null;
+  if (patch.notes !== undefined) out.notes = patch.notes ?? null;
+  if (patch.category !== undefined) out.category = patch.category ?? null;
+  return out;
+}
+
+export function rowToCityOverride(row: CityOverrideRow): CityOverride {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    dayKey: row.day_key,
+    cityLabel: row.city_label,
+    cityPlaceId: row.city_place_id ?? undefined,
+  };
+}
+
+export function cityOverrideDraftToInsert(
+  draft: CityOverrideDraft,
+): Omit<CityOverrideRow, 'id'> {
+  return {
+    trip_id: draft.tripId,
+    day_key: draft.dayKey,
+    city_label: draft.cityLabel,
+    city_place_id: draft.cityPlaceId ?? null,
+  };
+}
+
 export function itemPatchToUpdate(
-  patch: Partial<ItemDraft>,
+  patch: ItemPatch,
 ): Partial<Omit<TripItemRow, 'id' | 'trip_id'>> {
   const out: Partial<Omit<TripItemRow, 'id' | 'trip_id'>> = {};
   if (patch.kind !== undefined) out.kind = patch.kind;

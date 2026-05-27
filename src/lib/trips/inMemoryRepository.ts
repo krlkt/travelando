@@ -1,6 +1,16 @@
 import { mockTrips } from './mockData';
 import type { TripsRepository } from './repository';
-import type { ItemDraft, Trip, TripDraft, TripItem } from './types';
+import type {
+  CityOverride,
+  CityOverrideDraft,
+  FoodPlace,
+  FoodPlaceDraft,
+  ItemDraft,
+  ItemPatch,
+  Trip,
+  TripDraft,
+  TripItem,
+} from './types';
 
 const cloneTrip = (trip: Trip): Trip => ({
   ...trip,
@@ -15,6 +25,8 @@ export function createInMemoryRepository(
   seed: Trip[] = mockTrips,
 ): TripsRepository {
   let store: Trip[] = seed.map(cloneTrip);
+  let foodPlaces: FoodPlace[] = [];
+  let cityOverrides: CityOverride[] = [];
 
   return {
     async findAll() {
@@ -53,7 +65,7 @@ export function createInMemoryRepository(
       if (!added) throw new Error(`Trip ${tripId} not found`);
       return { ...item };
     },
-    async updateItem(tripId, itemId, patch) {
+    async updateItem(tripId, itemId, patch: ItemPatch) {
       let updated: TripItem | null = null;
       store = store.map((t) => {
         if (t.id !== tripId) return t;
@@ -61,8 +73,22 @@ export function createInMemoryRepository(
           ...t,
           items: t.items.map((i) => {
             if (i.id !== itemId) return i;
-            updated = { ...i, ...patch };
-            return updated;
+            const next: TripItem = { ...i };
+            if (patch.kind !== undefined) next.kind = patch.kind;
+            if (patch.title !== undefined) next.title = patch.title;
+            if (patch.startsAt !== undefined) next.startsAt = patch.startsAt;
+            if (patch.endsAt !== undefined)
+              next.endsAt = patch.endsAt ?? undefined;
+            if (patch.from !== undefined) next.from = patch.from ?? undefined;
+            if (patch.to !== undefined) next.to = patch.to ?? undefined;
+            if (patch.transportMode !== undefined)
+              next.transportMode = patch.transportMode ?? undefined;
+            if (patch.notes !== undefined)
+              next.notes = patch.notes ?? undefined;
+            if (patch.expense !== undefined)
+              next.expense = patch.expense ?? undefined;
+            updated = next;
+            return next;
           }),
         };
       });
@@ -76,6 +102,58 @@ export function createInMemoryRepository(
           ? { ...t, items: t.items.filter((i) => i.id !== itemId) }
           : t,
       );
+    },
+
+    async listFoodPlaces(tripId) {
+      return foodPlaces
+        .filter((p) => p.tripId === tripId)
+        .map((p) => ({ ...p }));
+    },
+    async addFoodPlace(draft: FoodPlaceDraft) {
+      const place: FoodPlace = { ...draft, id: randomId('fp') };
+      foodPlaces = [...foodPlaces, place];
+      return { ...place };
+    },
+    async updateFoodPlace(id, patch) {
+      let updated: FoodPlace | null = null;
+      foodPlaces = foodPlaces.map((p) => {
+        if (p.id !== id) return p;
+        updated = { ...p, ...patch };
+        return updated;
+      });
+      if (!updated) throw new Error(`FoodPlace ${id} not found`);
+      return { ...(updated as FoodPlace) };
+    },
+    async removeFoodPlace(id) {
+      foodPlaces = foodPlaces.filter((p) => p.id !== id);
+    },
+
+    async listCityOverrides(tripId) {
+      return cityOverrides
+        .filter((o) => o.tripId === tripId)
+        .map((o) => ({ ...o }));
+    },
+    async upsertCityOverride(draft: CityOverrideDraft) {
+      const existing = cityOverrides.find(
+        (o) => o.tripId === draft.tripId && o.dayKey === draft.dayKey,
+      );
+      if (existing) {
+        const updated = {
+          ...existing,
+          cityLabel: draft.cityLabel,
+          cityPlaceId: draft.cityPlaceId,
+        };
+        cityOverrides = cityOverrides.map((o) =>
+          o.id === existing.id ? updated : o,
+        );
+        return { ...updated };
+      }
+      const override: CityOverride = { ...draft, id: randomId('co') };
+      cityOverrides = [...cityOverrides, override];
+      return { ...override };
+    },
+    async removeCityOverride(id) {
+      cityOverrides = cityOverrides.filter((o) => o.id !== id);
     },
   };
 }

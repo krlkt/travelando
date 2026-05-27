@@ -1,4 +1,14 @@
-import type { ItemDraft, Trip, TripDraft, TripItem } from './types';
+import type {
+  CityOverride,
+  CityOverrideDraft,
+  FoodPlace,
+  FoodPlaceDraft,
+  ItemDraft,
+  ItemPatch,
+  Trip,
+  TripDraft,
+  TripItem,
+} from './types';
 
 export interface TripsRepository {
   findAll(): Promise<Trip[]>;
@@ -10,7 +20,19 @@ export interface TripsRepository {
   updateItem(
     tripId: string,
     itemId: string,
-    patch: Partial<ItemDraft>,
+    patch: ItemPatch,
   ): Promise<TripItem>;
   removeItem(tripId: string, itemId: string): Promise<void>;
+
+  listFoodPlaces(tripId: string): Promise<FoodPlace[]>;
+  addFoodPlace(draft: FoodPlaceDraft): Promise<FoodPlace>;
+  updateFoodPlace(
+    id: string,
+    patch: Partial<FoodPlaceDraft>,
+  ): Promise<FoodPlace>;
+  removeFoodPlace(id: string): Promise<void>;
+
+  listCityOverrides(tripId: string): Promise<CityOverride[]>;
+  upsertCityOverride(draft: CityOverrideDraft): Promise<CityOverride>;
+  removeCityOverride(id: string): Promise<void>;
 }
