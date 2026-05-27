@@ -96,11 +96,11 @@ export function TimelineItem({
           </span>
 
           <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
+            <div className="flex w-full min-w-0 items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
                 <div className="leading-tight font-medium">{item.title}</div>
                 {(item.from || item.to) && (
-                  <div className="text-muted-foreground mt-1 flex items-center gap-1.5 text-xs">
+                  <div className="text-muted-foreground mt-1 flex min-w-0 items-center gap-1.5 text-xs">
                     {item.from && (
                       <span className="truncate">{item.from.label}</span>
                     )}
