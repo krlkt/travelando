@@ -450,7 +450,7 @@ function DayContent({
                 )}
               </div>
             ))}
-            <div className="ml-[3.75rem] sm:ml-[4.5rem]">
+            <div className="ml-[3.25rem] sm:ml-[4rem]">
               <Button
                 variant="ghost"
                 size="sm"
