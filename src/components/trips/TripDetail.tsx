@@ -251,7 +251,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
           {/* Aside */}
           <aside className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
             <ExpensesPanel trip={trip} />
-            <FoodWishlist trip={trip} />
+            <FoodWishlist trip={trip} dayKey={activeDay} />
             <Button
               variant="outline"
               className="w-full"

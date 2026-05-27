@@ -5,15 +5,16 @@ import { Pencil, Plus, Trash2, UtensilsCrossed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FoodPlaceSheet } from './FoodPlaceSheet';
 import { useTrips } from '@/lib/trips/context';
-import { deriveCitiesByDay } from '@/lib/trips/cities';
+import { deriveCitiesByDay, foodPlaceCitiesForDay } from '@/lib/trips/cities';
 import { toast } from 'sonner';
 import type { FoodPlace, Trip } from '@/lib/trips/types';
 
 interface FoodWishlistProps {
   trip: Trip;
+  dayKey?: string;
 }
 
-export function FoodWishlist({ trip }: FoodWishlistProps) {
+export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
   const { foodPlaces, cityOverrides, removeFoodPlace } = useTrips();
   const tripId = trip.id;
 
@@ -27,6 +28,9 @@ export function FoodWishlist({ trip }: FoodWishlistProps) {
   const places = foodPlaces[tripId] ?? [];
 
   const cities = useMemo(() => {
+    if (dayKey) {
+      return foodPlaceCitiesForDay(trip, cityOverrides[tripId] ?? [], dayKey);
+    }
     const buckets = deriveCitiesByDay(trip, cityOverrides[tripId] ?? []);
     const seen = new Set<string>();
     const result: Array<{ cityLabel: string; cityPlaceId?: string }> = [];
@@ -45,7 +49,7 @@ export function FoodWishlist({ trip }: FoodWishlistProps) {
       }
     }
     return result;
-  }, [trip, cityOverrides, tripId]);
+  }, [trip, cityOverrides, tripId, dayKey]);
 
   const grouped = useMemo(() => {
     const byCity = new Map<string, FoodPlace[]>();

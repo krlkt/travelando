@@ -24,7 +24,8 @@ import {
 import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
 import { useTrips } from '@/lib/trips/context';
 import { itemKinds, transportModes, kindMeta } from '@/lib/trips/kindMeta';
-import { latestCityBefore } from '@/lib/trips/cities';
+import { latestCityBefore, foodPlaceCitiesForDay } from '@/lib/trips/cities';
+import { dayKey } from '@/lib/time/formatDate';
 import type {
   FoodPlace,
   ItemDraft,
@@ -122,24 +123,32 @@ export function ItemEditorSheet({
     }
   }
 
-  const currentCity = useMemo(() => {
+  const dayCities = useMemo(() => {
     if (!startsAt) return null;
-    return latestCityBefore(
+    return foodPlaceCitiesForDay(
       trip,
       cityOverrides[tripId] ?? [],
-      fromLocalInput(startsAt),
+      dayKey(fromLocalInput(startsAt)),
     );
   }, [startsAt, cityOverrides, tripId, trip]);
 
-  const wishlistPlaces = useMemo((): FoodPlace[] => {
+  const wishlistByCity = useMemo(() => {
     const all = foodPlaces[tripId] ?? [];
-    if (!currentCity) return all;
-    return all.filter((fp) =>
-      fp.cityPlaceId && currentCity.cityPlaceId
-        ? fp.cityPlaceId === currentCity.cityPlaceId
-        : fp.cityLabel === currentCity.cityLabel,
-    );
-  }, [foodPlaces, tripId, currentCity]);
+    const cities = dayCities ?? [{ cityLabel: trip.destination }];
+    return cities.map((city) => {
+      const places = all.filter((fp) =>
+        fp.cityPlaceId && city.cityPlaceId
+          ? fp.cityPlaceId === city.cityPlaceId
+          : fp.cityLabel === city.cityLabel,
+      );
+      return { city, places };
+    });
+  }, [foodPlaces, tripId, dayCities, trip.destination]);
+
+  const totalWishlistCount = useMemo(
+    () => wishlistByCity.reduce((sum, group) => sum + group.places.length, 0),
+    [wishlistByCity],
+  );
 
   function handleWishlistSelect(fp: FoodPlace) {
     setTitle(fp.name);
@@ -168,7 +177,10 @@ export function ItemEditorSheet({
     }
 
     const resolvedFrom: Place | undefined =
-      fromPlace ?? (fromValue.trim() ? { label: fromValue.trim() } : undefined);
+      kind === 'meal'
+        ? undefined
+        : (fromPlace ??
+          (fromValue.trim() ? { label: fromValue.trim() } : undefined));
     const resolvedTo: Place | undefined =
       toPlace ?? (toValue.trim() ? { label: toValue.trim() } : undefined);
     const resolvedExpense =
@@ -274,30 +286,73 @@ export function ItemEditorSheet({
             />
           </div>
 
-          {kind === 'meal' && wishlistPlaces.length > 0 && (
+          {kind === 'meal' && (
             <div className="grid gap-1.5">
               <Label className="text-muted-foreground text-xs">
-                {currentCity
-                  ? `Wishlist · ${currentCity.cityLabel}`
-                  : 'Wishlist'}
+                Pick from wishlist
               </Label>
-              <div className="border-border/60 bg-background/40 flex max-h-36 flex-col gap-0.5 overflow-y-auto rounded-md border p-1">
-                {wishlistPlaces.map((fp) => (
-                  <button
-                    key={fp.id}
-                    type="button"
-                    onClick={() => handleWishlistSelect(fp)}
-                    className="flex flex-col rounded px-2 py-1.5 text-left hover:bg-white/5 focus:bg-white/5 focus:outline-none"
-                  >
-                    <span className="text-sm font-medium">{fp.name}</span>
-                    {fp.address && (
-                      <span className="text-muted-foreground text-xs">
-                        {fp.address}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
+              {totalWishlistCount > 0 ? (
+                <div className="border-border/60 bg-background/40 flex max-h-48 flex-col gap-1 overflow-y-auto rounded-md border p-1">
+                  {wishlistByCity.map((group, idx) => {
+                    const cityKey =
+                      group.city.cityPlaceId ?? group.city.cityLabel;
+                    return (
+                      <div key={cityKey} className="flex flex-col gap-0.5">
+                        {wishlistByCity.length > 1 && (
+                          <div
+                            className={`text-muted-foreground/70 px-2 pt-1 pb-0.5 text-[10px] tracking-[0.14em] uppercase ${
+                              idx === 0 ? '' : 'border-border/30 mt-1 border-t'
+                            }`}
+                          >
+                            {group.city.cityLabel}
+                          </div>
+                        )}
+                        {group.places.length === 0 ? (
+                          <p className="text-muted-foreground/60 px-2 py-1 text-xs">
+                            No places saved yet.
+                          </p>
+                        ) : (
+                          group.places.map((fp) => {
+                            const selected = toPlace?.placeId
+                              ? toPlace.placeId === fp.placeId
+                              : title === fp.name;
+                            return (
+                              <button
+                                key={fp.id}
+                                type="button"
+                                onClick={() => handleWishlistSelect(fp)}
+                                aria-pressed={selected}
+                                className={`flex flex-col rounded px-2 py-1.5 text-left transition focus:outline-none ${
+                                  selected
+                                    ? 'bg-secondary'
+                                    : 'hover:bg-white/5 focus:bg-white/5'
+                                }`}
+                              >
+                                <span className="text-sm font-medium">
+                                  {fp.name}
+                                </span>
+                                {fp.address && (
+                                  <span className="text-muted-foreground text-xs">
+                                    {fp.address}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="border-border/60 bg-background/40 text-muted-foreground rounded-md border px-3 py-2 text-xs">
+                  No places saved
+                  {dayCities && dayCities.length === 1
+                    ? ` in ${dayCities[0].cityLabel}`
+                    : ''}{' '}
+                  yet. Add some from the Food wishlist on the trip page.
+                </p>
+              )}
             </div>
           )}
 
@@ -346,24 +401,30 @@ export function ItemEditorSheet({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label>From</Label>
-              <PlaceAutocomplete
-                value={fromValue}
-                onChange={(v) => {
-                  setFromValue(v);
-                  setFromPlace(undefined);
-                }}
-                onSelect={(place) => {
-                  setFromValue(place.label);
-                  setFromPlace(place);
-                }}
-                placeholder={
-                  kind === 'transport' ? 'AMS Schiphol' : '(optional)'
-                }
-              />
-            </div>
+          <div
+            className={
+              kind === 'meal' ? 'grid gap-3' : 'grid grid-cols-2 gap-3'
+            }
+          >
+            {kind !== 'meal' && (
+              <div className="grid gap-1.5">
+                <Label>From</Label>
+                <PlaceAutocomplete
+                  value={fromValue}
+                  onChange={(v) => {
+                    setFromValue(v);
+                    setFromPlace(undefined);
+                  }}
+                  onSelect={(place) => {
+                    setFromValue(place.label);
+                    setFromPlace(place);
+                  }}
+                  placeholder={
+                    kind === 'transport' ? 'AMS Schiphol' : '(optional)'
+                  }
+                />
+              </div>
+            )}
             <div className="grid gap-1.5">
               <Label>{kind === 'transport' ? 'To' : 'Place'}</Label>
               <PlaceAutocomplete
