@@ -168,8 +168,8 @@ export function cityForDay(
   const bucket = buckets.get(key);
   if (!bucket || bucket.segments.length === 0)
     return { cityLabel: trip.destination };
-  const first = bucket.segments[0];
-  return { cityLabel: first.cityLabel, cityPlaceId: first.cityPlaceId };
+  const last = bucket.segments[bucket.segments.length - 1];
+  return { cityLabel: last.cityLabel, cityPlaceId: last.cityPlaceId };
 }
 
 export function foodPlaceCitiesForDay(

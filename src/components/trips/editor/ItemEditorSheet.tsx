@@ -25,6 +25,7 @@ import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
 import { useTrips } from '@/lib/trips/context';
 import { itemKinds, transportModes, kindMeta } from '@/lib/trips/kindMeta';
 import { latestCityBefore, foodPlaceCitiesForDay } from '@/lib/trips/cities';
+import { formatAmountInput, parseAmountInput } from '@/lib/trips/grouping';
 import { dayKey } from '@/lib/time/formatDate';
 import type {
   FoodPlace,
@@ -106,7 +107,9 @@ export function ItemEditorSheet({
     setToPlace(item?.to ?? undefined);
     setTransportMode((item?.transportMode as TransportMode) ?? 'flight');
     setNotes(item?.notes ?? '');
-    setExpenseAmount(item?.expense ? String(item.expense.amount) : '');
+    setExpenseAmount(
+      item?.expense ? formatAmountInput(item.expense.amount) : '',
+    );
     setExpenseCurrency(item?.expense?.currency ?? 'EUR');
     setError(null);
   }, [open, item, defaultDate]);
@@ -183,10 +186,11 @@ export function ItemEditorSheet({
           (fromValue.trim() ? { label: fromValue.trim() } : undefined));
     const resolvedTo: Place | undefined =
       toPlace ?? (toValue.trim() ? { label: toValue.trim() } : undefined);
+    const parsedAmount = parseAmountInput(expenseAmount);
     const resolvedExpense =
-      expenseAmount && !Number.isNaN(Number(expenseAmount))
+      parsedAmount !== null
         ? {
-            amount: Number(expenseAmount),
+            amount: parsedAmount,
             currency: expenseCurrency.toUpperCase(),
           }
         : undefined;
@@ -460,12 +464,20 @@ export function ItemEditorSheet({
               <Label htmlFor="item-amount">Expense</Label>
               <Input
                 id="item-amount"
-                type="number"
-                step="0.01"
+                type="text"
                 inputMode="decimal"
+                autoComplete="off"
                 value={expenseAmount}
-                onChange={(e) => setExpenseAmount(e.target.value)}
-                placeholder="0"
+                onChange={(e) =>
+                  setExpenseAmount(e.target.value.replace(/[^\d.,-]/g, ''))
+                }
+                onBlur={() => {
+                  const parsed = parseAmountInput(expenseAmount);
+                  if (parsed !== null) {
+                    setExpenseAmount(formatAmountInput(parsed));
+                  }
+                }}
+                placeholder="0.00"
               />
             </div>
             <div className="grid gap-1.5">

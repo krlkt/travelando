@@ -75,7 +75,8 @@ export function TripDetail({ tripId }: TripDetailProps) {
     ? dayCityBuckets.indexOf(activeBucket)
     : 0;
   const activeCityLabel =
-    activeBucket?.segments[0]?.cityLabel ?? trip.destination;
+    activeBucket?.segments[activeBucket.segments.length - 1]?.cityLabel ??
+    trip.destination;
   const existingOverride: CityOverride | undefined = (
     cityOverrides[tripId] ?? []
   ).find((o) => o.dayKey === activeDay);

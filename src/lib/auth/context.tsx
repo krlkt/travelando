@@ -76,18 +76,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const signInWithGoogle = useCallback(
     async (redirectTo?: string) => {
-      const currentUser = (await client.auth.getUser()).data.user;
       const callback = buildCallbackUrl(redirectTo);
 
-      if (currentUser?.is_anonymous) {
-        const { error } = await client.auth.linkIdentity({
-          provider: 'google',
-          options: { redirectTo: callback },
-        });
-        if (error) throw error;
-        return;
-      }
-
+      // Always use signInWithOAuth — even when an anonymous session exists.
+      // linkIdentity would fail with "identity_already_exists" if the
+      // Google account is already tied to a permanent user (the common
+      // case for returning users). Supabase's OAuth flow will replace the
+      // anonymous session automatically.
       const { error } = await client.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: callback },

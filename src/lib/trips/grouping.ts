@@ -71,8 +71,52 @@ export function formatMoney(amount: number, currency: string): string {
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
     currency,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
+}
+
+export function formatAmountInput(amount: number): string {
+  return new Intl.NumberFormat('en-GB', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+export function parseAmountInput(input: string): number | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  const cleaned = trimmed.replace(/[^\d.,-]/g, '');
+  if (!cleaned || cleaned === '-' || cleaned === '.' || cleaned === ',') {
+    return null;
+  }
+
+  const hasDot = cleaned.includes('.');
+  const hasComma = cleaned.includes(',');
+
+  let normalized: string;
+  if (hasDot && hasComma) {
+    const lastDot = cleaned.lastIndexOf('.');
+    const lastComma = cleaned.lastIndexOf(',');
+    if (lastDot > lastComma) {
+      normalized = cleaned.replace(/,/g, '');
+    } else {
+      normalized = cleaned.replace(/\./g, '').replace(',', '.');
+    }
+  } else if (hasComma) {
+    const parts = cleaned.split(',');
+    const isDecimalUse =
+      parts.length === 2 && parts[1].length > 0 && parts[1].length <= 2;
+    normalized = isDecimalUse
+      ? `${parts[0]}.${parts[1]}`
+      : cleaned.replace(/,/g, '');
+  } else {
+    normalized = cleaned;
+  }
+
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
 }
 
 export function findCurrentItem(items: TripItem[], now: Date): TripItem | null {
