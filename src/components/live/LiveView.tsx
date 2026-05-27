@@ -1,11 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, ArrowRight, MapPin, Radio } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ArrowRight, MapPin, Radio } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useTrips } from '@/lib/trips/context';
 import { findCurrentItem, findNextItem } from '@/lib/trips/grouping';
@@ -39,6 +37,18 @@ export function LiveView({ tripId }: LiveViewProps) {
       );
   }, [trip.items, now]);
 
+  const tomorrowItems = useMemo(() => {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const key = dayKey(tomorrow.toISOString());
+    return trip.items
+      .filter((i) => dayKey(i.startsAt) === key)
+      .sort(
+        (a, b) =>
+          new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+      );
+  }, [trip.items, now]);
+
   return (
     <div className="from-background via-background to-secondary/30 relative min-h-svh bg-gradient-to-b">
       <div
@@ -52,13 +62,7 @@ export function LiveView({ tripId }: LiveViewProps) {
       />
 
       <div className="relative mx-auto max-w-3xl px-4 py-6 sm:px-6">
-        <div className="flex items-center justify-between">
-          <Button asChild variant="ghost" size="sm">
-            <Link href={`/trips/${trip.id}`}>
-              <ArrowLeft className="size-4" />
-              Trip
-            </Link>
-          </Button>
+        <div className="flex items-center justify-end">
           <div className="border-border/70 bg-background/70 flex items-center gap-2 rounded-full border px-3 py-1 text-xs backdrop-blur-md">
             <Radio className="text-primary size-3 animate-pulse" />
             Live · {trip.title}
@@ -86,54 +90,101 @@ export function LiveView({ tripId }: LiveViewProps) {
           {next && current && <NextCard item={next} now={now} />}
         </div>
 
-        <div className="mt-12">
-          <div className="text-muted-foreground text-[10px] tracking-[0.18em] uppercase">
-            Today
-          </div>
-          <ol className="mt-3 grid gap-1.5">
-            {todayItems.length === 0 ? (
-              <li className="border-border/70 bg-secondary/20 text-muted-foreground rounded-[var(--radius)] border border-dashed px-4 py-6 text-center text-sm">
-                Nothing on today&apos;s plan.
-              </li>
-            ) : (
-              todayItems.map((item) => {
-                const isCurrent = current?.id === item.id;
-                const isNext = next?.id === item.id;
-                const isPast =
-                  new Date(item.endsAt ?? item.startsAt) < now && !isCurrent;
-                const meta = kindMeta[item.kind];
-                return (
-                  <li
-                    key={item.id}
-                    className={cn(
-                      'bg-card flex items-center gap-3 rounded-[var(--radius)] border px-3 py-2.5 text-sm transition',
-                      isCurrent
-                        ? 'border-primary/30 bg-primary/[0.04] shadow-[0_0_0_4px_oklch(58%_0.16_38_/_0.08)]'
-                        : isNext
-                          ? 'border-accent/30'
-                          : 'border-border/60',
-                      isPast && 'opacity-50',
-                    )}
-                  >
-                    <span className="text-muted-foreground w-12 shrink-0 text-xs tabular-nums">
-                      {formatTime(item.startsAt)}
-                    </span>
-                    <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ background: meta.accent }}
-                    />
+        <DayList
+          label="Today"
+          items={todayItems}
+          now={now}
+          current={current}
+          next={next}
+          emptyCopy="Nothing on today's plan."
+        />
+
+        <DayList
+          label="Tomorrow"
+          items={tomorrowItems}
+          now={now}
+          current={null}
+          next={null}
+          emptyCopy="Nothing planned for tomorrow."
+        />
+      </div>
+    </div>
+  );
+}
+
+interface DayListProps {
+  label: string;
+  items: TripItem[];
+  now: Date;
+  current: TripItem | null;
+  next: TripItem | null;
+  emptyCopy: string;
+}
+
+function DayList({
+  label,
+  items,
+  now,
+  current,
+  next,
+  emptyCopy,
+}: DayListProps) {
+  return (
+    <div className="mt-12">
+      <div className="text-muted-foreground text-[10px] tracking-[0.18em] uppercase">
+        {label}
+      </div>
+      <ol className="mt-3 grid gap-1.5">
+        {items.length === 0 ? (
+          <li className="border-border/70 bg-secondary/20 text-muted-foreground rounded-[var(--radius)] border border-dashed px-4 py-6 text-center text-sm">
+            {emptyCopy}
+          </li>
+        ) : (
+          items.map((item) => {
+            const isCurrent = current?.id === item.id;
+            const isNext = next?.id === item.id;
+            const isPast =
+              new Date(item.endsAt ?? item.startsAt) < now && !isCurrent;
+            const meta = kindMeta[item.kind];
+            return (
+              <li
+                key={item.id}
+                className={cn(
+                  'bg-card flex gap-3 rounded-[var(--radius)] border px-3 py-2.5 text-sm transition',
+                  isCurrent
+                    ? 'border-primary/30 bg-primary/[0.04] shadow-[0_0_0_4px_oklch(58%_0.16_38_/_0.08)]'
+                    : isNext
+                      ? 'border-accent/30'
+                      : 'border-border/60',
+                  isPast && 'opacity-50',
+                )}
+              >
+                <span className="text-muted-foreground w-12 shrink-0 pt-0.5 text-xs tabular-nums">
+                  {formatTime(item.startsAt)}
+                </span>
+                <span
+                  className="mt-1.5 size-2 shrink-0 rounded-full"
+                  style={{ background: meta.accent }}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
                     <span className="flex-1 truncate">{item.title}</span>
                     {isCurrent && <Badge variant="primary">Now</Badge>}
                     {isNext && !isCurrent && (
                       <Badge variant="accent">Next</Badge>
                     )}
-                  </li>
-                );
-              })
-            )}
-          </ol>
-        </div>
-      </div>
+                  </div>
+                  {item.notes && (
+                    <p className="text-muted-foreground mt-1 line-clamp-2 text-xs leading-snug whitespace-pre-wrap">
+                      {item.notes}
+                    </p>
+                  )}
+                </div>
+              </li>
+            );
+          })
+        )}
+      </ol>
     </div>
   );
 }

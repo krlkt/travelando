@@ -11,6 +11,7 @@ import { AccountMenu, SignInAffordance } from '@/components/auth/AccountMenu';
 const links = [
   { href: '/', label: 'Home' },
   { href: '/trips', label: 'Trips' },
+  { href: '/trips/trip-lisbon/now', label: 'Live demo' },
 ];
 
 export function TopNav() {
@@ -41,7 +42,13 @@ export function TopNav() {
         <nav className="flex items-center gap-1 text-sm">
           {links.map((l) => {
             const active =
-              l.href === '/' ? pathname === '/' : pathname.startsWith(l.href);
+              l.href === '/'
+                ? pathname === '/'
+                : l.href.endsWith('/now')
+                  ? pathname === l.href
+                  : pathname === l.href ||
+                    (pathname.startsWith(`${l.href}/`) &&
+                      !pathname.endsWith('/now'));
             return (
               <Link
                 key={l.href}

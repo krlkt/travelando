@@ -464,3 +464,7 @@ export function useTrips(): TripsState {
   if (!ctx) throw new Error('useTrips must be used inside <TripsProvider>');
   return ctx;
 }
+
+export function useTripsOptional(): TripsState | null {
+  return useContext(TripsContext);
+}

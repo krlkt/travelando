@@ -116,19 +116,17 @@ export function TripDetail({ tripId }: TripDetailProps) {
               </Link>
             </Button>
             <div className="flex items-center gap-2">
-              {ongoing && (
-                <Button
-                  asChild
-                  variant="secondary"
-                  size="sm"
-                  className="bg-background/80 backdrop-blur-md"
-                >
-                  <Link href={`/trips/${trip.id}/now`}>
-                    <Radio className="size-3.5" />
-                    Live view
-                  </Link>
-                </Button>
-              )}
+              <Button
+                asChild
+                variant="secondary"
+                size="sm"
+                className="bg-background/80 backdrop-blur-md"
+              >
+                <Link href={`/trips/${trip.id}/now`}>
+                  <Radio className="size-3.5" />
+                  Live view
+                </Link>
+              </Button>
               <Button
                 variant="ghost"
                 size="icon-sm"
