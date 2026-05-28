@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,8 +13,9 @@ import { fadeUp, stagger } from '@/lib/motion/presets';
 import type { Trip } from '@/lib/trips/types';
 
 export function TripsDashboard() {
-  const { trips } = useTrips();
+  const { trips, loadTripExtras } = useTrips();
   const [editorOpen, setEditorOpen] = useState(false);
+  const loadedRef = useRef(new Set<string>());
 
   const visibleTrips = useMemo(
     () => trips.filter((t) => !isDemoTrip(t.id)),
@@ -37,6 +38,15 @@ export function TripsDashboard() {
     }
     return { ongoing: o, upcoming: u, past: p.reverse() };
   }, [visibleTrips]);
+
+  useEffect(() => {
+    for (const trip of visibleTrips) {
+      if (!loadedRef.current.has(trip.id)) {
+        loadedRef.current.add(trip.id);
+        void loadTripExtras(trip.id);
+      }
+    }
+  }, [visibleTrips, loadTripExtras]);
 
   return (
     <div className="px-4 pt-6 pb-16 sm:px-6 md:px-10 md:pt-14">

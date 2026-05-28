@@ -20,7 +20,12 @@ import {
   isUpcoming,
   relativeFromNow,
 } from '@/lib/time/formatDate';
-import { findCurrentItem, findNextItem } from '@/lib/trips/grouping';
+import {
+  findCurrentItem,
+  findNextItem,
+  formatMoney,
+} from '@/lib/trips/grouping';
+import { aggregateByCurrency } from '@/lib/trips/expenseTotals';
 import { useTrips } from '@/lib/trips/context';
 import type { Trip } from '@/lib/trips/types';
 
@@ -30,8 +35,11 @@ interface TripCardProps {
 }
 
 export function TripCard({ trip, highlight }: TripCardProps) {
-  const { removeTrip } = useTrips();
+  const { removeTrip, expenses } = useTrips();
   const now = new Date();
+  const tripExpenses = expenses[trip.id] ?? [];
+  const expenseTotals =
+    tripExpenses.length > 0 ? aggregateByCurrency(tripExpenses, null) : null;
   const ongoing = isOngoing(trip.startDate, trip.endDate, now);
   const upcoming = isUpcoming(trip.startDate, now);
   const days = tripDayCount(trip.startDate, trip.endDate);
@@ -193,6 +201,11 @@ export function TripCard({ trip, highlight }: TripCardProps) {
           <Badge variant="muted">
             {trip.items.length} {trip.items.length === 1 ? 'item' : 'items'}
           </Badge>
+          {expenseTotals?.byCurrency.map((c) => (
+            <Badge key={c.currency} variant="muted">
+              {formatMoney(c.total, c.currency)}
+            </Badge>
+          ))}
         </div>
       </div>
     </motion.article>
