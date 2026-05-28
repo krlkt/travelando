@@ -22,6 +22,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
+import { CurrencyCombobox } from '@/components/trips/editor/CurrencyCombobox';
 import { useTrips } from '@/lib/trips/context';
 import { itemKinds, transportModes, kindMeta } from '@/lib/trips/kindMeta';
 import {
@@ -675,13 +676,10 @@ function ItemEditorBody({
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="item-currency">Currency</Label>
-            <Input
+            <CurrencyCombobox
               id="item-currency"
               value={expenseCurrency}
-              onChange={(e) =>
-                setExpenseCurrency(e.target.value.toUpperCase().slice(0, 3))
-              }
-              placeholder="EUR"
+              onChange={setExpenseCurrency}
             />
           </div>
         </div>

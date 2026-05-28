@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Wallet } from 'lucide-react';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,17 +10,44 @@ import {
   totalsByCategory,
   totalsByCurrency,
 } from '@/lib/trips/grouping';
+import { convertToEur, getEurRates, type EurRates } from '@/lib/trips/fx';
 import type { Trip } from '@/lib/trips/types';
 
 export function ExpensesPanel({ trip }: { trip: Trip }) {
+  const [rates, setRates] = useState<EurRates | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getEurRates().then((r) => {
+      if (active) setRates(r);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const byCurrency = totalsByCurrency(trip.items);
   const byCategory = totalsByCategory(trip.items);
-
   const categories = Array.from(byCategory.entries());
-  const primaryCurrency = [...byCurrency.keys()][0];
-  const totalForPrimary = primaryCurrency
-    ? byCurrency.get(primaryCurrency)!
-    : 0;
+
+  const eurByCategory = new Map<string, number>();
+  const excluded = new Set<string>();
+  let totalEur = 0;
+  if (rates) {
+    for (const [cat, currencies] of byCategory.entries()) {
+      let catEur = 0;
+      for (const [code, amount] of currencies.entries()) {
+        const eur = convertToEur(amount, code, rates);
+        if (eur === null) {
+          excluded.add(code);
+          continue;
+        }
+        catEur += eur;
+      }
+      eurByCategory.set(cat, catEur);
+      totalEur += catEur;
+    }
+  }
 
   return (
     <Card className="overflow-hidden">
@@ -47,17 +75,13 @@ export function ExpensesPanel({ trip }: { trip: Trip }) {
           <div className="space-y-3">
             {categories.map(([cat, currencies]) => {
               const meta = kindMeta[cat as keyof typeof kindMeta];
-              const amount = primaryCurrency
-                ? (currencies.get(primaryCurrency) ?? 0)
-                : 0;
-              const pct = totalForPrimary
-                ? (amount / totalForPrimary) * 100
-                : 0;
+              const eurAmount = eurByCategory.get(cat) ?? 0;
+              const pct = totalEur > 0 ? (eurAmount / totalEur) * 100 : 0;
               return (
                 <div key={cat}>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium">{meta.label}</span>
-                    <span className="text-muted-foreground tabular-nums">
+                  <div className="flex items-start justify-between gap-3 text-xs">
+                    <span className="shrink-0 font-medium">{meta.label}</span>
+                    <span className="text-muted-foreground text-right tabular-nums">
                       {[...currencies.entries()]
                         .map(([c, a]) => formatMoney(a, c))
                         .join(' · ')}
@@ -66,8 +90,7 @@ export function ExpensesPanel({ trip }: { trip: Trip }) {
                   <div className="bg-secondary/70 mt-1.5 h-1.5 overflow-hidden rounded-full">
                     <motion.div
                       initial={{ width: 0 }}
-                      whileInView={{ width: `${pct}%` }}
-                      viewport={{ once: true }}
+                      animate={{ width: `${pct}%` }}
                       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                       className="h-full rounded-full"
                       style={{ background: meta.accent }}
@@ -77,6 +100,11 @@ export function ExpensesPanel({ trip }: { trip: Trip }) {
               );
             })}
           </div>
+          {excluded.size > 0 && (
+            <p className="text-muted-foreground/80 mt-3 text-[11px]">
+              Not included in %: {[...excluded].sort().join(', ')}
+            </p>
+          )}
         </div>
       )}
     </Card>

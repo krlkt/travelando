@@ -13,7 +13,8 @@
       "Bash(pnpm eslint *)",
       "Bash(pnpm lint *)",
       "Bash(echo \"EXIT=$?\")",
-      "Bash(echo \"---tsc-exit: $?\")"
+      "Bash(echo \"---tsc-exit: $?\")",
+      "Bash(pnpm build *)"
     ]
   }
 }

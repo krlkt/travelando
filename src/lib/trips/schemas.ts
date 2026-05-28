@@ -10,7 +10,10 @@ const placeSchema = z.object({
 
 const moneySchema = z.object({
   amount: z.number(),
-  currency: z.string().min(1).max(8),
+  currency: z
+    .string()
+    .length(3)
+    .regex(/^[A-Z]{3}$/, 'Currency must be a 3-letter uppercase code'),
 });
 
 export const tripDraftSchema = z.object({

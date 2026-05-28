@@ -68,12 +68,17 @@ export function totalsByCategory(
 }
 
 export function formatMoney(amount: number, currency: string): string {
-  return new Intl.NumberFormat('en-GB', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
+  const code = currency.toUpperCase();
+  try {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${formatAmountInput(amount)} ${code}`;
+  }
 }
 
 export function formatAmountInput(amount: number): string {
