@@ -38,35 +38,6 @@ export function groupItemsByDay(trip: Trip): DayBucket[] {
   );
 }
 
-export function totalsByCurrency(items: TripItem[]): Map<string, number> {
-  const out = new Map<string, number>();
-  for (const i of items) {
-    if (!i.expense) continue;
-    out.set(
-      i.expense.currency,
-      (out.get(i.expense.currency) ?? 0) + i.expense.amount,
-    );
-  }
-  return out;
-}
-
-export function totalsByCategory(
-  items: TripItem[],
-): Map<string, Map<string, number>> {
-  const out = new Map<string, Map<string, number>>();
-  for (const i of items) {
-    if (!i.expense) continue;
-    const cat = i.kind;
-    if (!out.has(cat)) out.set(cat, new Map());
-    const cur = out.get(cat)!;
-    cur.set(
-      i.expense.currency,
-      (cur.get(i.expense.currency) ?? 0) + i.expense.amount,
-    );
-  }
-  return out;
-}
-
 export function formatMoney(amount: number, currency: string): string {
   const code = currency.toUpperCase();
   try {

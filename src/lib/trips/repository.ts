@@ -1,6 +1,9 @@
 import type {
   CityOverride,
   CityOverrideDraft,
+  Expense,
+  ExpenseDraft,
+  ExpensePatch,
   FoodPlace,
   FoodPlaceDraft,
   ItemDraft,
@@ -47,4 +50,9 @@ export interface TripsRepository {
     patch: TripMemberPatch,
   ): Promise<TripMember>;
   removeMember(tripId: string, memberId: string): Promise<void>;
+
+  listExpenses(tripId: string): Promise<Expense[]>;
+  addExpense(draft: ExpenseDraft): Promise<Expense>;
+  updateExpense(id: string, patch: ExpensePatch): Promise<Expense>;
+  removeExpense(id: string): Promise<void>;
 }

@@ -1,11 +1,13 @@
 'use client';
 
+import { useMemo, useState } from 'react';
 import {
   ArrowRight,
   Calendar,
   Clock,
   MapPin,
   Pencil,
+  Plus,
   Trash2,
   Wallet,
 } from 'lucide-react';
@@ -21,12 +23,19 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { formatDateLong, formatTime } from '@/lib/time/formatDate';
 import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
-import { formatMoney } from '@/lib/trips/grouping';
 import { useTrips } from '@/lib/trips/context';
-import type { TripItem } from '@/lib/trips/types';
+import {
+  defaultCategoryForKind,
+  defaultExpenseTitleForItem,
+  categoryLabels,
+} from '@/lib/trips/expenseCategory';
+import { formatMoney } from '@/lib/trips/grouping';
+import type { Expense, Trip, TripItem } from '@/lib/trips/types';
 import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
+import { ExpenseSheet } from './expenses/ExpenseSheet';
 
 interface ItemDetailSheetProps {
+  trip: Trip;
   item: TripItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -34,12 +43,21 @@ interface ItemDetailSheetProps {
 }
 
 export function ItemDetailSheet({
+  trip,
   item,
   open,
   onOpenChange,
   onEdit,
 }: ItemDetailSheetProps) {
-  const { removeItem } = useTrips();
+  const { removeItem, expenses } = useTrips();
+  const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+
+  const itemExpenses = useMemo(() => {
+    if (!item) return [];
+    return (expenses[item.tripId] ?? []).filter((e) => e.itemId === item.id);
+  }, [expenses, item]);
+
   if (!item) return null;
 
   const meta = kindMeta[item.kind];
@@ -107,19 +125,61 @@ export function ItemDetailSheet({
             </Row>
           )}
 
-          {item.expense && (
-            <Row icon={Wallet} label="Expense">
-              <span className="[overflow-wrap:anywhere] tabular-nums">
-                {formatMoney(item.expense.amount, item.expense.currency)}
-              </span>
-            </Row>
-          )}
-
           {item.notes && (
             <Row icon={Calendar} label="Notes">
               <p className="text-foreground/90 text-sm leading-relaxed [overflow-wrap:anywhere] whitespace-pre-wrap">
                 {item.notes}
               </p>
+            </Row>
+          )}
+
+          {item.kind !== 'note' && (
+            <Row icon={Wallet} label="Expenses">
+              <div className="flex flex-col gap-2">
+                {itemExpenses.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    No expense yet.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-1">
+                    {itemExpenses.map((e) => (
+                      <li key={e.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingExpense(e);
+                            setExpenseSheetOpen(true);
+                          }}
+                          className="hover:bg-secondary/40 flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left transition"
+                        >
+                          <span className="min-w-0 flex-1 truncate text-sm">
+                            {e.title}
+                            <span className="text-muted-foreground ml-2 text-xs">
+                              {categoryLabels[e.category]}
+                            </span>
+                          </span>
+                          <span className="text-sm tabular-nums">
+                            {formatMoney(e.amount, e.currency)}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-fit"
+                  onClick={() => {
+                    setEditingExpense(null);
+                    setExpenseSheetOpen(true);
+                  }}
+                >
+                  <Plus className="size-4" />
+                  Add expense
+                </Button>
+              </div>
             </Row>
           )}
         </dl>
@@ -155,6 +215,20 @@ export function ItemDetailSheet({
           </Button>
         </div>
       </SheetContent>
+
+      <ExpenseSheet
+        trip={trip}
+        expense={editingExpense}
+        open={expenseSheetOpen}
+        onOpenChange={(o) => {
+          setExpenseSheetOpen(o);
+          if (!o) setEditingExpense(null);
+        }}
+        itemId={item.id}
+        defaultCategory={defaultCategoryForKind(item.kind)}
+        defaultTitle={defaultExpenseTitleForItem(item.kind, item.title)}
+        lockTitle={!editingExpense}
+      />
     </Sheet>
   );
 }

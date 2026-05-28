@@ -11,6 +11,9 @@ import {
 import type {
   CityOverride,
   CityOverrideDraft,
+  Expense,
+  ExpenseDraft,
+  ExpensePatch,
   FoodPlace,
   FoodPlaceDraft,
   ItemDraft,
@@ -40,6 +43,7 @@ interface TripsState {
 
   foodPlaces: Record<string, FoodPlace[]>;
   cityOverrides: Record<string, CityOverride[]>;
+  expenses: Record<string, Expense[]>;
   loadTripExtras: (tripId: string) => Promise<void>;
   addFoodPlace: (draft: FoodPlaceDraft) => Promise<FoodPlace>;
   updateFoodPlace: (
@@ -49,6 +53,13 @@ interface TripsState {
   removeFoodPlace: (tripId: string, id: string) => Promise<void>;
   upsertCityOverride: (draft: CityOverrideDraft) => Promise<void>;
   removeCityOverride: (tripId: string, id: string) => Promise<void>;
+  addExpense: (draft: ExpenseDraft) => Promise<Expense>;
+  updateExpense: (
+    tripId: string,
+    id: string,
+    patch: ExpensePatch,
+  ) => Promise<void>;
+  removeExpense: (tripId: string, id: string) => Promise<void>;
 
   addMember: (tripId: string, draft: TripMemberDraft) => Promise<TripMember>;
   updateMember: (
@@ -75,7 +86,6 @@ function applyItemPatch(item: TripItem, patch: ItemPatch): TripItem {
   if (patch.transportMode !== undefined)
     next.transportMode = patch.transportMode ?? undefined;
   if (patch.notes !== undefined) next.notes = patch.notes ?? undefined;
-  if (patch.expense !== undefined) next.expense = patch.expense ?? undefined;
   return next;
 }
 
@@ -114,6 +124,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   const [cityOverrides, setCityOverrides] = useState<
     Record<string, CityOverride[]>
   >({});
+  const [expenses, setExpenses] = useState<Record<string, Expense[]>>({});
 
   const getTrip = useCallback(
     (id: string) => trips.find((t) => t.id === id),
@@ -298,12 +309,14 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   );
 
   const loadTripExtras = useCallback(async (tripId: string): Promise<void> => {
-    const [fp, co] = await Promise.all([
+    const [fp, co, ex] = await Promise.all([
       callApi<FoodPlace[]>(`/api/trips/${tripId}/food-places`),
       callApi<CityOverride[]>(`/api/trips/${tripId}/city-overrides`),
+      callApi<Expense[]>(`/api/trips/${tripId}/expenses`),
     ]);
     setFoodPlaces((prev) => ({ ...prev, [tripId]: fp ?? [] }));
     setCityOverrides((prev) => ({ ...prev, [tripId]: co ?? [] }));
+    setExpenses((prev) => ({ ...prev, [tripId]: ex ?? [] }));
   }, []);
 
   const addFoodPlace = useCallback(
@@ -399,6 +412,64 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       }
     },
     [loadTripExtras],
+  );
+
+  const addExpense = useCallback(
+    async (draft: ExpenseDraft): Promise<Expense> => {
+      const created = await callApi<Expense>(
+        `/api/trips/${draft.tripId}/expenses`,
+        {
+          method: 'POST',
+          body: JSON.stringify(draft),
+        },
+      );
+      if (!created) throw new Error('Expense not returned');
+      setExpenses((prev) => ({
+        ...prev,
+        [draft.tripId]: [...(prev[draft.tripId] ?? []), created],
+      }));
+      return created;
+    },
+    [],
+  );
+
+  const updateExpense = useCallback(
+    async (tripId: string, id: string, patch: ExpensePatch): Promise<void> => {
+      const updated = await callApi<Expense>(`/api/expenses/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      });
+      if (!updated) return;
+      setExpenses((prev) => ({
+        ...prev,
+        [tripId]: (prev[tripId] ?? []).map((e) => (e.id === id ? updated : e)),
+      }));
+    },
+    [],
+  );
+
+  const removeExpense = useCallback(
+    async (tripId: string, id: string): Promise<void> => {
+      let snapshot: Expense | undefined;
+      setExpenses((prev) => {
+        const list = prev[tripId] ?? [];
+        snapshot = list.find((e) => e.id === id);
+        return { ...prev, [tripId]: list.filter((e) => e.id !== id) };
+      });
+      try {
+        await callApi<null>(`/api/expenses/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        if (snapshot) {
+          const restored = snapshot;
+          setExpenses((prev) => ({
+            ...prev,
+            [tripId]: [...(prev[tripId] ?? []), restored],
+          }));
+        }
+        throw err;
+      }
+    },
+    [],
   );
 
   const addMember = useCallback(
@@ -562,12 +633,16 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       removeItem,
       foodPlaces,
       cityOverrides,
+      expenses,
       loadTripExtras,
       addFoodPlace,
       updateFoodPlace,
       removeFoodPlace,
       upsertCityOverride,
       removeCityOverride,
+      addExpense,
+      updateExpense,
+      removeExpense,
       addMember,
       updateMember,
       removeMember,
@@ -583,12 +658,16 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       removeItem,
       foodPlaces,
       cityOverrides,
+      expenses,
       loadTripExtras,
       addFoodPlace,
       updateFoodPlace,
       removeFoodPlace,
       upsertCityOverride,
       removeCityOverride,
+      addExpense,
+      updateExpense,
+      removeExpense,
       addMember,
       updateMember,
       removeMember,

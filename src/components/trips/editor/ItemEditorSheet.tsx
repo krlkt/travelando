@@ -22,7 +22,6 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
-import { CurrencyCombobox } from '@/components/trips/editor/CurrencyCombobox';
 import { useTrips } from '@/lib/trips/context';
 import { itemKinds, transportModes, kindMeta } from '@/lib/trips/kindMeta';
 import {
@@ -30,7 +29,6 @@ import {
   foodPlaceCitiesForDay,
   findLodgingConflict,
 } from '@/lib/trips/cities';
-import { formatAmountInput, parseAmountInput } from '@/lib/trips/grouping';
 import { dayKey, formatDate } from '@/lib/time/formatDate';
 import type {
   FoodPlace,
@@ -196,12 +194,6 @@ function ItemEditorBody({
     (item?.transportMode as TransportMode) ?? 'flight',
   );
   const [notes, setNotes] = useState<string>(item?.notes ?? '');
-  const [expenseAmount, setExpenseAmount] = useState<string>(
-    item?.expense ? formatAmountInput(item.expense.amount) : '',
-  );
-  const [expenseCurrency, setExpenseCurrency] = useState<string>(
-    item?.expense?.currency ?? 'EUR',
-  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -316,14 +308,6 @@ function ItemEditorBody({
           (fromValue.trim() ? { label: fromValue.trim() } : undefined));
     const resolvedTo: Place | undefined =
       toPlace ?? (toValue.trim() ? { label: toValue.trim() } : undefined);
-    const parsedAmount = parseAmountInput(expenseAmount);
-    const resolvedExpense =
-      parsedAmount !== null
-        ? {
-            amount: parsedAmount,
-            currency: expenseCurrency.toUpperCase(),
-          }
-        : undefined;
 
     setSaving(true);
     try {
@@ -337,7 +321,6 @@ function ItemEditorBody({
           to: resolvedTo ?? null,
           transportMode: kind === 'transport' ? transportMode : null,
           notes: notes.trim() || null,
-          expense: resolvedExpense ?? null,
         };
         await updateItem(tripId, item.id, patch);
         toast.success('Item updated');
@@ -351,7 +334,6 @@ function ItemEditorBody({
           to: resolvedTo,
           transportMode: kind === 'transport' ? transportMode : undefined,
           notes: notes.trim() || undefined,
-          expense: resolvedExpense,
         };
         await addItem(tripId, draft);
         toast.success('Item added');
@@ -651,37 +633,6 @@ function ItemEditorBody({
             placeholder="Flight KL 1693 · Seat 14A · Gate D4"
             rows={3}
           />
-        </div>
-
-        <div className="grid grid-cols-[1fr_88px] gap-3">
-          <div className="grid gap-1.5">
-            <Label htmlFor="item-amount">Expense</Label>
-            <Input
-              id="item-amount"
-              type="text"
-              inputMode="decimal"
-              autoComplete="off"
-              value={expenseAmount}
-              onChange={(e) =>
-                setExpenseAmount(e.target.value.replace(/[^\d.,-]/g, ''))
-              }
-              onBlur={() => {
-                const parsed = parseAmountInput(expenseAmount);
-                if (parsed !== null) {
-                  setExpenseAmount(formatAmountInput(parsed));
-                }
-              }}
-              placeholder="0.00"
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="item-currency">Currency</Label>
-            <CurrencyCombobox
-              id="item-currency"
-              value={expenseCurrency}
-              onChange={setExpenseCurrency}
-            />
-          </div>
         </div>
 
         {error && (

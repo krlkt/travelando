@@ -1,6 +1,12 @@
 import type {
   CityOverride,
   CityOverrideDraft,
+  Expense,
+  ExpenseCategory,
+  ExpenseDraft,
+  ExpensePatch,
+  ExpenseShare,
+  ExpenseSplitMode,
   FoodPlace,
   FoodPlaceDraft,
   ItemDraft,
@@ -51,7 +57,6 @@ export interface TripItemRow {
   to_place: Place | null;
   transport_mode: string | null;
   notes: string | null;
-  expense: { amount: number; currency: string } | null;
 }
 
 export function rowToItem(row: TripItemRow): TripItem {
@@ -67,7 +72,6 @@ export function rowToItem(row: TripItemRow): TripItem {
     transportMode:
       (row.transport_mode as TripItem['transportMode']) ?? undefined,
     notes: row.notes ?? undefined,
-    expense: row.expense ?? undefined,
   };
 }
 
@@ -153,7 +157,6 @@ export function itemDraftToInsert(
     to_place: draft.to ?? null,
     transport_mode: draft.transportMode ?? null,
     notes: draft.notes ?? null,
-    expense: draft.expense ?? null,
   };
 }
 
@@ -263,6 +266,113 @@ export function itemPatchToUpdate(
   if (patch.transportMode !== undefined)
     out.transport_mode = patch.transportMode ?? null;
   if (patch.notes !== undefined) out.notes = patch.notes ?? null;
-  if (patch.expense !== undefined) out.expense = patch.expense ?? null;
   return out;
+}
+
+export interface ExpenseShareRow {
+  id: string;
+  expense_id: string;
+  member_id: string;
+  value: number | string | null;
+  locked: boolean;
+}
+
+export interface ExpenseRow {
+  id: string;
+  trip_id: string;
+  item_id: string | null;
+  title: string;
+  amount: number | string;
+  currency: string;
+  payer_member_id: string;
+  spent_on: string;
+  mode: ExpenseSplitMode;
+  category: ExpenseCategory;
+  expense_shares?: ExpenseShareRow[] | null;
+}
+
+// Supabase returns numeric columns as strings to preserve precision. Coerce
+// to a finite number; non-numeric input falls back to 0 to keep math safe.
+function toNumber(value: number | string | null): number {
+  if (value === null) return 0;
+  if (typeof value === 'number') return value;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toNullableNumber(value: number | string | null): number | null {
+  if (value === null) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function rowToExpenseShare(row: ExpenseShareRow): ExpenseShare {
+  return {
+    memberId: row.member_id,
+    value: toNullableNumber(row.value),
+    locked: row.locked,
+  };
+}
+
+export function rowToExpense(row: ExpenseRow): Expense {
+  const shares = (row.expense_shares ?? []).map(rowToExpenseShare);
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    itemId: row.item_id ?? undefined,
+    title: row.title,
+    amount: toNumber(row.amount),
+    currency: row.currency,
+    payerMemberId: row.payer_member_id,
+    spentOn: row.spent_on,
+    mode: row.mode,
+    category: row.category,
+    shares,
+  };
+}
+
+export function expenseDraftToInsert(
+  draft: ExpenseDraft,
+): Omit<ExpenseRow, 'id' | 'expense_shares'> {
+  return {
+    trip_id: draft.tripId,
+    item_id: draft.itemId ?? null,
+    title: draft.title,
+    amount: draft.amount,
+    currency: draft.currency,
+    payer_member_id: draft.payerMemberId,
+    spent_on: draft.spentOn,
+    mode: draft.mode,
+    category: draft.category,
+  };
+}
+
+export function expensePatchToUpdate(
+  patch: ExpensePatch,
+): Partial<Omit<ExpenseRow, 'id' | 'trip_id' | 'expense_shares'>> {
+  const out: Partial<Omit<ExpenseRow, 'id' | 'trip_id' | 'expense_shares'>> =
+    {};
+  if (patch.itemId !== undefined) out.item_id = patch.itemId ?? null;
+  if (patch.title !== undefined) out.title = patch.title;
+  if (patch.amount !== undefined) out.amount = patch.amount;
+  if (patch.currency !== undefined) out.currency = patch.currency;
+  if (patch.payerMemberId !== undefined)
+    out.payer_member_id = patch.payerMemberId;
+  if (patch.spentOn !== undefined) out.spent_on = patch.spentOn;
+  if (patch.mode !== undefined) out.mode = patch.mode;
+  if (patch.category !== undefined) out.category = patch.category;
+  return out;
+}
+
+export function expenseSharesToInsert(
+  expenseId: string,
+  shares: ExpenseShare[],
+): Omit<ExpenseShareRow, 'id'>[] {
+  return shares.map((s) => ({
+    expense_id: expenseId,
+    member_id: s.memberId,
+    value: s.value,
+    locked: s.locked,
+  }));
 }

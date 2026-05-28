@@ -3,6 +3,9 @@ import type { TripsRepository } from './repository';
 import type {
   CityOverride,
   CityOverrideDraft,
+  Expense,
+  ExpenseDraft,
+  ExpensePatch,
   FoodPlace,
   FoodPlaceDraft,
   ItemDraft,
@@ -30,6 +33,12 @@ export function createInMemoryRepository(
   let store: Trip[] = seed.map(cloneTrip);
   let foodPlaces: FoodPlace[] = [];
   let cityOverrides: CityOverride[] = [];
+  let expenses: Expense[] = [];
+
+  const cloneExpense = (e: Expense): Expense => ({
+    ...e,
+    shares: e.shares.map((s) => ({ ...s })),
+  });
 
   return {
     async findAll() {
@@ -93,8 +102,6 @@ export function createInMemoryRepository(
               next.transportMode = patch.transportMode ?? undefined;
             if (patch.notes !== undefined)
               next.notes = patch.notes ?? undefined;
-            if (patch.expense !== undefined)
-              next.expense = patch.expense ?? undefined;
             updated = next;
             return next;
           }),
@@ -208,6 +215,44 @@ export function createInMemoryRepository(
           ? { ...t, members: t.members.filter((m) => m.id !== memberId) }
           : t,
       );
+    },
+
+    async listExpenses(tripId) {
+      return expenses.filter((e) => e.tripId === tripId).map(cloneExpense);
+    },
+    async addExpense(draft: ExpenseDraft) {
+      const expense: Expense = {
+        ...draft,
+        id: randomId('exp'),
+        shares: draft.shares.map((s) => ({ ...s })),
+      };
+      expenses = [...expenses, expense];
+      return cloneExpense(expense);
+    },
+    async updateExpense(id, patch: ExpensePatch) {
+      let updated: Expense | null = null;
+      expenses = expenses.map((e) => {
+        if (e.id !== id) return e;
+        const next: Expense = { ...e };
+        if (patch.itemId !== undefined) next.itemId = patch.itemId ?? undefined;
+        if (patch.title !== undefined) next.title = patch.title;
+        if (patch.amount !== undefined) next.amount = patch.amount;
+        if (patch.currency !== undefined) next.currency = patch.currency;
+        if (patch.payerMemberId !== undefined)
+          next.payerMemberId = patch.payerMemberId;
+        if (patch.spentOn !== undefined) next.spentOn = patch.spentOn;
+        if (patch.mode !== undefined) next.mode = patch.mode;
+        if (patch.category !== undefined) next.category = patch.category;
+        if (patch.shares !== undefined)
+          next.shares = patch.shares.map((s) => ({ ...s }));
+        updated = next;
+        return next;
+      });
+      if (!updated) throw new Error(`Expense ${id} not found`);
+      return cloneExpense(updated);
+    },
+    async removeExpense(id) {
+      expenses = expenses.filter((e) => e.id !== id);
     },
   };
 }

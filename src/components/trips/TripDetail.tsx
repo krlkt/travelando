@@ -4,14 +4,27 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeft, Bed, MapPin, Plus, Radio, Share2 } from 'lucide-react';
+import {
+  ArrowLeft,
+  Bed,
+  MapPin,
+  Plus,
+  Radio,
+  Share2,
+  Wallet,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TimelineItem } from './TimelineItem';
+import { useAuth } from '@/lib/auth/context';
+import { findMemberIdForUser } from '@/lib/trips/balances';
+import {
+  buildItemExpenseTotals,
+  type ItemExpenseTotal,
+} from '@/lib/trips/itemExpenseTotals';
 import { DayBackgroundStrip } from './DayBackgroundStrip';
 import { ItemDetailSheet } from './ItemDetailSheet';
-import { ExpensesPanel } from './ExpensesPanel';
 import { FoodWishlist } from './FoodWishlist';
 import { CityOverrideSheet } from './CityOverrideSheet';
 import { ItemEditorSheet } from './editor/ItemEditorSheet';
@@ -38,12 +51,14 @@ interface TripDetailProps {
 }
 
 export function TripDetail({ tripId }: TripDetailProps) {
-  const { getTrip, loadTripExtras, cityOverrides } = useTrips();
+  const { getTrip, loadTripExtras, cityOverrides, expenses } = useTrips();
+  const { user } = useAuth();
   const trip = getTrip(tripId);
 
   useEffect(() => {
     loadTripExtras(tripId);
   }, [tripId, loadTripExtras]);
+
   if (!trip) notFound();
 
   const now = new Date();
@@ -92,6 +107,11 @@ export function TripDetail({ tripId }: TripDetailProps) {
   ).find((o) => o.dayKey === activeDay);
 
   const totalDays = tripDayCount(trip.startDate, trip.endDate);
+
+  const itemExpenseTotals = useMemo(() => {
+    const currentMemberId = findMemberIdForUser(trip.members, user?.id);
+    return buildItemExpenseTotals(expenses[tripId] ?? [], currentMemberId);
+  }, [expenses, tripId, trip.members, user?.id]);
 
   return (
     <div className="relative">
@@ -278,6 +298,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
                       setDefaultDayDate(dayDate);
                       setItemEditorOpen(true);
                     }}
+                    itemExpenseTotals={itemExpenseTotals}
                   />
                 </TabsContent>
               ))}
@@ -286,8 +307,13 @@ export function TripDetail({ tripId }: TripDetailProps) {
 
           {/* Aside */}
           <aside className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
-            <ExpensesPanel trip={trip} />
             <FoodWishlist trip={trip} dayKey={activeDay} />
+            <Button asChild variant="outline" className="w-full">
+              <Link href={`/trips/${trip.id}/expenses`}>
+                <Wallet className="size-4" />
+                Expenses
+              </Link>
+            </Button>
             <Button
               variant="outline"
               className="w-full"
@@ -300,6 +326,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
       </div>
 
       <ItemDetailSheet
+        trip={trip}
         item={selectedItem}
         open={!!selectedItem}
         onOpenChange={(o) => {
@@ -358,11 +385,13 @@ function DayContent({
   currentItemId,
   onSelect,
   onAdd,
+  itemExpenseTotals,
 }: {
   bucket: DayCityBucket;
   currentItemId: string | null;
   onSelect: (item: TripItem) => void;
   onAdd: (dayDate: Date) => void;
+  itemExpenseTotals: Map<string, ItemExpenseTotal>;
 }) {
   const partitionedSegments = bucket.segments.map((seg) => {
     const background: TripItem[] = [];
@@ -444,6 +473,7 @@ function DayContent({
                         isOverlapping={seg.overlappingIds.has(item.id)}
                         bucketDate={bucket.date}
                         onSelect={() => onSelect(item)}
+                        expenseTotal={itemExpenseTotals.get(item.id)}
                       />
                     ))}
                   </motion.ol>

@@ -116,6 +116,13 @@ function MembersSheetBody({
     ? trip.members.find((m) => m.userId === user.id)
     : undefined;
 
+  // The owner is mirrored into trip_members so they can participate in
+  // expenses, but the owner row is rendered separately above — hide it
+  // from the additional-members list to avoid showing them twice.
+  const additionalMembers = trip.ownerId
+    ? trip.members.filter((m) => m.userId !== trip.ownerId)
+    : trip.members;
+
   return (
     <>
       <div>
@@ -203,7 +210,7 @@ function MembersSheetBody({
 
       <div className="grid gap-2">
         <Label className="text-muted-foreground text-xs tracking-wide uppercase">
-          On this trip ({trip.members.length + 1})
+          On this trip ({additionalMembers.length + 1})
         </Label>
 
         <div className="grid gap-1">
@@ -222,7 +229,7 @@ function MembersSheetBody({
             </div>
           </div>
 
-          {trip.members.map((member) => {
+          {additionalMembers.map((member) => {
             const isMe = Boolean(user && member.userId === user.id);
             const canRemove = isOwner || isMe;
             return (

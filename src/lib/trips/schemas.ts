@@ -8,14 +8,6 @@ const placeSchema = z.object({
   placeId: z.string().optional(),
 });
 
-const moneySchema = z.object({
-  amount: z.number(),
-  currency: z
-    .string()
-    .length(3)
-    .regex(/^[A-Z]{3}$/, 'Currency must be a 3-letter uppercase code'),
-});
-
 export const tripDraftSchema = z.object({
   title: z.string().min(1),
   destination: z.string().min(1),
@@ -68,7 +60,6 @@ export const itemDraftSchema = z.object({
   to: placeSchema.optional(),
   transportMode: transportModeSchema.optional(),
   notes: z.string().optional(),
-  expense: moneySchema.optional(),
 });
 
 export const itemPatchSchema = z.object({
@@ -80,7 +71,6 @@ export const itemPatchSchema = z.object({
   to: placeSchema.nullish(),
   transportMode: transportModeSchema.nullish(),
   notes: z.string().nullish(),
-  expense: moneySchema.nullish(),
 });
 
 export const foodPlaceCategorySchema = z.enum([
@@ -113,3 +103,42 @@ export const cityOverrideDraftSchema = z.object({
   cityLabel: z.string().min(1),
   cityPlaceId: z.string().optional(),
 });
+
+export const expenseSplitModeSchema = z.enum(['equally', 'parts', 'amounts']);
+
+export const expenseCategorySchema = z.enum([
+  'accommodation',
+  'entertainment',
+  'groceries',
+  'restaurants',
+  'shopping',
+  'transport',
+  'other',
+]);
+
+const expenseShareSchema = z.object({
+  memberId: z.string().min(1),
+  value: z.number().nullable(),
+  locked: z.boolean(),
+});
+
+export const expenseDraftSchema = z.object({
+  tripId: z.string().min(1),
+  itemId: z.string().min(1).optional(),
+  title: z.string().min(1).max(120),
+  amount: z.number().positive(),
+  currency: z
+    .string()
+    .length(3)
+    .regex(/^[A-Z]{3}$/, 'Currency must be a 3-letter uppercase code'),
+  payerMemberId: z.string().min(1),
+  spentOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  mode: expenseSplitModeSchema,
+  category: expenseCategorySchema,
+  shares: z.array(expenseShareSchema).min(1),
+});
+
+export const expensePatchSchema = expenseDraftSchema
+  .partial()
+  .omit({ tripId: true })
+  .extend({ itemId: z.string().min(1).nullish() });

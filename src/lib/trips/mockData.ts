@@ -39,7 +39,6 @@ export const mockTrips: Trip[] = [
         from: { label: 'AMS Schiphol', address: 'Amsterdam, NL' },
         to: { label: 'LIS Humberto Delgado', address: 'Lisbon, PT' },
         notes: 'KL 1693 · Gate D4. Seat 14A.',
-        expense: { amount: 184, currency: 'EUR' },
       },
       {
         id: 'i-l-2',
@@ -50,7 +49,6 @@ export const mockTrips: Trip[] = [
         endsAt: iso(2, 11, 0),
         to: { label: 'Príncipe Real', address: 'R. Dom Pedro V, Lisbon' },
         notes: 'Check-in code: 4422 · Host: Inês',
-        expense: { amount: 312, currency: 'EUR' },
       },
       {
         id: 'i-l-3',
@@ -61,7 +59,6 @@ export const mockTrips: Trip[] = [
         endsAt: iso(-1, 21, 30),
         to: { label: 'Cervejaria Ramiro', address: 'Av. Almirante Reis 1' },
         notes: 'Garlic prawns, percebes, prego no fim.',
-        expense: { amount: 78, currency: 'EUR' },
       },
       {
         id: 'i-l-4',
@@ -91,7 +88,6 @@ export const mockTrips: Trip[] = [
         startsAt: iso(0, 20, 0),
         endsAt: iso(0, 22, 0),
         to: { label: 'Time Out Market' },
-        expense: { amount: 64, currency: 'EUR' },
       },
       {
         id: 'i-l-7',
@@ -103,7 +99,6 @@ export const mockTrips: Trip[] = [
         transportMode: 'train',
         from: { label: 'Rossio Station' },
         to: { label: 'Sintra Station' },
-        expense: { amount: 9, currency: 'EUR' },
       },
       {
         id: 'i-l-8',
@@ -113,7 +108,6 @@ export const mockTrips: Trip[] = [
         startsAt: iso(1, 10, 30),
         endsAt: iso(1, 16, 0),
         to: { label: 'Sintra' },
-        expense: { amount: 28, currency: 'EUR' },
       },
       {
         id: 'i-l-9',
@@ -125,7 +119,6 @@ export const mockTrips: Trip[] = [
         transportMode: 'flight',
         from: { label: 'LIS Humberto Delgado' },
         to: { label: 'AMS Schiphol' },
-        expense: { amount: 169, currency: 'EUR' },
       },
     ],
   },
@@ -153,7 +146,6 @@ export const mockTrips: Trip[] = [
         transportMode: 'flight',
         from: { label: 'AMS Schiphol' },
         to: { label: 'HND Tokyo' },
-        expense: { amount: 920, currency: 'EUR' },
       },
       {
         id: 'i-j-2',
@@ -163,7 +155,6 @@ export const mockTrips: Trip[] = [
         startsAt: iso(29, 14, 0),
         endsAt: iso(32, 11, 0),
         to: { label: 'Shibuya, Tokyo' },
-        expense: { amount: 540, currency: 'EUR' },
       },
       {
         id: 'i-j-3',
@@ -173,7 +164,6 @@ export const mockTrips: Trip[] = [
         startsAt: iso(30, 10, 0),
         endsAt: iso(30, 13, 0),
         to: { label: 'Toyosu, Tokyo' },
-        expense: { amount: 22, currency: 'EUR' },
       },
       {
         id: 'i-j-4',
@@ -185,7 +175,6 @@ export const mockTrips: Trip[] = [
         transportMode: 'train',
         from: { label: 'Tokyo Station' },
         to: { label: 'Kyoto Station' },
-        expense: { amount: 95, currency: 'EUR' },
       },
     ],
   },
@@ -209,7 +198,6 @@ export const mockTrips: Trip[] = [
         transportMode: 'flight',
         from: { label: 'AMS' },
         to: { label: 'KEF Keflavík' },
-        expense: { amount: 220, currency: 'EUR' },
       },
       {
         id: 'i-ic-2',

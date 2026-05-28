@@ -3,10 +3,11 @@
 import { motion } from 'motion/react';
 import { ArrowRight, MapPin } from 'lucide-react';
 import type { TripItem } from '@/lib/trips/types';
+import type { ItemExpenseTotal } from '@/lib/trips/itemExpenseTotals';
 import { Badge } from '@/components/ui/badge';
 import { dayOffsetFrom, formatTime } from '@/lib/time/formatDate';
-import { formatMoney } from '@/lib/trips/grouping';
 import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
+import { formatMoney } from '@/lib/trips/grouping';
 import { fadeUp, spring } from '@/lib/motion/presets';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +18,7 @@ interface TimelineItemProps {
   isOverlapping?: boolean;
   bucketDate?: Date;
   onSelect?: () => void;
+  expenseTotal?: ItemExpenseTotal;
 }
 
 function dayOffsetSuffix(offset: number): string {
@@ -32,6 +34,7 @@ export function TimelineItem({
   isOverlapping,
   bucketDate,
   onSelect,
+  expenseTotal,
 }: TimelineItemProps) {
   const meta = kindMeta[item.kind];
   const Icon =
@@ -134,10 +137,24 @@ export function TimelineItem({
                       overlaps
                     </Badge>
                   )}
-                  {item.expense && (
-                    <span className="text-muted-foreground text-xs tabular-nums">
-                      {formatMoney(item.expense.amount, item.expense.currency)}
-                    </span>
+                  {expenseTotal && expenseTotal.byCurrency.length > 0 && (
+                    <div className="flex flex-col items-end gap-0.5 leading-tight">
+                      {expenseTotal.byCurrency.map((c) => (
+                        <div
+                          key={c.currency}
+                          className="flex flex-col items-end gap-0.5"
+                        >
+                          <span className="text-sm tabular-nums">
+                            {formatMoney(c.total, c.currency)}
+                          </span>
+                          {c.mine > 0 && (
+                            <span className="text-muted-foreground text-[11px] tabular-nums">
+                              you {formatMoney(c.mine, c.currency)}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

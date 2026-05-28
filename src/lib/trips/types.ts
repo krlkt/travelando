@@ -10,11 +10,6 @@ export type TransportMode =
   | 'metro'
   | 'taxi';
 
-export interface Money {
-  amount: number;
-  currency: string;
-}
-
 export interface Place {
   label: string;
   address?: string;
@@ -34,7 +29,6 @@ export interface TripItem {
   to?: Place;
   transportMode?: TransportMode;
   notes?: string;
-  expense?: Money;
 }
 
 export interface TripMember {
@@ -81,7 +75,6 @@ export interface ItemPatch {
   to?: Place | null;
   transportMode?: TransportMode | null;
   notes?: string | null;
-  expense?: Money | null;
 }
 
 export type FoodPlaceCategory =
@@ -130,3 +123,51 @@ export interface DayCityBucket {
 
 export type FoodPlaceDraft = Omit<FoodPlace, 'id'>;
 export type CityOverrideDraft = Omit<CityOverride, 'id'>;
+
+export type ExpenseSplitMode = 'equally' | 'parts' | 'amounts';
+
+export type ExpenseCategory =
+  | 'accommodation'
+  | 'entertainment'
+  | 'groceries'
+  | 'restaurants'
+  | 'shopping'
+  | 'transport'
+  | 'other';
+
+export interface ExpenseShare {
+  memberId: string;
+  // equally: null
+  // parts:   integer multiplier (>= 1)
+  // amounts: locked amount when locked === true, else null (auto-distributed)
+  value: number | null;
+  locked: boolean;
+}
+
+export interface Expense {
+  id: string;
+  tripId: string;
+  itemId?: string;
+  title: string;
+  amount: number;
+  currency: string;
+  payerMemberId: string;
+  spentOn: string;
+  mode: ExpenseSplitMode;
+  category: ExpenseCategory;
+  shares: ExpenseShare[];
+}
+
+export type ExpenseDraft = Omit<Expense, 'id'>;
+
+export interface ExpensePatch {
+  itemId?: string | null;
+  title?: string;
+  amount?: number;
+  currency?: string;
+  payerMemberId?: string;
+  spentOn?: string;
+  mode?: ExpenseSplitMode;
+  category?: ExpenseCategory;
+  shares?: ExpenseShare[];
+}

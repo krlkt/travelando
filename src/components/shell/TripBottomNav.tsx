@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Map, Menu, Radio } from 'lucide-react';
+import { Map, Menu, Radio, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { spring } from '@/lib/motion/presets';
 import { MobileMenu } from './MobileMenu';
@@ -19,8 +19,10 @@ export function TripBottomNav() {
   if (!tripId) return null;
 
   const overviewHref = `/trips/${tripId}`;
+  const expensesHref = `/trips/${tripId}/expenses`;
   const liveHref = `/trips/${tripId}/now`;
   const overviewActive = pathname === overviewHref;
+  const expensesActive = pathname === expensesHref;
   const liveActive = pathname === liveHref;
 
   return (
@@ -50,6 +52,12 @@ export function TripBottomNav() {
             label="Trip"
             icon={<Map className="size-[18px]" />}
             active={overviewActive}
+          />
+          <Tab
+            href={expensesHref}
+            label="Expenses"
+            icon={<Wallet className="size-[18px]" />}
+            active={expensesActive}
           />
           <Tab
             href={liveHref}

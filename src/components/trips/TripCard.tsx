@@ -20,12 +20,7 @@ import {
   isUpcoming,
   relativeFromNow,
 } from '@/lib/time/formatDate';
-import {
-  formatMoney,
-  totalsByCurrency,
-  findCurrentItem,
-  findNextItem,
-} from '@/lib/trips/grouping';
+import { findCurrentItem, findNextItem } from '@/lib/trips/grouping';
 import { useTrips } from '@/lib/trips/context';
 import type { Trip } from '@/lib/trips/types';
 
@@ -40,7 +35,6 @@ export function TripCard({ trip, highlight }: TripCardProps) {
   const ongoing = isOngoing(trip.startDate, trip.endDate, now);
   const upcoming = isUpcoming(trip.startDate, now);
   const days = tripDayCount(trip.startDate, trip.endDate);
-  const totals = totalsByCurrency(trip.items);
   const currentItem = ongoing ? findCurrentItem(trip.items, now) : null;
   const nextItem = ongoing ? findNextItem(trip.items, now) : null;
 
@@ -196,11 +190,6 @@ export function TripCard({ trip, highlight }: TripCardProps) {
         )}
 
         <div className="flex flex-wrap items-center gap-1.5">
-          {[...totals.entries()].slice(0, 3).map(([currency, amount]) => (
-            <Badge key={currency} variant="outline">
-              {formatMoney(amount, currency)}
-            </Badge>
-          ))}
           <Badge variant="muted">
             {trip.items.length} {trip.items.length === 1 ? 'item' : 'items'}
           </Badge>

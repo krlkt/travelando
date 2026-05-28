@@ -1,11 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   cityOverrideDraftToInsert,
+  expenseDraftToInsert,
+  expensePatchToUpdate,
+  expenseSharesToInsert,
   foodPlaceDraftToInsert,
   foodPlacePatchToUpdate,
   itemDraftToInsert,
   itemPatchToUpdate,
   rowToCityOverride,
+  rowToExpense,
   rowToFoodPlace,
   rowToItem,
   rowToMember,
@@ -13,6 +17,7 @@ import {
   tripDraftToInsert,
   tripPatchToUpdate,
   type CityOverrideRow,
+  type ExpenseRow,
   type FoodPlaceRow,
   type TripItemRow,
   type TripMemberRow,
@@ -22,6 +27,9 @@ import type { TripsRepository } from './repository';
 import type {
   CityOverride,
   CityOverrideDraft,
+  Expense,
+  ExpenseDraft,
+  ExpensePatch,
   FoodPlace,
   FoodPlaceDraft,
   ItemDraft,
@@ -44,10 +52,14 @@ const TRIP_COLUMNS =
   'id, owner_id, title, destination, cover_image, cover_gradient, start_date, end_date';
 
 const ITEM_COLUMNS =
-  'id, trip_id, kind, title, starts_at, ends_at, from_place, to_place, transport_mode, notes, expense';
+  'id, trip_id, kind, title, starts_at, ends_at, from_place, to_place, transport_mode, notes';
 
 const MEMBER_COLUMNS =
   'id, trip_id, user_id, display_name, email, invited_by, profiles(avatar_url, display_name)';
+
+const EXPENSE_SHARE_COLUMNS = 'id, expense_id, member_id, value, locked';
+
+const EXPENSE_COLUMNS = `id, trip_id, item_id, title, amount, currency, payer_member_id, spent_on, mode, category, expense_shares(${EXPENSE_SHARE_COLUMNS})`;
 
 const TRIP_WITH_ITEMS = `${TRIP_COLUMNS}, trip_items(${ITEM_COLUMNS}), trip_members(${MEMBER_COLUMNS})`;
 
@@ -367,6 +379,103 @@ export function createSupabaseRepository(
       if (error) {
         throw new Error(`removeMember ${memberId}: ${error.message}`);
       }
+    },
+
+    async listExpenses(tripId: string): Promise<Expense[]> {
+      const { data, error } = await client
+        .from('expenses')
+        .select(EXPENSE_COLUMNS)
+        .eq('trip_id', tripId)
+        .order('spent_on', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (error) throw new Error(`listExpenses: ${error.message}`);
+      return (data ?? []).map((r) => rowToExpense(r as ExpenseRow));
+    },
+
+    async addExpense(draft: ExpenseDraft): Promise<Expense> {
+      if (isDemoTrip(draft.tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
+      const insert = expenseDraftToInsert(draft);
+      const { data, error } = await client
+        .from('expenses')
+        .insert(insert)
+        .select(EXPENSE_COLUMNS)
+        .single();
+      const parent = unwrap(data as ExpenseRow | null, error, 'addExpense');
+
+      const sharesInsert = expenseSharesToInsert(parent.id, draft.shares);
+      const { error: sharesError } = await client
+        .from('expense_shares')
+        .insert(sharesInsert);
+      if (sharesError) {
+        // Best-effort cleanup; CASCADE removes any partially-inserted shares.
+        await client.from('expenses').delete().eq('id', parent.id);
+        throw new Error(`addExpense shares: ${sharesError.message}`);
+      }
+
+      const { data: refetched, error: refetchError } = await client
+        .from('expenses')
+        .select(EXPENSE_COLUMNS)
+        .eq('id', parent.id)
+        .single();
+      const finalRow = unwrap(
+        refetched as ExpenseRow | null,
+        refetchError,
+        `addExpense fetch ${parent.id}`,
+      );
+      return rowToExpense(finalRow);
+    },
+
+    async updateExpense(id: string, patch: ExpensePatch): Promise<Expense> {
+      const update = expensePatchToUpdate(patch);
+      if (Object.keys(update).length > 0) {
+        const { error } = await client
+          .from('expenses')
+          .update(update)
+          .eq('id', id);
+        if (error) {
+          throw new Error(`updateExpense ${id}: ${error.message}`);
+        }
+      }
+
+      if (patch.shares !== undefined) {
+        const { error: deleteError } = await client
+          .from('expense_shares')
+          .delete()
+          .eq('expense_id', id);
+        if (deleteError) {
+          throw new Error(
+            `updateExpense ${id} clear shares: ${deleteError.message}`,
+          );
+        }
+        const sharesInsert = expenseSharesToInsert(id, patch.shares);
+        if (sharesInsert.length > 0) {
+          const { error: insertError } = await client
+            .from('expense_shares')
+            .insert(sharesInsert);
+          if (insertError) {
+            throw new Error(
+              `updateExpense ${id} shares: ${insertError.message}`,
+            );
+          }
+        }
+      }
+
+      const { data, error } = await client
+        .from('expenses')
+        .select(EXPENSE_COLUMNS)
+        .eq('id', id)
+        .single();
+      const row = unwrap(
+        data as ExpenseRow | null,
+        error,
+        `updateExpense fetch ${id}`,
+      );
+      return rowToExpense(row);
+    },
+
+    async removeExpense(id: string): Promise<void> {
+      const { error } = await client.from('expenses').delete().eq('id', id);
+      if (error) throw new Error(`removeExpense ${id}: ${error.message}`);
     },
   };
 }
