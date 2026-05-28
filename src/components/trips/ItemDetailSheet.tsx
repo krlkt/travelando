@@ -24,6 +24,7 @@ import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
 import { formatMoney } from '@/lib/trips/grouping';
 import { useTrips } from '@/lib/trips/context';
 import type { TripItem } from '@/lib/trips/types';
+import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
 
 interface ItemDetailSheetProps {
   item: TripItem | null;
@@ -78,7 +79,7 @@ export function ItemDetailSheet({
             <Row icon={MapPin} label="Place">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 [overflow-wrap:anywhere]">
                 {item.from && (
-                  <span>
+                  <PlaceAddressLink place={item.from}>
                     {item.from.label}
                     {item.from.address && (
                       <span className="text-muted-foreground">
@@ -86,13 +87,13 @@ export function ItemDetailSheet({
                         · {item.from.address}
                       </span>
                     )}
-                  </span>
+                  </PlaceAddressLink>
                 )}
                 {item.from && item.to && (
                   <ArrowRight className="text-muted-foreground size-3.5 shrink-0" />
                 )}
                 {item.to && (
-                  <span>
+                  <PlaceAddressLink place={item.to}>
                     {item.to.label}
                     {item.to.address && (
                       <span className="text-muted-foreground">
@@ -100,7 +101,7 @@ export function ItemDetailSheet({
                         · {item.to.address}
                       </span>
                     )}
-                  </span>
+                  </PlaceAddressLink>
                 )}
               </div>
             </Row>

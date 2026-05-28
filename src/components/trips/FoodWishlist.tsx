@@ -8,6 +8,7 @@ import { useTrips } from '@/lib/trips/context';
 import { deriveCitiesByDay, foodPlaceCitiesForDay } from '@/lib/trips/cities';
 import { toast } from 'sonner';
 import type { FoodPlace, Trip } from '@/lib/trips/types';
+import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
 
 interface FoodWishlistProps {
   trip: Trip;
@@ -132,14 +133,25 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
                       className="group flex items-start justify-between gap-2"
                     >
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {place.name}
-                        </p>
-                        {place.address && (
-                          <p className="text-muted-foreground truncate text-xs">
-                            {place.address}
-                          </p>
-                        )}
+                        <PlaceAddressLink
+                          place={{
+                            label: place.name,
+                            address: place.address,
+                            lat: place.lat,
+                            lng: place.lng,
+                            placeId: place.placeId,
+                          }}
+                          className="block max-w-full min-w-0"
+                        >
+                          <span className="block truncate text-sm font-medium">
+                            {place.name}
+                          </span>
+                          {place.address && (
+                            <span className="text-muted-foreground block truncate text-xs">
+                              {place.address}
+                            </span>
+                          )}
+                        </PlaceAddressLink>
                       </div>
                       <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
                         <Button
