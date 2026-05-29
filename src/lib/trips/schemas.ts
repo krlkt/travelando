@@ -93,6 +93,7 @@ export const foodPlaceDraftSchema = z.object({
   placeId: z.string().optional(),
   notes: z.string().optional(),
   category: foodPlaceCategorySchema.optional(),
+  wantLevel: z.number().int().min(1).max(5).optional(),
 });
 
 export const foodPlacePatchSchema = foodPlaceDraftSchema.partial();

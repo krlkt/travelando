@@ -22,6 +22,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
+import { WantLevel } from './WantLevel';
 import { useTrips } from '@/lib/trips/context';
 import type {
   FoodPlace,
@@ -107,6 +108,9 @@ function FoodPlaceBody({
   const [category, setCategory] = useState<FoodPlaceCategory>(
     item?.category ?? 'restaurant',
   );
+  const [wantLevel, setWantLevel] = useState<number | undefined>(
+    item?.wantLevel,
+  );
   const [notes, setNotes] = useState<string>(item?.notes ?? '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -127,6 +131,7 @@ function FoodPlaceBody({
       lng: addressPlace?.lng,
       placeId: addressPlace?.placeId,
       category,
+      wantLevel,
       notes: notes.trim() || undefined,
     };
 
@@ -204,6 +209,11 @@ function FoodPlaceBody({
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="grid gap-1.5">
+          <Label>How much you want this</Label>
+          <WantLevel value={wantLevel} onChange={setWantLevel} />
         </div>
 
         <div className="grid gap-1.5">

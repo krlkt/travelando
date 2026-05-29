@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pencil, Plus, Trash2, UtensilsCrossed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FoodPlaceSheet } from './FoodPlaceSheet';
+import { WantLevel } from './WantLevel';
 import { useTrips } from '@/lib/trips/context';
 import { deriveCitiesByDay, foodPlaceCitiesForDay } from '@/lib/trips/cities';
 import { toast } from 'sonner';
@@ -65,6 +66,11 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
       if (!byCity.has(key)) byCity.set(key, []);
       byCity.get(key)!.push(place);
     }
+    // Highest want level first within each city; unrated sink to the bottom.
+    // Array.sort is stable, so equal levels keep their original order.
+    for (const cityPlaces of byCity.values()) {
+      cityPlaces.sort((a, b) => (b.wantLevel ?? 0) - (a.wantLevel ?? 0));
+    }
     return byCity;
   }, [places, cities]);
 
@@ -99,7 +105,7 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
         <span className="text-sm font-medium">Food wishlist</span>
       </div>
 
-      <div className="divide-border/30 divide-y">
+      <div className="divide-border/30 max-h-[60vh] divide-y overflow-y-auto">
         {cities.map((city) => {
           const cityKey = city.cityPlaceId ?? city.cityLabel;
           const cityPlaces = grouped.get(cityKey) ?? [];
@@ -153,25 +159,28 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
                           )}
                         </PlaceAddressLink>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-muted-foreground hover:text-foreground size-6"
-                          onClick={() => openEdit(place)}
-                          aria-label={`Edit ${place.name}`}
-                        >
-                          <Pencil className="size-3" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-muted-foreground hover:text-destructive size-6"
-                          onClick={() => handleDelete(place)}
-                          aria-label={`Remove ${place.name}`}
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <WantLevel mode="indicator" value={place.wantLevel} />
+                        <div className="flex items-center gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-muted-foreground hover:text-foreground size-6"
+                            onClick={() => openEdit(place)}
+                            aria-label={`Edit ${place.name}`}
+                          >
+                            <Pencil className="size-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-muted-foreground hover:text-destructive size-6"
+                            onClick={() => handleDelete(place)}
+                            aria-label={`Remove ${place.name}`}
+                          >
+                            <Trash2 className="size-3" />
+                          </Button>
+                        </div>
                       </div>
                     </li>
                   ))}

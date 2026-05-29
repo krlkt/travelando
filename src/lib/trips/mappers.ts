@@ -174,6 +174,7 @@ export interface FoodPlaceRow {
   place_id: string | null;
   notes: string | null;
   category: string | null;
+  want_level: number | null;
 }
 
 export interface CityOverrideRow {
@@ -197,6 +198,7 @@ export function rowToFoodPlace(row: FoodPlaceRow): FoodPlace {
     placeId: row.place_id ?? undefined,
     notes: row.notes ?? undefined,
     category: (row.category as FoodPlace['category']) ?? undefined,
+    wantLevel: row.want_level ?? undefined,
   };
 }
 
@@ -214,6 +216,7 @@ export function foodPlaceDraftToInsert(
     place_id: draft.placeId ?? null,
     notes: draft.notes ?? null,
     category: draft.category ?? null,
+    want_level: draft.wantLevel ?? null,
   };
 }
 
@@ -231,6 +234,7 @@ export function foodPlacePatchToUpdate(
   if (patch.placeId !== undefined) out.place_id = patch.placeId ?? null;
   if (patch.notes !== undefined) out.notes = patch.notes ?? null;
   if (patch.category !== undefined) out.category = patch.category ?? null;
+  if (patch.wantLevel !== undefined) out.want_level = patch.wantLevel ?? null;
   return out;
 }
 

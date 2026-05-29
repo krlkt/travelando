@@ -97,6 +97,7 @@ export interface FoodPlace {
   placeId?: string;
   notes?: string;
   category?: FoodPlaceCategory;
+  wantLevel?: number;
 }
 
 export interface CityOverride {
