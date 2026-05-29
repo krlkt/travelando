@@ -1,6 +1,8 @@
 import { mockTrips } from './mockData';
 import type { TripsRepository } from './repository';
 import type {
+  ActivityPlace,
+  ActivityPlaceDraft,
   CityOverride,
   CityOverrideDraft,
   Expense,
@@ -34,6 +36,7 @@ export function createInMemoryRepository(
 ): TripsRepository {
   let store: Trip[] = seed.map(cloneTrip);
   let foodPlaces: FoodPlace[] = [];
+  let activityPlaces: ActivityPlace[] = [];
   let cityOverrides: CityOverride[] = [];
   let expenses: Expense[] = [];
   let settlements: Settlement[] = [];
@@ -144,6 +147,30 @@ export function createInMemoryRepository(
     },
     async removeFoodPlace(id) {
       foodPlaces = foodPlaces.filter((p) => p.id !== id);
+    },
+
+    async listActivityPlaces(tripId) {
+      return activityPlaces
+        .filter((p) => p.tripId === tripId)
+        .map((p) => ({ ...p }));
+    },
+    async addActivityPlace(draft: ActivityPlaceDraft) {
+      const place: ActivityPlace = { ...draft, id: randomId('ap') };
+      activityPlaces = [...activityPlaces, place];
+      return { ...place };
+    },
+    async updateActivityPlace(id, patch) {
+      let updated: ActivityPlace | null = null;
+      activityPlaces = activityPlaces.map((p) => {
+        if (p.id !== id) return p;
+        updated = { ...p, ...patch };
+        return updated;
+      });
+      if (!updated) throw new Error(`ActivityPlace ${id} not found`);
+      return { ...(updated as ActivityPlace) };
+    },
+    async removeActivityPlace(id) {
+      activityPlaces = activityPlaces.filter((p) => p.id !== id);
     },
 
     async listCityOverrides(tripId) {

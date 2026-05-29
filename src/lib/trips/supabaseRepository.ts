@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  activityPlaceDraftToInsert,
+  activityPlacePatchToUpdate,
   cityOverrideDraftToInsert,
   expenseDraftToInsert,
   expensePatchToUpdate,
@@ -8,6 +10,7 @@ import {
   foodPlacePatchToUpdate,
   itemDraftToInsert,
   itemPatchToUpdate,
+  rowToActivityPlace,
   rowToCityOverride,
   rowToExpense,
   rowToFoodPlace,
@@ -18,6 +21,7 @@ import {
   settlementDraftToInsert,
   tripDraftToInsert,
   tripPatchToUpdate,
+  type ActivityPlaceRow,
   type CityOverrideRow,
   type ExpenseRow,
   type FoodPlaceRow,
@@ -28,6 +32,8 @@ import {
 } from './mappers';
 import type { TripsRepository } from './repository';
 import type {
+  ActivityPlace,
+  ActivityPlaceDraft,
   CityOverride,
   CityOverrideDraft,
   Expense,
@@ -250,6 +256,59 @@ export function createSupabaseRepository(
     async removeFoodPlace(id: string): Promise<void> {
       const { error } = await client.from('food_places').delete().eq('id', id);
       if (error) throw new Error(`removeFoodPlace ${id}: ${error.message}`);
+    },
+
+    async listActivityPlaces(tripId: string): Promise<ActivityPlace[]> {
+      const { data, error } = await client
+        .from('activity_places')
+        .select('*')
+        .eq('trip_id', tripId)
+        .order('created_at', { ascending: true });
+      if (error) throw new Error(`listActivityPlaces: ${error.message}`);
+      return (data ?? []).map((r) => rowToActivityPlace(r as ActivityPlaceRow));
+    },
+
+    async addActivityPlace(draft: ActivityPlaceDraft): Promise<ActivityPlace> {
+      if (isDemoTrip(draft.tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
+      const insert = activityPlaceDraftToInsert(draft);
+      const { data, error } = await client
+        .from('activity_places')
+        .insert(insert)
+        .select('*')
+        .single();
+      const row = unwrap(
+        data as ActivityPlaceRow | null,
+        error,
+        'addActivityPlace',
+      );
+      return rowToActivityPlace(row);
+    },
+
+    async updateActivityPlace(
+      id: string,
+      patch: Partial<ActivityPlaceDraft>,
+    ): Promise<ActivityPlace> {
+      const update = activityPlacePatchToUpdate(patch);
+      const { data, error } = await client
+        .from('activity_places')
+        .update(update)
+        .eq('id', id)
+        .select('*')
+        .single();
+      const row = unwrap(
+        data as ActivityPlaceRow | null,
+        error,
+        `updateActivityPlace ${id}`,
+      );
+      return rowToActivityPlace(row);
+    },
+
+    async removeActivityPlace(id: string): Promise<void> {
+      const { error } = await client
+        .from('activity_places')
+        .delete()
+        .eq('id', id);
+      if (error) throw new Error(`removeActivityPlace ${id}: ${error.message}`);
     },
 
     async listCityOverrides(tripId: string): Promise<CityOverride[]> {

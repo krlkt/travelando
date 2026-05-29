@@ -98,6 +98,33 @@ export const foodPlaceDraftSchema = z.object({
 
 export const foodPlacePatchSchema = foodPlaceDraftSchema.partial();
 
+export const activityPlaceCategorySchema = z.enum([
+  'sightseeing',
+  'museum',
+  'outdoor',
+  'entertainment',
+  'tour',
+  'shopping',
+  'nightlife',
+  'other',
+]);
+
+export const activityPlaceDraftSchema = z.object({
+  tripId: z.string().min(1),
+  cityLabel: z.string().min(1),
+  cityPlaceId: z.string().optional(),
+  name: z.string().min(1),
+  address: z.string().optional(),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  placeId: z.string().optional(),
+  notes: z.string().optional(),
+  category: activityPlaceCategorySchema.optional(),
+  wantLevel: z.number().int().min(1).max(5).optional(),
+});
+
+export const activityPlacePatchSchema = activityPlaceDraftSchema.partial();
+
 export const cityOverrideDraftSchema = z.object({
   tripId: z.string().min(1),
   dayKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

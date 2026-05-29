@@ -1,4 +1,6 @@
 import type {
+  ActivityPlace,
+  ActivityPlaceDraft,
   CityOverride,
   CityOverrideDraft,
   Expense,
@@ -39,6 +41,14 @@ export interface TripsRepository {
     patch: Partial<FoodPlaceDraft>,
   ): Promise<FoodPlace>;
   removeFoodPlace(id: string): Promise<void>;
+
+  listActivityPlaces(tripId: string): Promise<ActivityPlace[]>;
+  addActivityPlace(draft: ActivityPlaceDraft): Promise<ActivityPlace>;
+  updateActivityPlace(
+    id: string,
+    patch: Partial<ActivityPlaceDraft>,
+  ): Promise<ActivityPlace>;
+  removeActivityPlace(id: string): Promise<void>;
 
   listCityOverrides(tripId: string): Promise<CityOverride[]>;
   upsertCityOverride(draft: CityOverrideDraft): Promise<CityOverride>;

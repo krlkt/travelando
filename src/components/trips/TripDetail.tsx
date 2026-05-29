@@ -26,6 +26,7 @@ import {
 import { DayBackgroundStrip } from './DayBackgroundStrip';
 import { ItemDetailSheet } from './ItemDetailSheet';
 import { FoodWishlist } from './FoodWishlist';
+import { ActivityWishlist } from './ActivityWishlist';
 import { CityOverrideSheet } from './CityOverrideSheet';
 import { ItemEditorSheet } from './editor/ItemEditorSheet';
 import { TripEditorSheet } from './editor/TripEditorSheet';
@@ -308,6 +309,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
           {/* Aside */}
           <aside className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
             <FoodWishlist trip={trip} dayKey={activeDay} />
+            <ActivityWishlist trip={trip} dayKey={activeDay} />
             <Button asChild variant="outline" className="w-full">
               <Link href={`/trips/${trip.id}/expenses`}>
                 <Wallet className="size-4" />

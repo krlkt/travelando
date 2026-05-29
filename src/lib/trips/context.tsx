@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from 'react';
 import type {
+  ActivityPlace,
+  ActivityPlaceDraft,
   CityOverride,
   CityOverrideDraft,
   Expense,
@@ -44,6 +46,7 @@ interface TripsState {
   removeItem: (tripId: string, itemId: string) => Promise<void>;
 
   foodPlaces: Record<string, FoodPlace[]>;
+  activityPlaces: Record<string, ActivityPlace[]>;
   cityOverrides: Record<string, CityOverride[]>;
   expenses: Record<string, Expense[]>;
   settlements: Record<string, Settlement[]>;
@@ -54,6 +57,12 @@ interface TripsState {
     patch: Partial<FoodPlaceDraft>,
   ) => Promise<void>;
   removeFoodPlace: (tripId: string, id: string) => Promise<void>;
+  addActivityPlace: (draft: ActivityPlaceDraft) => Promise<ActivityPlace>;
+  updateActivityPlace: (
+    id: string,
+    patch: Partial<ActivityPlaceDraft>,
+  ) => Promise<void>;
+  removeActivityPlace: (tripId: string, id: string) => Promise<void>;
   upsertCityOverride: (draft: CityOverrideDraft) => Promise<void>;
   removeCityOverride: (tripId: string, id: string) => Promise<void>;
   addExpense: (draft: ExpenseDraft) => Promise<Expense>;
@@ -126,6 +135,9 @@ interface TripsProviderProps {
 export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   const [trips, setTrips] = useState<Trip[]>(initialTrips);
   const [foodPlaces, setFoodPlaces] = useState<Record<string, FoodPlace[]>>({});
+  const [activityPlaces, setActivityPlaces] = useState<
+    Record<string, ActivityPlace[]>
+  >({});
   const [cityOverrides, setCityOverrides] = useState<
     Record<string, CityOverride[]>
   >({});
@@ -317,13 +329,15 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   );
 
   const loadTripExtras = useCallback(async (tripId: string): Promise<void> => {
-    const [fp, co, ex, st] = await Promise.all([
+    const [fp, ap, co, ex, st] = await Promise.all([
       callApi<FoodPlace[]>(`/api/trips/${tripId}/food-places`),
+      callApi<ActivityPlace[]>(`/api/trips/${tripId}/activity-places`),
       callApi<CityOverride[]>(`/api/trips/${tripId}/city-overrides`),
       callApi<Expense[]>(`/api/trips/${tripId}/expenses`),
       callApi<Settlement[]>(`/api/trips/${tripId}/settlements`),
     ]);
     setFoodPlaces((prev) => ({ ...prev, [tripId]: fp ?? [] }));
+    setActivityPlaces((prev) => ({ ...prev, [tripId]: ap ?? [] }));
     setCityOverrides((prev) => ({ ...prev, [tripId]: co ?? [] }));
     setExpenses((prev) => ({ ...prev, [tripId]: ex ?? [] }));
     setSettlements((prev) => ({ ...prev, [tripId]: st ?? [] }));
@@ -380,6 +394,68 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       }));
       try {
         await callApi<null>(`/api/food-places/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        await loadTripExtras(tripId);
+        throw err;
+      }
+    },
+    [loadTripExtras],
+  );
+
+  const addActivityPlace = useCallback(
+    async (draft: ActivityPlaceDraft): Promise<ActivityPlace> => {
+      const created = await callApi<ActivityPlace>(
+        `/api/trips/${draft.tripId}/activity-places`,
+        {
+          method: 'POST',
+          body: JSON.stringify(draft),
+        },
+      );
+      if (!created) throw new Error('ActivityPlace not returned');
+      setActivityPlaces((prev) => ({
+        ...prev,
+        [draft.tripId]: [...(prev[draft.tripId] ?? []), created],
+      }));
+      return created;
+    },
+    [],
+  );
+
+  const updateActivityPlace = useCallback(
+    async (id: string, patch: Partial<ActivityPlaceDraft>): Promise<void> => {
+      const tripId =
+        patch.tripId ??
+        Object.keys(activityPlaces).find((tid) =>
+          activityPlaces[tid]?.some((p) => p.id === id),
+        );
+      if (!tripId) throw new Error(`ActivityPlace ${id} not found in context`);
+      const updated = await callApi<ActivityPlace>(
+        `/api/activity-places/${id}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify(patch),
+        },
+      );
+      if (updated) {
+        setActivityPlaces((prev) => ({
+          ...prev,
+          [tripId]: (prev[tripId] ?? []).map((p) =>
+            p.id === id ? updated : p,
+          ),
+        }));
+      }
+    },
+    [activityPlaces],
+  );
+
+  const removeActivityPlace = useCallback(
+    async (tripId: string, id: string): Promise<void> => {
+      setActivityPlaces((prev) => ({
+        ...prev,
+        [tripId]: (prev[tripId] ?? []).filter((p) => p.id !== id),
+      }));
+      try {
+        await callApi<null>(`/api/activity-places/${id}`, { method: 'DELETE' });
       } catch (err) {
         await loadTripExtras(tripId);
         throw err;
@@ -685,6 +761,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       updateItem,
       removeItem,
       foodPlaces,
+      activityPlaces,
       cityOverrides,
       expenses,
       settlements,
@@ -692,6 +769,9 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       addFoodPlace,
       updateFoodPlace,
       removeFoodPlace,
+      addActivityPlace,
+      updateActivityPlace,
+      removeActivityPlace,
       upsertCityOverride,
       removeCityOverride,
       addExpense,
@@ -713,6 +793,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       updateItem,
       removeItem,
       foodPlaces,
+      activityPlaces,
       cityOverrides,
       expenses,
       settlements,
@@ -720,6 +801,9 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       addFoodPlace,
       updateFoodPlace,
       removeFoodPlace,
+      addActivityPlace,
+      updateActivityPlace,
+      removeActivityPlace,
       upsertCityOverride,
       removeCityOverride,
       addExpense,

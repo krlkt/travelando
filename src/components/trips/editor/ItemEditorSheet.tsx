@@ -31,6 +31,7 @@ import {
 } from '@/lib/trips/cities';
 import { dayKey, formatDate } from '@/lib/time/formatDate';
 import type {
+  ActivityPlace,
   FoodPlace,
   ItemDraft,
   ItemKind,
@@ -170,7 +171,8 @@ function ItemEditorBody({
   defaultDate,
   onClose,
 }: ItemEditorBodyProps) {
-  const { addItem, updateItem, foodPlaces, cityOverrides } = useTrips();
+  const { addItem, updateItem, foodPlaces, activityPlaces, cityOverrides } =
+    useTrips();
   const tripId = trip.id;
   const isEdit = !!item;
 
@@ -231,7 +233,10 @@ function ItemEditorBody({
   }, [startsAt, cityOverrides, tripId, trip]);
 
   const wishlistByCity = useMemo(() => {
-    const all = foodPlaces[tripId] ?? [];
+    const all: Array<FoodPlace | ActivityPlace> =
+      kind === 'activity'
+        ? (activityPlaces[tripId] ?? [])
+        : (foodPlaces[tripId] ?? []);
     const cities = dayCities ?? [{ cityLabel: trip.destination }];
     return cities.map((city) => {
       const places = all.filter((fp) =>
@@ -241,14 +246,14 @@ function ItemEditorBody({
       );
       return { city, places };
     });
-  }, [foodPlaces, tripId, dayCities, trip.destination]);
+  }, [kind, foodPlaces, activityPlaces, tripId, dayCities, trip.destination]);
 
   const totalWishlistCount = useMemo(
     () => wishlistByCity.reduce((sum, group) => sum + group.places.length, 0),
     [wishlistByCity],
   );
 
-  function handleWishlistSelect(fp: FoodPlace) {
+  function handleWishlistSelect(fp: FoodPlace | ActivityPlace) {
     setTitle(fp.name);
     setToValue(fp.address ?? fp.name);
     setToPlace({
@@ -403,7 +408,7 @@ function ItemEditorBody({
           </div>
         )}
 
-        {kind === 'meal' && (
+        {(kind === 'meal' || kind === 'activity') && (
           <div className="grid gap-1.5">
             <Label className="text-muted-foreground text-xs">
               Pick from wishlist
@@ -467,7 +472,9 @@ function ItemEditorBody({
                 {dayCities && dayCities.length === 1
                   ? ` in ${dayCities[0].cityLabel}`
                   : ''}{' '}
-                yet. Add some from the Food wishlist on the trip page.
+                yet. Add some from the{' '}
+                {kind === 'activity' ? 'Activity' : 'Food'} wishlist on the trip
+                page.
               </p>
             )}
           </div>

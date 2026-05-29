@@ -123,6 +123,33 @@ export interface DayCityBucket {
 }
 
 export type FoodPlaceDraft = Omit<FoodPlace, 'id'>;
+
+export type ActivityPlaceCategory =
+  | 'sightseeing'
+  | 'museum'
+  | 'outdoor'
+  | 'entertainment'
+  | 'tour'
+  | 'shopping'
+  | 'nightlife'
+  | 'other';
+
+export interface ActivityPlace {
+  id: string;
+  tripId: string;
+  cityLabel: string;
+  cityPlaceId?: string;
+  name: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+  notes?: string;
+  category?: ActivityPlaceCategory;
+  wantLevel?: number;
+}
+
+export type ActivityPlaceDraft = Omit<ActivityPlace, 'id'>;
 export type CityOverrideDraft = Omit<CityOverride, 'id'>;
 
 export type ExpenseSplitMode = 'equally' | 'parts' | 'amounts';

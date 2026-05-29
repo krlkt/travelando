@@ -1,27 +1,27 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { Pencil, Plus, Trash2, UtensilsCrossed } from 'lucide-react';
+import { MapPinned, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { FoodPlaceSheet } from './FoodPlaceSheet';
+import { ActivityPlaceSheet } from './ActivityPlaceSheet';
 import { WantLevel } from './WantLevel';
 import { useTrips } from '@/lib/trips/context';
 import { deriveCitiesByDay, foodPlaceCitiesForDay } from '@/lib/trips/cities';
 import { toast } from 'sonner';
-import type { FoodPlace, Trip } from '@/lib/trips/types';
+import type { ActivityPlace, Trip } from '@/lib/trips/types';
 import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
 
-interface FoodWishlistProps {
+interface ActivityWishlistProps {
   trip: Trip;
   dayKey?: string;
 }
 
-export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
-  const { foodPlaces, cityOverrides, removeFoodPlace } = useTrips();
+export function ActivityWishlist({ trip, dayKey }: ActivityWishlistProps) {
+  const { activityPlaces, cityOverrides, removeActivityPlace } = useTrips();
   const tripId = trip.id;
 
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editingPlace, setEditingPlace] = useState<FoodPlace | null>(null);
+  const [editingPlace, setEditingPlace] = useState<ActivityPlace | null>(null);
   const [activeCity, setActiveCity] = useState<{
     cityLabel: string;
     cityPlaceId?: string;
@@ -32,7 +32,7 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
     new Map(),
   );
 
-  const placesForTrip = foodPlaces[tripId];
+  const placesForTrip = activityPlaces[tripId];
 
   const places = useMemo(() => placesForTrip ?? [], [placesForTrip]);
 
@@ -61,7 +61,7 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
   }, [trip, cityOverrides, tripId, dayKey]);
 
   const grouped = useMemo(() => {
-    const byCity = new Map<string, FoodPlace[]>();
+    const byCity = new Map<string, ActivityPlace[]>();
     for (const city of cities) {
       const key = city.cityPlaceId ?? city.cityLabel;
       byCity.set(key, []);
@@ -85,7 +85,7 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
     setSheetOpen(true);
   }
 
-  function openEdit(place: FoodPlace) {
+  function openEdit(place: ActivityPlace) {
     setEditingPlace(place);
     setActiveCity({
       cityLabel: place.cityLabel,
@@ -94,15 +94,15 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
     setSheetOpen(true);
   }
 
-  function handleDelete(place: FoodPlace) {
+  function handleDelete(place: ActivityPlace) {
     setDeletingIds((prev) => new Set([...prev, place.id]));
 
     const timeout = setTimeout(async () => {
       pendingDeletes.current.delete(place.id);
       try {
-        await removeFoodPlace(tripId, place.id);
+        await removeActivityPlace(tripId, place.id);
       } catch {
-        toast.error("Couldn't remove place");
+        toast.error("Couldn't remove activity");
         setDeletingIds((prev) => {
           const next = new Set(prev);
           next.delete(place.id);
@@ -133,14 +133,17 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
   return (
     <div className="border-border/60 bg-card rounded-[var(--radius-lg)] border">
       <div className="border-border/40 flex items-center gap-2 border-b px-4 py-3">
-        <UtensilsCrossed className="text-muted-foreground size-4" />
-        <span className="text-sm font-medium">Food wishlist</span>
+        <MapPinned className="text-muted-foreground size-4" />
+        <span className="text-sm font-medium">Activity wishlist</span>
       </div>
 
       <div className="divide-border/30 max-h-[60vh] divide-y overflow-y-auto">
         {cities.map((city) => {
           const cityKey = city.cityPlaceId ?? city.cityLabel;
           const cityPlaces = grouped.get(cityKey) ?? [];
+          const visiblePlaces = cityPlaces.filter(
+            (p) => !deletingIds.has(p.id),
+          );
 
           return (
             <div key={cityKey} className="px-4 py-3">
@@ -152,72 +155,74 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
                   variant="ghost"
                   size="icon-sm"
                   onClick={() => openAdd(city)}
-                  aria-label={`Add place in ${city.cityLabel}`}
+                  aria-label={`Add activity in ${city.cityLabel}`}
                   className="text-muted-foreground hover:text-foreground -mr-1 size-6"
                 >
                   <Plus className="size-3.5" />
                 </Button>
               </div>
 
-              {cityPlaces.filter((p) => !deletingIds.has(p.id)).length === 0 ? (
+              {visiblePlaces.length === 0 ? (
                 <p className="text-muted-foreground/60 text-xs">
-                  No places yet.
+                  No activities yet.
                 </p>
               ) : (
                 <ul className="space-y-1">
-                  {cityPlaces
-                    .filter((p) => !deletingIds.has(p.id))
-                    .map((place) => (
-                      <li
-                        key={place.id}
-                        className="group flex items-start justify-between gap-2"
-                      >
-                        <div className="min-w-0">
-                          <PlaceAddressLink
-                            place={{
-                              label: place.name,
-                              address: place.address,
-                              lat: place.lat,
-                              lng: place.lng,
-                              placeId: place.placeId,
-                            }}
-                            className="block max-w-full min-w-0"
-                          >
-                            <span className="block truncate text-sm font-medium">
-                              {place.name}
+                  {visiblePlaces.map((place) => (
+                    <li
+                      key={place.id}
+                      className="group flex items-start justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <PlaceAddressLink
+                          place={{
+                            label: place.name,
+                            address: place.address,
+                            lat: place.lat,
+                            lng: place.lng,
+                            placeId: place.placeId,
+                          }}
+                          className="block max-w-full min-w-0"
+                        >
+                          <span className="block truncate text-sm font-medium">
+                            {place.name}
+                          </span>
+                          {place.address && (
+                            <span className="text-muted-foreground block truncate text-xs">
+                              {place.address}
                             </span>
-                            {place.address && (
-                              <span className="text-muted-foreground block truncate text-xs">
-                                {place.address}
-                              </span>
-                            )}
-                          </PlaceAddressLink>
+                          )}
+                        </PlaceAddressLink>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <WantLevel
+                          mode="indicator"
+                          variant="star"
+                          value={place.wantLevel}
+                        />
+                        <div className="flex items-center gap-1 sm:opacity-0 sm:transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-muted-foreground hover:text-foreground size-6"
+                            onClick={() => openEdit(place)}
+                            aria-label={`Edit ${place.name}`}
+                          >
+                            <Pencil className="size-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-muted-foreground hover:text-destructive size-6"
+                            onClick={() => handleDelete(place)}
+                            aria-label={`Remove ${place.name}`}
+                          >
+                            <Trash2 className="size-3" />
+                          </Button>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1">
-                          <WantLevel mode="indicator" value={place.wantLevel} />
-                          <div className="flex items-center gap-1 sm:opacity-0 sm:transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-muted-foreground hover:text-foreground size-6"
-                              onClick={() => openEdit(place)}
-                              aria-label={`Edit ${place.name}`}
-                            >
-                              <Pencil className="size-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              className="text-muted-foreground hover:text-destructive size-6"
-                              onClick={() => handleDelete(place)}
-                              aria-label={`Remove ${place.name}`}
-                            >
-                              <Trash2 className="size-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </li>
-                    ))}
+                      </div>
+                    </li>
+                  ))}
                 </ul>
               )}
             </div>
@@ -226,7 +231,7 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
       </div>
 
       {activeCity && (
-        <FoodPlaceSheet
+        <ActivityPlaceSheet
           tripId={tripId}
           cityLabel={activeCity.cityLabel}
           cityPlaceId={activeCity.cityPlaceId}
