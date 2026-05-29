@@ -10,6 +10,8 @@ import type {
   FoodPlaceDraft,
   ItemDraft,
   ItemPatch,
+  Settlement,
+  SettlementDraft,
   Trip,
   TripDraft,
   TripItem,
@@ -34,6 +36,7 @@ export function createInMemoryRepository(
   let foodPlaces: FoodPlace[] = [];
   let cityOverrides: CityOverride[] = [];
   let expenses: Expense[] = [];
+  let settlements: Settlement[] = [];
 
   const cloneExpense = (e: Expense): Expense => ({
     ...e,
@@ -253,6 +256,20 @@ export function createInMemoryRepository(
     },
     async removeExpense(id) {
       expenses = expenses.filter((e) => e.id !== id);
+    },
+
+    async listSettlements(tripId) {
+      return settlements
+        .filter((s) => s.tripId === tripId)
+        .map((s) => ({ ...s }));
+    },
+    async addSettlement(draft: SettlementDraft) {
+      const settlement: Settlement = { ...draft, id: randomId('stl') };
+      settlements = [...settlements, settlement];
+      return { ...settlement };
+    },
+    async removeSettlement(id) {
+      settlements = settlements.filter((s) => s.id !== id);
     },
   };
 }

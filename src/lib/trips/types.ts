@@ -171,3 +171,16 @@ export interface ExpensePatch {
   category?: ExpenseCategory;
   shares?: ExpenseShare[];
 }
+
+export interface Settlement {
+  id: string;
+  tripId: string;
+  fromMemberId: string;
+  toMemberId: string;
+  amount: number;
+  currency: string;
+  settledOn: string;
+  note?: string;
+}
+
+export type SettlementDraft = Omit<Settlement, 'id'>;

@@ -13,12 +13,15 @@ import {
   rowToFoodPlace,
   rowToItem,
   rowToMember,
+  rowToSettlement,
   rowToTrip,
+  settlementDraftToInsert,
   tripDraftToInsert,
   tripPatchToUpdate,
   type CityOverrideRow,
   type ExpenseRow,
   type FoodPlaceRow,
+  type SettlementRow,
   type TripItemRow,
   type TripMemberRow,
   type TripRow,
@@ -34,6 +37,8 @@ import type {
   FoodPlaceDraft,
   ItemDraft,
   ItemPatch,
+  Settlement,
+  SettlementDraft,
   Trip,
   TripDraft,
   TripItem,
@@ -60,6 +65,9 @@ const MEMBER_COLUMNS =
 const EXPENSE_SHARE_COLUMNS = 'id, expense_id, member_id, value, locked';
 
 const EXPENSE_COLUMNS = `id, trip_id, item_id, title, amount, currency, payer_member_id, spent_on, mode, category, expense_shares(${EXPENSE_SHARE_COLUMNS})`;
+
+const SETTLEMENT_COLUMNS =
+  'id, trip_id, from_member_id, to_member_id, amount, currency, settled_on, note';
 
 const TRIP_WITH_ITEMS = `${TRIP_COLUMNS}, trip_items(${ITEM_COLUMNS}), trip_members(${MEMBER_COLUMNS})`;
 
@@ -476,6 +484,34 @@ export function createSupabaseRepository(
     async removeExpense(id: string): Promise<void> {
       const { error } = await client.from('expenses').delete().eq('id', id);
       if (error) throw new Error(`removeExpense ${id}: ${error.message}`);
+    },
+
+    async listSettlements(tripId: string): Promise<Settlement[]> {
+      const { data, error } = await client
+        .from('settlements')
+        .select(SETTLEMENT_COLUMNS)
+        .eq('trip_id', tripId)
+        .order('settled_on', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (error) throw new Error(`listSettlements: ${error.message}`);
+      return (data ?? []).map((r) => rowToSettlement(r as SettlementRow));
+    },
+
+    async addSettlement(draft: SettlementDraft): Promise<Settlement> {
+      if (isDemoTrip(draft.tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
+      const insert = settlementDraftToInsert(draft);
+      const { data, error } = await client
+        .from('settlements')
+        .insert(insert)
+        .select(SETTLEMENT_COLUMNS)
+        .single();
+      const row = unwrap(data as SettlementRow | null, error, 'addSettlement');
+      return rowToSettlement(row);
+    },
+
+    async removeSettlement(id: string): Promise<void> {
+      const { error } = await client.from('settlements').delete().eq('id', id);
+      if (error) throw new Error(`removeSettlement ${id}: ${error.message}`);
     },
   };
 }

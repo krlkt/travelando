@@ -12,6 +12,8 @@ import type {
   ItemDraft,
   ItemPatch,
   Place,
+  Settlement,
+  SettlementDraft,
   Trip,
   TripDraft,
   TripItem,
@@ -375,4 +377,42 @@ export function expenseSharesToInsert(
     value: s.value,
     locked: s.locked,
   }));
+}
+
+export interface SettlementRow {
+  id: string;
+  trip_id: string;
+  from_member_id: string;
+  to_member_id: string;
+  amount: number | string;
+  currency: string;
+  settled_on: string;
+  note: string | null;
+}
+
+export function rowToSettlement(row: SettlementRow): Settlement {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    fromMemberId: row.from_member_id,
+    toMemberId: row.to_member_id,
+    amount: toNumber(row.amount),
+    currency: row.currency,
+    settledOn: row.settled_on,
+    note: row.note ?? undefined,
+  };
+}
+
+export function settlementDraftToInsert(
+  draft: SettlementDraft,
+): Omit<SettlementRow, 'id'> {
+  return {
+    trip_id: draft.tripId,
+    from_member_id: draft.fromMemberId,
+    to_member_id: draft.toMemberId,
+    amount: draft.amount,
+    currency: draft.currency,
+    settled_on: draft.settledOn,
+    note: draft.note ?? null,
+  };
 }

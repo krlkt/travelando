@@ -5,7 +5,7 @@ import {
   findMemberIdForUser,
   summarizeForUser,
 } from './balances';
-import type { Expense, TripMember } from './types';
+import type { Expense, Settlement, TripMember } from './types';
 
 const tripId = 'trip-1';
 const members: TripMember[] = [
@@ -254,6 +254,119 @@ describe('summarizeForUser', () => {
     });
     // Reference the original result so vitest doesn't complain about unused.
     expect(result.balances.length).toBe(3);
+  });
+});
+
+describe('computeBalances with settlements', () => {
+  const splitExpense: Expense = {
+    ...baseExpense,
+    mode: 'equally',
+    amount: 90,
+    payerMemberId: 'm-a',
+    shares: [
+      { memberId: 'm-a', value: null, locked: false },
+      { memberId: 'm-b', value: null, locked: false },
+      { memberId: 'm-c', value: null, locked: false },
+    ],
+  };
+
+  function netFor(
+    balances: ReturnType<typeof computeBalances>['balances'],
+    memberId: string,
+    currency: string,
+  ): number {
+    const m = balances.find((b) => b.memberId === memberId);
+    return m?.byCurrency.find((c) => c.currency === currency)?.net ?? 0;
+  }
+
+  it('settles a one-currency debt to zero', () => {
+    const settlement: Settlement = {
+      id: 's-1',
+      tripId,
+      fromMemberId: 'm-b',
+      toMemberId: 'm-a',
+      amount: 30,
+      currency: 'EUR',
+      settledOn: '2026-05-29',
+    };
+    const { balances } = computeBalances([splitExpense], members, [settlement]);
+    expect(netFor(balances, 'm-a', 'EUR')).toBeCloseTo(30);
+    expect(netFor(balances, 'm-b', 'EUR')).toBeCloseTo(0);
+    expect(netFor(balances, 'm-c', 'EUR')).toBeCloseTo(-30);
+  });
+
+  it('partial settlement reduces net', () => {
+    const settlement: Settlement = {
+      id: 's-2',
+      tripId,
+      fromMemberId: 'm-b',
+      toMemberId: 'm-a',
+      amount: 10,
+      currency: 'EUR',
+      settledOn: '2026-05-29',
+    };
+    const { balances } = computeBalances([splitExpense], members, [settlement]);
+    expect(netFor(balances, 'm-a', 'EUR')).toBeCloseTo(50);
+    expect(netFor(balances, 'm-b', 'EUR')).toBeCloseTo(-20);
+  });
+
+  it('overpayment flips the sign', () => {
+    const settlement: Settlement = {
+      id: 's-3',
+      tripId,
+      fromMemberId: 'm-b',
+      toMemberId: 'm-a',
+      amount: 50,
+      currency: 'EUR',
+      settledOn: '2026-05-29',
+    };
+    const { balances } = computeBalances([splitExpense], members, [settlement]);
+    // m-b paid 50 toward a 30 debt → m-b is now owed 20 by m-a.
+    expect(netFor(balances, 'm-a', 'EUR')).toBeCloseTo(10);
+    expect(netFor(balances, 'm-b', 'EUR')).toBeCloseTo(20);
+  });
+
+  it('does not cross currencies', () => {
+    const settlement: Settlement = {
+      id: 's-4',
+      tripId,
+      fromMemberId: 'm-b',
+      toMemberId: 'm-a',
+      amount: 30,
+      currency: 'USD',
+      settledOn: '2026-05-29',
+    };
+    const { balances } = computeBalances([splitExpense], members, [settlement]);
+    expect(netFor(balances, 'm-a', 'EUR')).toBeCloseTo(60);
+    expect(netFor(balances, 'm-b', 'EUR')).toBeCloseTo(-30);
+    expect(netFor(balances, 'm-a', 'USD')).toBeCloseTo(-30);
+    expect(netFor(balances, 'm-b', 'USD')).toBeCloseTo(30);
+  });
+
+  it('summarizeForUser reports settled once a settlement closes the net', () => {
+    const settlement: Settlement = {
+      id: 's-5',
+      tripId,
+      fromMemberId: 'm-b',
+      toMemberId: 'm-a',
+      amount: 30,
+      currency: 'EUR',
+      settledOn: '2026-05-29',
+    };
+    // Settle Bob and Carol both so the whole graph is closed.
+    const carolSettlement: Settlement = {
+      ...settlement,
+      id: 's-6',
+      fromMemberId: 'm-c',
+    };
+    const result = computeBalances([splitExpense], members, [
+      settlement,
+      carolSettlement,
+    ]);
+    expect(summarizeForUser(result, 'm-b')).toEqual({
+      kind: 'settled',
+      counterpartyCount: 0,
+    });
   });
 });
 

@@ -1,4 +1,4 @@
-import type { Expense, ExpenseShare, TripMember } from './types';
+import type { Expense, ExpenseShare, Settlement, TripMember } from './types';
 
 export interface ExpandedShare {
   memberId: string;
@@ -100,6 +100,7 @@ function emptyAcc(): CurrencyAcc {
 export function computeBalances(
   expenses: Expense[],
   members: TripMember[],
+  settlements: Settlement[] = [],
 ): BalancesResult {
   // memberId -> currency -> { paid, owed }
   const perMember = new Map<string, Map<string, CurrencyAcc>>();
@@ -126,6 +127,15 @@ export function computeBalances(
       const acc = bucketFor(row.memberId, code);
       acc.owed += row.share;
     }
+  }
+
+  // Settlements net into the same per-currency buckets. The sender's net rises
+  // by `amount` (they paid out real money) and the receiver's net falls by
+  // `amount` (their outstanding credit was consumed).
+  for (const settlement of settlements) {
+    const code = settlement.currency.toUpperCase();
+    bucketFor(settlement.fromMemberId, code).paid += settlement.amount;
+    bucketFor(settlement.toMemberId, code).owed += settlement.amount;
   }
 
   const balances: MemberBalance[] = members.map((member) => {

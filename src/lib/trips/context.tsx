@@ -18,6 +18,8 @@ import type {
   FoodPlaceDraft,
   ItemDraft,
   ItemPatch,
+  Settlement,
+  SettlementDraft,
   Trip,
   TripDraft,
   TripItem,
@@ -44,6 +46,7 @@ interface TripsState {
   foodPlaces: Record<string, FoodPlace[]>;
   cityOverrides: Record<string, CityOverride[]>;
   expenses: Record<string, Expense[]>;
+  settlements: Record<string, Settlement[]>;
   loadTripExtras: (tripId: string) => Promise<void>;
   addFoodPlace: (draft: FoodPlaceDraft) => Promise<FoodPlace>;
   updateFoodPlace: (
@@ -60,6 +63,8 @@ interface TripsState {
     patch: ExpensePatch,
   ) => Promise<void>;
   removeExpense: (tripId: string, id: string) => Promise<void>;
+  addSettlement: (draft: SettlementDraft) => Promise<Settlement>;
+  removeSettlement: (tripId: string, id: string) => Promise<void>;
 
   addMember: (tripId: string, draft: TripMemberDraft) => Promise<TripMember>;
   updateMember: (
@@ -125,6 +130,9 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
     Record<string, CityOverride[]>
   >({});
   const [expenses, setExpenses] = useState<Record<string, Expense[]>>({});
+  const [settlements, setSettlements] = useState<Record<string, Settlement[]>>(
+    {},
+  );
 
   const getTrip = useCallback(
     (id: string) => trips.find((t) => t.id === id),
@@ -309,14 +317,16 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   );
 
   const loadTripExtras = useCallback(async (tripId: string): Promise<void> => {
-    const [fp, co, ex] = await Promise.all([
+    const [fp, co, ex, st] = await Promise.all([
       callApi<FoodPlace[]>(`/api/trips/${tripId}/food-places`),
       callApi<CityOverride[]>(`/api/trips/${tripId}/city-overrides`),
       callApi<Expense[]>(`/api/trips/${tripId}/expenses`),
+      callApi<Settlement[]>(`/api/trips/${tripId}/settlements`),
     ]);
     setFoodPlaces((prev) => ({ ...prev, [tripId]: fp ?? [] }));
     setCityOverrides((prev) => ({ ...prev, [tripId]: co ?? [] }));
     setExpenses((prev) => ({ ...prev, [tripId]: ex ?? [] }));
+    setSettlements((prev) => ({ ...prev, [tripId]: st ?? [] }));
   }, []);
 
   const addFoodPlace = useCallback(
@@ -462,6 +472,49 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
         if (snapshot) {
           const restored = snapshot;
           setExpenses((prev) => ({
+            ...prev,
+            [tripId]: [...(prev[tripId] ?? []), restored],
+          }));
+        }
+        throw err;
+      }
+    },
+    [],
+  );
+
+  const addSettlement = useCallback(
+    async (draft: SettlementDraft): Promise<Settlement> => {
+      const created = await callApi<Settlement>(
+        `/api/trips/${draft.tripId}/settlements`,
+        {
+          method: 'POST',
+          body: JSON.stringify(draft),
+        },
+      );
+      if (!created) throw new Error('Settlement not returned');
+      setSettlements((prev) => ({
+        ...prev,
+        [draft.tripId]: [created, ...(prev[draft.tripId] ?? [])],
+      }));
+      return created;
+    },
+    [],
+  );
+
+  const removeSettlement = useCallback(
+    async (tripId: string, id: string): Promise<void> => {
+      let snapshot: Settlement | undefined;
+      setSettlements((prev) => {
+        const list = prev[tripId] ?? [];
+        snapshot = list.find((s) => s.id === id);
+        return { ...prev, [tripId]: list.filter((s) => s.id !== id) };
+      });
+      try {
+        await callApi<null>(`/api/settlements/${id}`, { method: 'DELETE' });
+      } catch (err) {
+        if (snapshot) {
+          const restored = snapshot;
+          setSettlements((prev) => ({
             ...prev,
             [tripId]: [...(prev[tripId] ?? []), restored],
           }));
@@ -634,6 +687,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       foodPlaces,
       cityOverrides,
       expenses,
+      settlements,
       loadTripExtras,
       addFoodPlace,
       updateFoodPlace,
@@ -643,6 +697,8 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       addExpense,
       updateExpense,
       removeExpense,
+      addSettlement,
+      removeSettlement,
       addMember,
       updateMember,
       removeMember,
@@ -659,6 +715,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       foodPlaces,
       cityOverrides,
       expenses,
+      settlements,
       loadTripExtras,
       addFoodPlace,
       updateFoodPlace,
@@ -668,6 +725,8 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       addExpense,
       updateExpense,
       removeExpense,
+      addSettlement,
+      removeSettlement,
       addMember,
       updateMember,
       removeMember,

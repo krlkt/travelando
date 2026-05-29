@@ -142,3 +142,21 @@ export const expensePatchSchema = expenseDraftSchema
   .partial()
   .omit({ tripId: true })
   .extend({ itemId: z.string().min(1).nullish() });
+
+export const settlementDraftSchema = z
+  .object({
+    tripId: z.string().min(1),
+    fromMemberId: z.string().min(1),
+    toMemberId: z.string().min(1),
+    amount: z.number().positive(),
+    currency: z
+      .string()
+      .length(3)
+      .regex(/^[A-Z]{3}$/, 'Currency must be a 3-letter uppercase code'),
+    settledOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    note: z.string().max(280).optional(),
+  })
+  .refine((v) => v.fromMemberId !== v.toMemberId, {
+    message: 'fromMemberId and toMemberId must differ',
+    path: ['toMemberId'],
+  });

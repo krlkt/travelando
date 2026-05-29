@@ -8,6 +8,8 @@ import type {
   FoodPlaceDraft,
   ItemDraft,
   ItemPatch,
+  Settlement,
+  SettlementDraft,
   Trip,
   TripDraft,
   TripItem,
@@ -55,4 +57,8 @@ export interface TripsRepository {
   addExpense(draft: ExpenseDraft): Promise<Expense>;
   updateExpense(id: string, patch: ExpensePatch): Promise<Expense>;
   removeExpense(id: string): Promise<void>;
+
+  listSettlements(tripId: string): Promise<Settlement[]>;
+  addSettlement(draft: SettlementDraft): Promise<Settlement>;
+  removeSettlement(id: string): Promise<void>;
 }

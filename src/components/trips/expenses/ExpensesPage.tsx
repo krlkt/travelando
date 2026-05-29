@@ -30,7 +30,8 @@ interface ExpensesPageProps {
 }
 
 export function ExpensesPage({ tripId }: ExpensesPageProps) {
-  const { getTrip, expenses, loadTripExtras } = useTrips();
+  const { getTrip, expenses, settlements, removeSettlement, loadTripExtras } =
+    useTrips();
   const { user } = useAuth();
   const trip = getTrip(tripId);
   const [rates, setRates] = useState<EurRates | null>(null);
@@ -59,6 +60,10 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
     () => expenses[tripId] ?? [],
     [expenses, tripId],
   );
+  const tripSettlements = useMemo(
+    () => settlements[tripId] ?? [],
+    [settlements, tripId],
+  );
   const visibleExpenses = useMemo(
     () =>
       selectedCategory
@@ -74,8 +79,8 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
   );
 
   const balanceResult = useMemo(
-    () => computeBalances(tripExpenses, trip.members),
-    [tripExpenses, trip.members],
+    () => computeBalances(tripExpenses, trip.members, tripSettlements),
+    [tripExpenses, trip.members, tripSettlements],
   );
 
   const summary = useMemo(
@@ -222,10 +227,13 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
 
           <TabsContent value="balances" className="mt-4">
             <BalancesTab
+              trip={trip}
               result={balanceResult}
               summary={summary}
               members={trip.members}
               currentMemberId={currentMemberId}
+              settlements={tripSettlements}
+              onRemoveSettlement={(id) => removeSettlement(trip.id, id)}
             />
           </TabsContent>
         </Tabs>
