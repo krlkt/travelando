@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
@@ -32,6 +32,8 @@ import { ItemEditorSheet } from './editor/ItemEditorSheet';
 import { TripEditorSheet } from './editor/TripEditorSheet';
 import { MembersSheet } from './MembersSheet';
 import { useTrips } from '@/lib/trips/context';
+import { usePersistedDay } from '@/hooks/usePersistedDay';
+import { buildActiveDayKey } from '@/lib/trips/activeDayStorage';
 import {
   findCurrentItem,
   findOverlappingItemIds,
@@ -83,7 +85,35 @@ export function TripDetail({ tripId }: TripDetailProps) {
     return dayCityBuckets[0]?.key ?? '';
   }, [dayCityBuckets, current]);
 
-  const [activeDay, setActiveDay] = useState(defaultDay);
+  const validDayKeys = useMemo(
+    () => dayCityBuckets.map((b) => b.key),
+    [dayCityBuckets],
+  );
+  const [activeDay, setActiveDay] = usePersistedDay(
+    buildActiveDayKey(tripId),
+    defaultDay,
+    validDayKeys,
+  );
+  const dayScrollRef = useRef<HTMLDivElement>(null);
+
+  // Bring the active day tab into view within its horizontal strip (e.g. after
+  // restoring a far-right day on a long trip). Scrolls only the strip, not the
+  // page.
+  useEffect(() => {
+    const container = dayScrollRef.current;
+    const active = container?.querySelector<HTMLElement>(
+      '[data-state="active"]',
+    );
+    if (!container || !active) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const activeRect = active.getBoundingClientRect();
+    const delta =
+      activeRect.left -
+      containerRect.left -
+      (container.clientWidth - activeRect.width) / 2;
+    container.scrollBy({ left: delta });
+  }, [activeDay]);
   const [selectedItem, setSelectedItem] = useState<TripItem | null>(null);
   const [itemEditorOpen, setItemEditorOpen] = useState(false);
   const [tripEditorOpen, setTripEditorOpen] = useState(false);
@@ -219,7 +249,10 @@ export function TripDetail({ tripId }: TripDetailProps) {
             <Tabs value={activeDay} onValueChange={setActiveDay}>
               {/* Day picker — sticky only as far as its own column */}
               <div className="bg-background/85 border-border/40 lg:backdrop-blur-0 sticky top-0 z-20 -mx-4 -mt-4 mb-2 border-b px-4 pt-3 pb-3 backdrop-blur-xl sm:-mx-6 sm:px-6 md:top-16 md:-mx-10 md:-mt-6 md:px-10 lg:relative lg:top-auto lg:mx-0 lg:mt-0 lg:border-b-0 lg:bg-transparent lg:px-0 lg:pt-0">
-                <div className="no-scrollbar -mx-1 overflow-x-auto px-1">
+                <div
+                  ref={dayScrollRef}
+                  className="no-scrollbar -mx-1 overflow-x-auto px-1"
+                >
                   <TabsList className="w-max min-w-full justify-start">
                     {dayCityBuckets.map((bucket, idx) => {
                       const itemCount = bucket.segments.reduce(
