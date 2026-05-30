@@ -23,7 +23,8 @@
       "Bash(pnpm vitest *)",
       "Bash(pnpm exec *)",
       "Bash(npm run *)",
-      "Bash(pnpm prettier *)"
+      "Bash(pnpm prettier *)",
+      "Bash(git log *)"
     ]
   }
 }

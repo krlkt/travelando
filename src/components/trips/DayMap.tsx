@@ -20,6 +20,8 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { TimeField } from '@/components/ui/TimeField';
 import {
   Sheet,
   SheetContent,
@@ -33,6 +35,11 @@ import { useTrips } from '@/lib/trips/context';
 import { buildDayMapPoints, type DayMapPoint } from '@/lib/trips/dayMapPoints';
 import { isMapConfigured, type MapTheme } from '@/lib/map/style';
 import { formatDistance, walkMinutes } from '@/lib/map/distance';
+import {
+  fromLocalInput,
+  getTimePart,
+  toLocalInput,
+} from '@/lib/time/timeInput';
 import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
 import type { ItemDraft, Trip, TripItem } from '@/lib/trips/types';
 
@@ -94,6 +101,11 @@ function nextSlotIso(dayKey: string, scheduled: DayMapPoint[]): string {
   return new Date(Math.max(...times) + SLOT_GAP_MS).toISOString();
 }
 
+/** Local `HH:MM` to prefill the add-to-day time field from the next free slot. */
+function nextSlotTime(dayKey: string, scheduled: DayMapPoint[]): string {
+  return getTimePart(toLocalInput(nextSlotIso(dayKey, scheduled)));
+}
+
 export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
   const { foodPlaces, activityPlaces, cityOverrides, addItem } = useTrips();
   const theme = useMapTheme();
@@ -101,6 +113,8 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
 
   const [showWishlist, setShowWishlist] = useState(true);
   const [selectedWish, setSelectedWish] = useState<DayMapPoint | null>(null);
+  const [time, setTime] = useState('');
+  const [endTime, setEndTime] = useState('');
   const [adding, setAdding] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -194,9 +208,13 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
         if (item) onSelectItem(item);
         return;
       }
+      // Prefill the time field with the next free slot, but let the user edit it
+      // before adding instead of silently committing to that slot.
+      setTime(nextSlotTime(dayKey, points));
+      setEndTime('');
       setSelectedWish(point);
     },
-    [trip.items, onSelectItem],
+    [trip.items, onSelectItem, dayKey, points],
   );
 
   const handleAddToDay = useCallback(async () => {
@@ -207,10 +225,23 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
     )
       return;
 
+    // Honor the chosen time; fall back to the next free slot if it was cleared.
+    const startsAt = time
+      ? fromLocalInput(`${dayKey}T${time}`)
+      : nextSlotIso(dayKey, points);
+
+    // End time is optional, but when set it must not precede the start.
+    const endsAt = endTime ? fromLocalInput(`${dayKey}T${endTime}`) : undefined;
+    if (endsAt && new Date(endsAt) < new Date(startsAt)) {
+      toast.error("End time can't be before the start.");
+      return;
+    }
+
     const draft: ItemDraft = {
       kind: selectedWish.kind === 'foodWish' ? 'meal' : 'activity',
       title: selectedWish.label,
-      startsAt: nextSlotIso(dayKey, points),
+      startsAt,
+      endsAt,
       to: {
         label: selectedWish.label,
         address: selectedWish.address,
@@ -231,7 +262,7 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
     } finally {
       setAdding(false);
     }
-  }, [selectedWish, dayKey, points, addItem, tripId]);
+  }, [selectedWish, dayKey, points, time, endTime, addItem, tripId]);
 
   if (!isMapConfigured()) {
     return (
@@ -340,6 +371,10 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
 
       <AddToDaySheet
         wish={selectedWish}
+        time={time}
+        onTimeChange={setTime}
+        endTime={endTime}
+        onEndTimeChange={setEndTime}
         adding={adding}
         onOpenChange={(open) => {
           if (!open) setSelectedWish(null);
@@ -361,6 +396,10 @@ function LegendDot({ className, label }: { className: string; label: string }) {
 
 interface AddToDaySheetProps {
   wish: DayMapPoint | null;
+  time: string;
+  onTimeChange: (time: string) => void;
+  endTime: string;
+  onEndTimeChange: (time: string) => void;
   adding: boolean;
   onOpenChange: (open: boolean) => void;
   onAdd: () => void;
@@ -368,6 +407,10 @@ interface AddToDaySheetProps {
 
 function AddToDaySheet({
   wish,
+  time,
+  onTimeChange,
+  endTime,
+  onEndTimeChange,
   adding,
   onOpenChange,
   onAdd,
@@ -421,6 +464,25 @@ function AddToDaySheet({
                   value={wish.wantLevel}
                 />
               ) : null}
+
+              <div className="flex gap-3">
+                <div className="grid max-w-[8rem] gap-1.5">
+                  <Label>Start time</Label>
+                  <TimeField
+                    value={time}
+                    ariaLabel="Start time"
+                    onCommit={onTimeChange}
+                  />
+                </div>
+                <div className="grid max-w-[8rem] gap-1.5">
+                  <Label>End time</Label>
+                  <TimeField
+                    value={endTime}
+                    ariaLabel="End time"
+                    onCommit={onEndTimeChange}
+                  />
+                </div>
+              </div>
             </div>
 
             <SheetFooter>

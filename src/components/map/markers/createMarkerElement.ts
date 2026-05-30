@@ -1,15 +1,14 @@
 import type { DayMapPoint } from '@/lib/trips/dayMapPoints';
 import type { ItemKind } from '@/lib/trips/types';
 import { WALKABLE_THRESHOLD_M } from '@/lib/map/distance';
+import { activityCategoryGlyph, foodCategoryGlyph } from './categoryGlyphs';
 
 // Minimal inline SVG glyphs (lucide-derived paths) — markers are imperative DOM
 // elements managed by MapLibre, so we can't mount React/lucide components here.
+// Per-category wishlist glyphs live in `categoryGlyphs.ts`; this only keeps the
+// glyph used by the lodging anchor.
 const GLYPH = {
   bed: '<path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>',
-  utensils:
-    '<path d="m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8"/><path d="M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7"/><path d="m2.1 21.8 6.4-6.3"/>',
-  camera:
-    '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
 } as const;
 
 function svg(paths: string): string {
@@ -78,11 +77,11 @@ export function createMarkerElement(point: DayMapPoint): HTMLButtonElement {
       break;
     case 'foodWish':
       el.style.setProperty('--dm-accent', 'var(--kind-meal)');
-      inner = `<span class="dm-marker__pin dm-marker__pin--ghost">${svg(GLYPH.utensils)}</span>${wantDots(point.wantLevel)}`;
+      inner = `<span class="dm-marker__pin dm-marker__pin--ghost">${svg(foodCategoryGlyph(point.category))}</span>${wantDots(point.wantLevel)}`;
       break;
     case 'activityWish':
       el.style.setProperty('--dm-accent', 'var(--kind-activity)');
-      inner = `<span class="dm-marker__pin dm-marker__pin--ghost">${svg(GLYPH.camera)}</span>${wantDots(point.wantLevel)}`;
+      inner = `<span class="dm-marker__pin dm-marker__pin--ghost">${svg(activityCategoryGlyph(point.category))}</span>${wantDots(point.wantLevel)}`;
       break;
   }
 

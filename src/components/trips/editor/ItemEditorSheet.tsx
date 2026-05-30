@@ -22,6 +22,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
+import { TimeField } from '@/components/ui/TimeField';
 import { useTrips } from '@/lib/trips/context';
 import { itemKinds, transportModes, kindMeta } from '@/lib/trips/kindMeta';
 import {
@@ -30,6 +31,13 @@ import {
   findLodgingConflict,
 } from '@/lib/trips/cities';
 import { dayKey, formatDate } from '@/lib/time/formatDate';
+import {
+  toLocalInput,
+  fromLocalInput,
+  getDatePart,
+  getTimePart,
+  todayLocalDate,
+} from '@/lib/time/timeInput';
 import type {
   ActivityPlace,
   FoodPlace,
@@ -48,65 +56,6 @@ interface ItemEditorSheetProps {
   defaultDate?: Date | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-function toLocalInput(iso?: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function fromLocalInput(value: string): string {
-  return new Date(value).toISOString();
-}
-
-function getDatePart(value: string): string {
-  if (!value) return '';
-  const idx = value.indexOf('T');
-  return idx === -1 ? value : value.slice(0, idx);
-}
-
-function getTimePart(value: string): string {
-  if (!value) return '';
-  const idx = value.indexOf('T');
-  return idx === -1 ? '' : value.slice(idx + 1, idx + 6);
-}
-
-function todayLocalDate(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function parseTimeInput(value: string): string | null {
-  const cleaned = value.trim();
-  if (!cleaned) return null;
-  const pad = (n: number) => String(n).padStart(2, '0');
-
-  const sepMatch = cleaned.match(/^(\d{1,2})[:.\- ](\d{1,2})$/);
-  if (sepMatch) {
-    const h = Number(sepMatch[1]);
-    const m = Number(sepMatch[2]);
-    if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return `${pad(h)}:${pad(m)}`;
-    return null;
-  }
-
-  if (/^\d{1,2}$/.test(cleaned)) {
-    const h = Number(cleaned);
-    if (h >= 0 && h <= 23) return `${pad(h)}:00`;
-    return null;
-  }
-
-  if (/^\d{3,4}$/.test(cleaned)) {
-    const padded = cleaned.padStart(4, '0');
-    const h = Number(padded.slice(0, 2));
-    const m = Number(padded.slice(2));
-    if (h <= 23 && m <= 59) return `${pad(h)}:${pad(m)}`;
-    return null;
-  }
-
-  return null;
 }
 
 function initialStartsAt(
@@ -766,53 +715,5 @@ function ItemEditorBody({
         </Button>
       </SheetFooter>
     </>
-  );
-}
-
-interface TimeFieldProps {
-  value: string;
-  ariaLabel: string;
-  onCommit: (time: string) => void;
-}
-
-function TimeField({ value, ariaLabel, onCommit }: TimeFieldProps) {
-  const [draft, setDraft] = useState(value);
-  const [focused, setFocused] = useState(false);
-  const display = focused ? draft : value;
-
-  function commit() {
-    const trimmed = draft.trim();
-    if (!trimmed) {
-      onCommit('');
-    } else {
-      const parsed = parseTimeInput(trimmed);
-      if (parsed !== null) onCommit(parsed);
-    }
-    setFocused(false);
-  }
-
-  return (
-    <Input
-      type="text"
-      inputMode="numeric"
-      autoComplete="off"
-      aria-label={ariaLabel}
-      placeholder="HH:MM"
-      value={display}
-      onFocus={(e) => {
-        setDraft(value);
-        setFocused(true);
-        e.currentTarget.select();
-      }}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          (e.currentTarget as HTMLInputElement).blur();
-        }
-      }}
-      className="text-center tabular-nums"
-    />
   );
 }
