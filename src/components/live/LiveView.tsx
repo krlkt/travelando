@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { useTrips } from '@/lib/trips/context';
 import { findCurrentItem, findNextItem } from '@/lib/trips/grouping';
 import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
+import { routeHeadline, routeStations } from '@/lib/trips/transportRoute';
 import { formatTime, dayKey, relativeFromNow } from '@/lib/time/formatDate';
 import { useNow } from '@/lib/time/useNow';
 import { spring } from '@/lib/motion/presets';
@@ -232,18 +233,36 @@ function NowCard({ item, now }: { item: TripItem; now: Date }) {
           <h2 className="font-display mt-2 text-3xl leading-tight tracking-tight">
             {item.title}
           </h2>
-          {(item.from || item.to) && (
-            <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-1.5 text-sm">
-              {item.from && <span>{item.from.label}</span>}
-              {item.from && item.to && <ArrowRight className="size-3.5" />}
-              {item.to && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="size-3.5" />
-                  {item.to.label}
-                </span>
-              )}
-            </div>
-          )}
+          {(() => {
+            const route = routeHeadline(item);
+            const stations = routeStations(item);
+            if (!route.from && !route.to) return null;
+            return (
+              <>
+                <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-1.5 text-sm">
+                  {route.from && <span>{route.from.label}</span>}
+                  {route.from && route.to && (
+                    <ArrowRight className="size-3.5" />
+                  )}
+                  {route.to && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="size-3.5" />
+                      {route.to.label}
+                    </span>
+                  )}
+                </div>
+                {stations && (
+                  <div className="text-muted-foreground/70 mt-1 flex flex-wrap items-center gap-1.5 text-xs">
+                    {stations.from && <span>{stations.from.label}</span>}
+                    {stations.from && stations.to && (
+                      <ArrowRight className="size-3" />
+                    )}
+                    {stations.to && <span>{stations.to.label}</span>}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       </div>
 
@@ -306,12 +325,16 @@ function NextCard({ item, now }: { item: TripItem; now: Date }) {
         </span>
         <div className="min-w-0 flex-1">
           <div className="leading-tight font-medium">{item.title}</div>
-          {item.to && (
-            <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
-              <MapPin className="size-3" />
-              <span className="truncate">{item.to.label}</span>
-            </div>
-          )}
+          {(() => {
+            const dest = routeHeadline(item).to;
+            if (!dest) return null;
+            return (
+              <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
+                <MapPin className="size-3" />
+                <span className="truncate">{dest.label}</span>
+              </div>
+            );
+          })()}
         </div>
         <span className="text-muted-foreground text-sm tabular-nums">
           {formatTime(item.startsAt)}

@@ -7,6 +7,7 @@ import type { ItemExpenseTotal } from '@/lib/trips/itemExpenseTotals';
 import { Badge } from '@/components/ui/badge';
 import { dayOffsetFrom, formatTime } from '@/lib/time/formatDate';
 import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
+import { routeHeadline, routeStations } from '@/lib/trips/transportRoute';
 import { formatMoney } from '@/lib/trips/grouping';
 import { fadeUp, spring } from '@/lib/motion/presets';
 import { cn } from '@/lib/utils';
@@ -47,6 +48,9 @@ export function TimelineItem({
     bucketDate && item.endsAt ? dayOffsetFrom(bucketDate, item.endsAt) : 0;
   const startSuffix = dayOffsetSuffix(startOffset);
   const endSuffix = dayOffsetSuffix(endOffset);
+
+  const route = routeHeadline(item);
+  const stations = routeStations(item);
 
   return (
     <motion.li
@@ -103,19 +107,32 @@ export function TimelineItem({
               <div className="flex w-full min-w-0 items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="leading-tight font-medium">{item.title}</div>
-                  {(item.from || item.to) && (
+                  {(route.from || route.to) && (
                     <div className="text-muted-foreground mt-1 flex min-w-0 items-center gap-1.5 text-xs">
-                      {item.from && (
-                        <span className="truncate">{item.from.label}</span>
+                      {route.from && (
+                        <span className="truncate">{route.from.label}</span>
                       )}
-                      {item.from && item.to && (
+                      {route.from && route.to && (
                         <ArrowRight className="size-3 shrink-0 opacity-50" />
                       )}
-                      {item.to && !item.from && (
+                      {route.to && !route.from && (
                         <MapPin className="size-3 shrink-0 opacity-60" />
                       )}
-                      {item.to && (
-                        <span className="truncate">{item.to.label}</span>
+                      {route.to && (
+                        <span className="truncate">{route.to.label}</span>
+                      )}
+                    </div>
+                  )}
+                  {stations && (
+                    <div className="text-muted-foreground/70 mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px]">
+                      {stations.from && (
+                        <span className="truncate">{stations.from.label}</span>
+                      )}
+                      {stations.from && stations.to && (
+                        <ArrowRight className="size-2.5 shrink-0 opacity-50" />
+                      )}
+                      {stations.to && (
+                        <span className="truncate">{stations.to.label}</span>
                       )}
                     </div>
                   )}

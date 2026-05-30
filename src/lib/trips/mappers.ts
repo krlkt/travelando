@@ -57,6 +57,8 @@ export interface TripItemRow {
   title: string;
   starts_at: string;
   ends_at: string | null;
+  from_city: Place | null;
+  to_city: Place | null;
   from_place: Place | null;
   to_place: Place | null;
   transport_mode: string | null;
@@ -71,6 +73,8 @@ export function rowToItem(row: TripItemRow): TripItem {
     title: row.title,
     startsAt: row.starts_at,
     endsAt: row.ends_at ?? undefined,
+    fromCity: row.from_city ?? undefined,
+    toCity: row.to_city ?? undefined,
     from: row.from_place ?? undefined,
     to: row.to_place ?? undefined,
     transportMode:
@@ -157,6 +161,8 @@ export function itemDraftToInsert(
     title: draft.title,
     starts_at: draft.startsAt,
     ends_at: draft.endsAt ?? null,
+    from_city: draft.fromCity ?? null,
+    to_city: draft.toCity ?? null,
     from_place: draft.from ?? null,
     to_place: draft.to ?? null,
     transport_mode: draft.transportMode ?? null,
@@ -337,6 +343,8 @@ export function itemPatchToUpdate(
   if (patch.title !== undefined) out.title = patch.title;
   if (patch.startsAt !== undefined) out.starts_at = patch.startsAt;
   if (patch.endsAt !== undefined) out.ends_at = patch.endsAt ?? null;
+  if (patch.fromCity !== undefined) out.from_city = patch.fromCity ?? null;
+  if (patch.toCity !== undefined) out.to_city = patch.toCity ?? null;
   if (patch.from !== undefined) out.from_place = patch.from ?? null;
   if (patch.to !== undefined) out.to_place = patch.to ?? null;
   if (patch.transportMode !== undefined)

@@ -30,6 +30,7 @@ import {
   categoryLabels,
 } from '@/lib/trips/expenseCategory';
 import { formatMoney } from '@/lib/trips/grouping';
+import { routeHeadline, routeStations } from '@/lib/trips/transportRoute';
 import type { Expense, Trip, TripItem } from '@/lib/trips/types';
 import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
 import { ExpenseSheet } from './expenses/ExpenseSheet';
@@ -66,6 +67,10 @@ export function ItemDetailSheet({
       ? transportIcons[item.transportMode]
       : meta.icon;
 
+  const route = routeHeadline(item);
+  const stations = routeStations(item);
+  const isTransport = item.kind === 'transport';
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right">
@@ -93,30 +98,62 @@ export function ItemDetailSheet({
             {item.endsAt && <> → {formatTime(item.endsAt)}</>}
           </Row>
 
-          {(item.from || item.to) && (
-            <Row icon={MapPin} label="Place">
+          {(route.from || route.to) && (
+            <Row icon={MapPin} label={isTransport ? 'Cities' : 'Place'}>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 [overflow-wrap:anywhere]">
-                {item.from && (
-                  <PlaceAddressLink place={item.from}>
-                    {item.from.label}
-                    {item.from.address && (
+                {route.from && (
+                  <PlaceAddressLink place={route.from}>
+                    {route.from.label}
+                    {route.from.address && (
                       <span className="text-muted-foreground">
                         {' '}
-                        · {item.from.address}
+                        · {route.from.address}
                       </span>
                     )}
                   </PlaceAddressLink>
                 )}
-                {item.from && item.to && (
+                {route.from && route.to && (
                   <ArrowRight className="text-muted-foreground size-3.5 shrink-0" />
                 )}
-                {item.to && (
-                  <PlaceAddressLink place={item.to}>
-                    {item.to.label}
-                    {item.to.address && (
+                {route.to && (
+                  <PlaceAddressLink place={route.to}>
+                    {route.to.label}
+                    {route.to.address && (
                       <span className="text-muted-foreground">
                         {' '}
-                        · {item.to.address}
+                        · {route.to.address}
+                      </span>
+                    )}
+                  </PlaceAddressLink>
+                )}
+              </div>
+            </Row>
+          )}
+
+          {stations && (
+            <Row icon={MapPin} label="Route">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 [overflow-wrap:anywhere]">
+                {stations.from && (
+                  <PlaceAddressLink place={stations.from}>
+                    {stations.from.label}
+                    {stations.from.address && (
+                      <span className="text-muted-foreground">
+                        {' '}
+                        · {stations.from.address}
+                      </span>
+                    )}
+                  </PlaceAddressLink>
+                )}
+                {stations.from && stations.to && (
+                  <ArrowRight className="text-muted-foreground size-3.5 shrink-0" />
+                )}
+                {stations.to && (
+                  <PlaceAddressLink place={stations.to}>
+                    {stations.to.label}
+                    {stations.to.address && (
+                      <span className="text-muted-foreground">
+                        {' '}
+                        · {stations.to.address}
                       </span>
                     )}
                   </PlaceAddressLink>

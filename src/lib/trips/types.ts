@@ -25,7 +25,13 @@ export interface TripItem {
   title: string;
   startsAt: string;
   endsAt?: string;
+  /** Transport only: the city you're leaving. Drives the trip's "City" logic. */
+  fromCity?: Place;
+  /** Transport only: the city you're arriving at. Drives the trip's "City" logic. */
+  toCity?: Place;
+  /** Departure waypoint (station/airport). Used for map-view routing. */
   from?: Place;
+  /** Arrival waypoint (station/airport). Used for map-view routing. */
   to?: Place;
   transportMode?: TransportMode;
   notes?: string;
@@ -71,6 +77,8 @@ export interface ItemPatch {
   title?: string;
   startsAt?: string;
   endsAt?: string | null;
+  fromCity?: Place | null;
+  toCity?: Place | null;
   from?: Place | null;
   to?: Place | null;
   transportMode?: TransportMode | null;

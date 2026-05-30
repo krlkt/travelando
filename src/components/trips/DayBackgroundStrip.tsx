@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react';
 import type { TripItem } from '@/lib/trips/types';
 import { dayOffsetFrom, formatTime } from '@/lib/time/formatDate';
 import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
+import { routeHeadline } from '@/lib/trips/transportRoute';
 import { fadeUp, spring } from '@/lib/motion/presets';
 import { cn } from '@/lib/utils';
 
@@ -56,10 +57,11 @@ export function DayBackgroundStrip({
           ? dayOffsetFrom(bucketDate, item.startsAt)
           : 0;
 
+        const route = routeHeadline(item);
         const routeLabel =
-          item.from?.label && item.to?.label
+          route.from?.label && route.to?.label
             ? null
-            : (item.to?.label ?? item.from?.label ?? null);
+            : (route.to?.label ?? route.from?.label ?? null);
 
         return (
           <button
@@ -80,11 +82,11 @@ export function DayBackgroundStrip({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium">
-                  {item.from?.label && item.to?.label ? (
+                  {route.from?.label && route.to?.label ? (
                     <>
-                      <span className="truncate">{item.from.label}</span>
+                      <span className="truncate">{route.from.label}</span>
                       <ArrowRight className="size-3 shrink-0 opacity-50" />
-                      <span className="truncate">{item.to.label}</span>
+                      <span className="truncate">{route.to.label}</span>
                     </>
                   ) : (
                     <span className="truncate">{routeLabel ?? item.title}</span>

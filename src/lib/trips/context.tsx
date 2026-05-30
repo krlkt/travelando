@@ -95,6 +95,8 @@ function applyItemPatch(item: TripItem, patch: ItemPatch): TripItem {
   if (patch.title !== undefined) next.title = patch.title;
   if (patch.startsAt !== undefined) next.startsAt = patch.startsAt;
   if (patch.endsAt !== undefined) next.endsAt = patch.endsAt ?? undefined;
+  if (patch.fromCity !== undefined) next.fromCity = patch.fromCity ?? undefined;
+  if (patch.toCity !== undefined) next.toCity = patch.toCity ?? undefined;
   if (patch.from !== undefined) next.from = patch.from ?? undefined;
   if (patch.to !== undefined) next.to = patch.to ?? undefined;
   if (patch.transportMode !== undefined)

@@ -184,6 +184,18 @@ function ItemEditorBody({
   const [endsAt, setEndsAt] = useState<string>(
     initialEndsAt(item, defaultDate),
   );
+  const [fromCityValue, setFromCityValue] = useState<string>(
+    item?.fromCity?.label ?? '',
+  );
+  const [fromCityPlace, setFromCityPlace] = useState<Place | undefined>(
+    item?.fromCity ?? undefined,
+  );
+  const [toCityValue, setToCityValue] = useState<string>(
+    item?.toCity?.label ?? '',
+  );
+  const [toCityPlace, setToCityPlace] = useState<Place | undefined>(
+    item?.toCity ?? undefined,
+  );
   const [fromValue, setFromValue] = useState<string>(item?.from?.label ?? '');
   const [fromPlace, setFromPlace] = useState<Place | undefined>(
     item?.from ?? undefined,
@@ -206,8 +218,8 @@ function ItemEditorBody({
         ? fromLocalInput(startsAt)
         : new Date().toISOString();
       const city = latestCityBefore(trip, cityOverrides[tripId] ?? [], isoTs);
-      setFromValue(city.cityLabel);
-      setFromPlace({ label: city.cityLabel, placeId: city.cityPlaceId });
+      setFromCityValue(city.cityLabel);
+      setFromCityPlace({ label: city.cityLabel, placeId: city.cityPlaceId });
     }
     if (newKind === 'lodging' && !isEdit) {
       const base = startsAt ? new Date(fromLocalInput(startsAt)) : new Date();
@@ -306,6 +318,22 @@ function ItemEditorBody({
       }
     }
 
+    const resolvedFromCity: Place | undefined =
+      kind === 'transport'
+        ? (fromCityPlace ??
+          (fromCityValue.trim() ? { label: fromCityValue.trim() } : undefined))
+        : undefined;
+    const resolvedToCity: Place | undefined =
+      kind === 'transport'
+        ? (toCityPlace ??
+          (toCityValue.trim() ? { label: toCityValue.trim() } : undefined))
+        : undefined;
+
+    if (kind === 'transport' && !resolvedToCity) {
+      setError('Pick the city you are arriving in.');
+      return;
+    }
+
     const resolvedFrom: Place | undefined =
       kind === 'meal' || kind === 'lodging'
         ? undefined
@@ -322,6 +350,8 @@ function ItemEditorBody({
           title: effectiveTitle,
           startsAt: fromLocalInput(startsAt),
           endsAt: endsAt ? fromLocalInput(endsAt) : null,
+          fromCity: resolvedFromCity ?? null,
+          toCity: resolvedToCity ?? null,
           from: resolvedFrom ?? null,
           to: resolvedTo ?? null,
           transportMode: kind === 'transport' ? transportMode : null,
@@ -335,6 +365,8 @@ function ItemEditorBody({
           title: effectiveTitle,
           startsAt: fromLocalInput(startsAt),
           endsAt: endsAt ? fromLocalInput(endsAt) : undefined,
+          fromCity: resolvedFromCity,
+          toCity: resolvedToCity,
           from: resolvedFrom,
           to: resolvedTo,
           transportMode: kind === 'transport' ? transportMode : undefined,
@@ -576,60 +608,131 @@ function ItemEditorBody({
           </div>
         )}
 
-        <div
-          className={
-            kind === 'meal' || kind === 'lodging'
-              ? 'grid gap-3'
-              : 'grid grid-cols-2 gap-3'
-          }
-        >
-          {kind !== 'meal' && kind !== 'lodging' && (
+        {kind === 'transport' ? (
+          <div className="grid gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label>From city</Label>
+                <PlaceAutocomplete
+                  value={fromCityValue}
+                  onChange={(v) => {
+                    setFromCityValue(v);
+                    setFromCityPlace(undefined);
+                  }}
+                  onSelect={(place) => {
+                    setFromCityValue(place.label);
+                    setFromCityPlace(place);
+                  }}
+                  placeholder="Amsterdam"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>To city</Label>
+                <PlaceAutocomplete
+                  value={toCityValue}
+                  onChange={(v) => {
+                    setToCityValue(v);
+                    setToCityPlace(undefined);
+                  }}
+                  onSelect={(place) => {
+                    setToCityValue(place.label);
+                    setToCityPlace(place);
+                  }}
+                  placeholder="Lisbon"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-1.5">
+                <Label className="flex items-center gap-1.5">
+                  Depart from
+                  <span className="text-muted-foreground text-[10px]">
+                    optional
+                  </span>
+                </Label>
+                <PlaceAutocomplete
+                  value={fromValue}
+                  onChange={(v) => {
+                    setFromValue(v);
+                    setFromPlace(undefined);
+                  }}
+                  onSelect={(place) => {
+                    setFromValue(place.label);
+                    setFromPlace(place);
+                  }}
+                  placeholder="AMS Schiphol"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label className="flex items-center gap-1.5">
+                  Arrive at
+                  <span className="text-muted-foreground text-[10px]">
+                    optional
+                  </span>
+                </Label>
+                <PlaceAutocomplete
+                  value={toValue}
+                  onChange={(v) => {
+                    setToValue(v);
+                    setToPlace(undefined);
+                  }}
+                  onSelect={(place) => {
+                    setToValue(place.label);
+                    setToPlace(place);
+                  }}
+                  placeholder="Humberto Delgado"
+                />
+              </div>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Cities set where you are on the trip. Stations or airports are
+              optional and only used to route the map view.
+            </p>
+          </div>
+        ) : (
+          <div
+            className={
+              kind === 'meal' || kind === 'lodging'
+                ? 'grid gap-3'
+                : 'grid grid-cols-2 gap-3'
+            }
+          >
+            {kind !== 'meal' && kind !== 'lodging' && (
+              <div className="grid gap-1.5">
+                <Label>From</Label>
+                <PlaceAutocomplete
+                  value={fromValue}
+                  onChange={(v) => {
+                    setFromValue(v);
+                    setFromPlace(undefined);
+                  }}
+                  onSelect={(place) => {
+                    setFromValue(place.label);
+                    setFromPlace(place);
+                  }}
+                  placeholder="(optional)"
+                />
+              </div>
+            )}
             <div className="grid gap-1.5">
-              <Label>From</Label>
+              <Label>{kind === 'lodging' ? 'Where' : 'Place'}</Label>
               <PlaceAutocomplete
-                value={fromValue}
+                value={toValue}
                 onChange={(v) => {
-                  setFromValue(v);
-                  setFromPlace(undefined);
+                  setToValue(v);
+                  setToPlace(undefined);
                 }}
                 onSelect={(place) => {
-                  setFromValue(place.label);
-                  setFromPlace(place);
+                  setToValue(place.label);
+                  setToPlace(place);
                 }}
                 placeholder={
-                  kind === 'transport' ? 'AMS Schiphol' : '(optional)'
+                  kind === 'lodging' ? 'Casa do Príncipe' : 'Cervejaria Ramiro'
                 }
               />
             </div>
-          )}
-          <div className="grid gap-1.5">
-            <Label>
-              {kind === 'transport'
-                ? 'To'
-                : kind === 'lodging'
-                  ? 'Where'
-                  : 'Place'}
-            </Label>
-            <PlaceAutocomplete
-              value={toValue}
-              onChange={(v) => {
-                setToValue(v);
-                setToPlace(undefined);
-              }}
-              onSelect={(place) => {
-                setToValue(place.label);
-                setToPlace(place);
-              }}
-              placeholder={
-                kind === 'transport'
-                  ? 'LIS Lisbon'
-                  : kind === 'lodging'
-                    ? 'Casa do Príncipe'
-                    : 'Cervejaria Ramiro'
-              }
-            />
           </div>
-        </div>
+        )}
 
         <div className="grid gap-1.5">
           <Label htmlFor="item-notes">Notes</Label>

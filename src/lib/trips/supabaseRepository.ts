@@ -63,7 +63,7 @@ const TRIP_COLUMNS =
   'id, owner_id, title, destination, cover_image, cover_gradient, start_date, end_date';
 
 const ITEM_COLUMNS =
-  'id, trip_id, kind, title, starts_at, ends_at, from_place, to_place, transport_mode, notes';
+  'id, trip_id, kind, title, starts_at, ends_at, from_city, to_city, from_place, to_place, transport_mode, notes';
 
 const MEMBER_COLUMNS =
   'id, trip_id, user_id, display_name, email, invited_by, profiles(avatar_url, display_name)';

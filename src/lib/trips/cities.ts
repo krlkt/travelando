@@ -63,8 +63,8 @@ function buildDaySegments(
       items: segItems,
     });
 
-    segCity = transport.to!.label;
-    segPlaceId = transport.to!.placeId;
+    segCity = transport.toCity!.label;
+    segPlaceId = transport.toCity!.placeId;
     prevCutoff = arrivalTs;
   }
 
@@ -119,7 +119,7 @@ export function deriveCitiesByDay(
     );
 
     const cityChangeTransports = dayItems.filter((i) => {
-      if (i.kind !== 'transport' || !i.to?.label) return false;
+      if (i.kind !== 'transport' || !i.toCity?.label) return false;
       const arrivalTs = arrivalTimestamp(i);
       return arrivalTs >= dayStart && arrivalTs <= dayEnd;
     });
