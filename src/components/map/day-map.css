@@ -1,0 +1,159 @@
+/* Day map markers + canvas chrome. Markers are imperative MapLibre DOM nodes,
+   so their styling lives here rather than in a component module. */
+
+/* Root marker: MapLibre owns its inline `transform` (it repositions this node
+   every move/zoom frame), so it must carry NO transform or transform
+   transition — otherwise repositioning gets animated and the pin drifts. */
+.dm-marker {
+  --dm-size: 2rem;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--dm-accent, var(--primary));
+}
+
+.dm-marker:hover,
+.dm-marker:focus-visible {
+  outline: none;
+  z-index: 2;
+}
+
+/* Inner wrapper carries all hover/scale/lift motion, keeping the
+   MapLibre-controlled root transform-free. */
+.dm-marker__inner {
+  display: grid;
+  place-items: center;
+  transition: transform var(--duration-fast, 150ms) var(--ease-out-expo, ease);
+  will-change: transform;
+}
+
+.dm-marker:hover .dm-marker__inner,
+.dm-marker:focus-visible .dm-marker__inner {
+  transform: translateY(-2px) scale(1.06);
+}
+
+.dm-marker:focus-visible .dm-marker__pin {
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px var(--dm-accent);
+}
+
+.dm-marker__pin {
+  width: var(--dm-size);
+  height: var(--dm-size);
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--dm-accent);
+  color: white;
+  box-shadow:
+    0 1px 2px oklch(20% 0.02 250 / 0.25),
+    0 4px 12px oklch(20% 0.02 250 / 0.28);
+}
+
+.dm-marker__pin svg {
+  width: 60%;
+  height: 60%;
+}
+
+/* Numbered scheduled stop. */
+.dm-marker__pin--num {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lodging reads as the anchor: larger, rounded-square, ringed. */
+.dm-marker--lodging {
+  --dm-size: 2.35rem;
+}
+.dm-marker--lodging .dm-marker__pin {
+  border-radius: 0.85rem;
+  box-shadow:
+    0 0 0 3px var(--background),
+    0 4px 14px oklch(20% 0.02 250 / 0.32);
+}
+
+/* Wishlist "ghost" markers: hollow, dashed, recede behind the plan. */
+.dm-marker--foodWish,
+.dm-marker--activityWish {
+  --dm-size: 1.65rem;
+}
+.dm-marker__pin--ghost {
+  background: color-mix(in oklch, var(--card) 88%, var(--dm-accent));
+  color: var(--dm-accent);
+  border: 1.5px dashed var(--dm-accent);
+  box-shadow: 0 1px 4px oklch(20% 0.02 250 / 0.18);
+}
+
+/* Wishlist places far from today's plan fade back; hover/focus restores them. */
+.dm-marker--far .dm-marker__inner {
+  opacity: 0.45;
+}
+.dm-marker--far:hover .dm-marker__inner,
+.dm-marker--far:focus-visible .dm-marker__inner {
+  opacity: 1;
+}
+
+/* Tiny want-level pips under a wishlist marker. */
+.dm-marker__want {
+  position: absolute;
+  bottom: -0.45rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1.5px;
+}
+.dm-marker--foodWish,
+.dm-marker--activityWish {
+  position: relative;
+}
+.dm-marker__want i {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--dm-accent);
+}
+
+/* Wishlist cluster: a neutral "+N" pill reading as "more wishes here". Sized a
+   touch larger than a wish pin; dashed accent echoes the ghost wishlist look. */
+.dm-cluster__pill {
+  --dm-cluster-accent: var(--kind-activity);
+  display: grid;
+  place-items: center;
+  min-width: 1.95rem;
+  height: 1.95rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--card) 82%, var(--dm-cluster-accent));
+  color: var(--dm-cluster-accent);
+  border: 1.5px dashed var(--dm-cluster-accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow:
+    0 1px 2px oklch(20% 0.02 250 / 0.22),
+    0 4px 12px oklch(20% 0.02 250 / 0.26);
+}
+
+.dm-cluster:focus-visible .dm-cluster__pill {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--background),
+    0 0 0 4px var(--dm-cluster-accent);
+}
+
+/* Honor reduced motion: no marker lift/scale animation. */
+@media (prefers-reduced-motion: reduce) {
+  .dm-marker__inner {
+    transition: none;
+    will-change: auto;
+  }
+  .dm-marker:hover .dm-marker__inner,
+  .dm-marker:focus-visible .dm-marker__inner {
+    transform: none;
+  }
+}

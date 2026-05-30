@@ -7,6 +7,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowLeft,
   Bed,
+  CalendarDays,
+  Map as MapIcon,
   MapPin,
   Plus,
   Radio,
@@ -25,6 +27,7 @@ import {
 } from '@/lib/trips/itemExpenseTotals';
 import { DayBackgroundStrip } from './DayBackgroundStrip';
 import { ItemDetailSheet } from './ItemDetailSheet';
+import { DayMap } from './DayMap';
 import { FoodWishlist } from './FoodWishlist';
 import { ActivityWishlist } from './ActivityWishlist';
 import { CityOverrideSheet } from './CityOverrideSheet';
@@ -121,6 +124,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
   const [defaultDayDate, setDefaultDayDate] = useState<Date | null>(null);
   const [cityOverrideOpen, setCityOverrideOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [view, setView] = useState<'timeline' | 'map'>('timeline');
 
   const activeBucket =
     dayCityBuckets.find((b) => b.key === activeDay) ?? dayCityBuckets[0];
@@ -321,21 +325,59 @@ export function TripDetail({ tripId }: TripDetailProps) {
                 </div>
               )}
 
-              {dayCityBuckets.map((bucket) => (
-                <TabsContent key={bucket.key} value={bucket.key}>
-                  <DayContent
-                    bucket={bucket}
-                    currentItemId={current?.id ?? null}
-                    onSelect={(item) => setSelectedItem(item)}
-                    onAdd={(dayDate) => {
-                      setEditingItem(null);
-                      setDefaultDayDate(dayDate);
-                      setItemEditorOpen(true);
-                    }}
-                    itemExpenseTotals={itemExpenseTotals}
-                  />
-                </TabsContent>
-              ))}
+              {/* Timeline ⇄ Map view toggle */}
+              <div className="border-border/60 bg-secondary/40 mt-1 inline-flex rounded-full border p-0.5 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setView('timeline')}
+                  aria-pressed={view === 'timeline'}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition ${
+                    view === 'timeline'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <CalendarDays className="size-3.5" />
+                  Timeline
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setView('map')}
+                  aria-pressed={view === 'map'}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition ${
+                    view === 'map'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <MapIcon className="size-3.5" />
+                  Map
+                </button>
+              </div>
+
+              {view === 'map' ? (
+                <DayMap
+                  trip={trip}
+                  dayKey={activeDay}
+                  onSelectItem={(item) => setSelectedItem(item)}
+                />
+              ) : (
+                dayCityBuckets.map((bucket) => (
+                  <TabsContent key={bucket.key} value={bucket.key}>
+                    <DayContent
+                      bucket={bucket}
+                      currentItemId={current?.id ?? null}
+                      onSelect={(item) => setSelectedItem(item)}
+                      onAdd={(dayDate) => {
+                        setEditingItem(null);
+                        setDefaultDayDate(dayDate);
+                        setItemEditorOpen(true);
+                      }}
+                      itemExpenseTotals={itemExpenseTotals}
+                    />
+                  </TabsContent>
+                ))
+              )}
             </Tabs>
           </div>
 

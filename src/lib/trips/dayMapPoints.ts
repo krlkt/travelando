@@ -1,0 +1,245 @@
+import type {
+  ActivityPlace,
+  ActivityPlaceCategory,
+  CityOverride,
+  FoodPlace,
+  FoodPlaceCategory,
+  ItemKind,
+  Place,
+  Trip,
+  TripItem,
+} from './types';
+import {
+  deriveCitiesByDay,
+  foodPlaceCitiesForDay,
+  lodgingForDay,
+} from './cities';
+import { nearestDistanceMeters, type LngLat } from '@/lib/map/distance';
+
+/**
+ * A single point plotted on the day map. The discriminated `kind` drives both
+ * marker styling and interaction:
+ *  - `lodging`        — where you're sleeping (anchor)
+ *  - `scheduled`      — something already on the day's timeline (the route)
+ *  - `foodWish` /
+ *    `activityWish`   — unscheduled wishlist candidates for the day's cities
+ */
+interface BaseDayMapPoint {
+  /** Stable key for rendering/diffing markers. */
+  id: string;
+  lat: number;
+  lng: number;
+  label: string;
+  address?: string;
+  placeId?: string;
+}
+
+export interface LodgingMapPoint extends BaseDayMapPoint {
+  kind: 'lodging';
+  itemId: string;
+}
+
+export interface ScheduledMapPoint extends BaseDayMapPoint {
+  kind: 'scheduled';
+  itemId: string;
+  itemKind: ItemKind;
+  /** 1-based position in the day's time-ordered route. */
+  order: number;
+  startsAt: string;
+}
+
+export interface FoodWishMapPoint extends BaseDayMapPoint {
+  kind: 'foodWish';
+  placeRefId: string;
+  wantLevel?: number;
+  category?: FoodPlaceCategory;
+  /** Straight-line metres to the nearest scheduled/lodging anchor (proximity hint). */
+  nearestPlanMeters?: number;
+}
+
+export interface ActivityWishMapPoint extends BaseDayMapPoint {
+  kind: 'activityWish';
+  placeRefId: string;
+  wantLevel?: number;
+  category?: ActivityPlaceCategory;
+  /** Straight-line metres to the nearest scheduled/lodging anchor (proximity hint). */
+  nearestPlanMeters?: number;
+}
+
+export type DayMapPoint =
+  | LodgingMapPoint
+  | ScheduledMapPoint
+  | FoodWishMapPoint
+  | ActivityWishMapPoint;
+
+export interface DayMapData {
+  points: DayMapPoint[];
+  /** Items/wishes relevant to the day that lack coordinates (can't be pinned). */
+  unlocatedCount: number;
+  /** Cities covered by the day, in segment order. */
+  cities: Array<{ cityLabel: string; cityPlaceId?: string }>;
+}
+
+function isLocated(
+  place: Pick<Place, 'lat' | 'lng'> | undefined,
+): place is { lat: number; lng: number } {
+  return (
+    !!place &&
+    typeof place.lat === 'number' &&
+    typeof place.lng === 'number' &&
+    Number.isFinite(place.lat) &&
+    Number.isFinite(place.lng)
+  );
+}
+
+/** The location a timeline item should be pinned at: destination first, else origin. */
+function itemPlace(item: TripItem): Place | undefined {
+  if (isLocated(item.to)) return item.to;
+  if (isLocated(item.from)) return item.from;
+  return undefined;
+}
+
+function cityKey(city: { cityLabel: string; cityPlaceId?: string }): string {
+  return city.cityPlaceId ?? city.cityLabel;
+}
+
+/**
+ * Collects every map-able point for a single day: lodging, the day's scheduled
+ * items (in time order), and the food/activity wishlists for the day's cities.
+ * Pure and side-effect free so it can be unit-tested without a map renderer.
+ *
+ * Wishlist points already represented by a scheduled item (same `placeId`) are
+ * dropped to avoid duplicate pins once a wish has been added to the day.
+ */
+export function buildDayMapPoints(
+  trip: Trip,
+  dayKey: string,
+  foodPlaces: FoodPlace[],
+  activityPlaces: ActivityPlace[],
+  overrides: CityOverride[] = [],
+): DayMapData {
+  const buckets = deriveCitiesByDay(trip, overrides);
+  const bucket = buckets.get(dayKey);
+  const cities = foodPlaceCitiesForDay(trip, overrides, dayKey);
+  const cityKeys = new Set(cities.map(cityKey));
+
+  const points: DayMapPoint[] = [];
+  let unlocatedCount = 0;
+
+  // --- Scheduled items (the route), time-ordered ----------------------------
+  const dayItems = bucket
+    ? bucket.segments
+        .flatMap((seg) => seg.items)
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+        )
+    : [];
+
+  const scheduledPlaceIds = new Set<string>();
+  let order = 0;
+  for (const item of dayItems) {
+    const place = itemPlace(item);
+    if (!place) {
+      unlocatedCount += 1;
+      continue;
+    }
+    order += 1;
+    if (place.placeId) scheduledPlaceIds.add(place.placeId);
+    points.push({
+      kind: 'scheduled',
+      id: `scheduled-${item.id}`,
+      itemId: item.id,
+      itemKind: item.kind,
+      order,
+      startsAt: item.startsAt,
+      lat: place.lat!,
+      lng: place.lng!,
+      label: item.title || place.label,
+      address: place.address,
+      placeId: place.placeId,
+    });
+  }
+
+  // --- Lodging anchor --------------------------------------------------------
+  const lodging = lodgingForDay(trip, dayKey);
+  if (lodging) {
+    const place = itemPlace(lodging);
+    if (place) {
+      points.push({
+        kind: 'lodging',
+        id: `lodging-${lodging.id}`,
+        itemId: lodging.id,
+        lat: place.lat!,
+        lng: place.lng!,
+        label: place.label || lodging.title,
+        address: place.address,
+        placeId: place.placeId,
+      });
+    } else {
+      unlocatedCount += 1;
+    }
+  }
+
+  // --- Wishlists for the day's cities ---------------------------------------
+  const inDayCity = (p: { cityLabel: string; cityPlaceId?: string }): boolean =>
+    cityKeys.has(cityKey(p));
+
+  // Anchors the day's plan revolves around: scheduled stops + lodging. Used to
+  // hint how close each wishlist place sits to what's already planned.
+  const planAnchors: LngLat[] = points
+    .filter((p) => p.kind === 'scheduled' || p.kind === 'lodging')
+    .map((p) => ({ lat: p.lat, lng: p.lng }));
+
+  const planDistance = (p: LngLat): number | undefined =>
+    planAnchors.length > 0
+      ? (nearestDistanceMeters(p, planAnchors) ?? undefined)
+      : undefined;
+
+  for (const fp of foodPlaces) {
+    if (!inDayCity(fp)) continue;
+    if (!isLocated(fp)) {
+      unlocatedCount += 1;
+      continue;
+    }
+    if (fp.placeId && scheduledPlaceIds.has(fp.placeId)) continue;
+    points.push({
+      kind: 'foodWish',
+      id: `food-${fp.id}`,
+      placeRefId: fp.id,
+      lat: fp.lat,
+      lng: fp.lng,
+      label: fp.name,
+      address: fp.address,
+      placeId: fp.placeId,
+      wantLevel: fp.wantLevel,
+      category: fp.category,
+      nearestPlanMeters: planDistance({ lat: fp.lat, lng: fp.lng }),
+    });
+  }
+
+  for (const ap of activityPlaces) {
+    if (!inDayCity(ap)) continue;
+    if (!isLocated(ap)) {
+      unlocatedCount += 1;
+      continue;
+    }
+    if (ap.placeId && scheduledPlaceIds.has(ap.placeId)) continue;
+    points.push({
+      kind: 'activityWish',
+      id: `activity-${ap.id}`,
+      placeRefId: ap.id,
+      lat: ap.lat,
+      lng: ap.lng,
+      label: ap.name,
+      address: ap.address,
+      placeId: ap.placeId,
+      wantLevel: ap.wantLevel,
+      category: ap.category,
+      nearestPlanMeters: planDistance({ lat: ap.lat, lng: ap.lng }),
+    });
+  }
+
+  return { points, unlocatedCount, cities };
+}

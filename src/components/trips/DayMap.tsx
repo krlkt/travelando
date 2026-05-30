@@ -1,0 +1,322 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { toast } from 'sonner';
+import { Camera, MapPin, UtensilsCrossed } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetClose,
+} from '@/components/ui/sheet';
+import { WantLevel } from './WantLevel';
+import { useTrips } from '@/lib/trips/context';
+import { buildDayMapPoints, type DayMapPoint } from '@/lib/trips/dayMapPoints';
+import { isMapConfigured, type MapTheme } from '@/lib/map/style';
+import { formatDistance, walkMinutes } from '@/lib/map/distance';
+import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
+import type { ItemDraft, Trip, TripItem } from '@/lib/trips/types';
+
+const DayMapCanvas = dynamic(
+  () => import('@/components/map/DayMapCanvas').then((m) => m.DayMapCanvas),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="bg-secondary/30 absolute inset-0 animate-pulse" />
+    ),
+  },
+);
+
+const SLOT_GAP_MS = 60 * 60 * 1000;
+const DEFAULT_START_HOUR = 10;
+
+interface DayMapProps {
+  trip: Trip;
+  dayKey: string;
+  /** Opens the existing item detail sheet for scheduled/lodging pins. */
+  onSelectItem: (item: TripItem) => void;
+}
+
+function resolveTheme(): MapTheme {
+  if (typeof document === 'undefined') return 'light';
+  if (document.documentElement.classList.contains('dark')) return 'dark';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+}
+
+function useMapTheme(): MapTheme {
+  // Lazy initializer resolves the theme up front (no setState-in-effect); the
+  // effect only subscribes to later system-theme changes.
+  const [theme, setTheme] = useState<MapTheme>(resolveTheme);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => setTheme(resolveTheme());
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return theme;
+}
+
+/** Next free start time on the day: after the last scheduled stop, else 10:00. */
+function nextSlotIso(dayKey: string, scheduled: DayMapPoint[]): string {
+  const times = scheduled
+    .filter((p): p is Extract<DayMapPoint, { kind: 'scheduled' }> => {
+      return p.kind === 'scheduled';
+    })
+    .map((p) => new Date(p.startsAt).getTime())
+    .filter((t) => Number.isFinite(t));
+
+  if (times.length === 0) {
+    const d = new Date(`${dayKey}T00:00:00`);
+    d.setHours(DEFAULT_START_HOUR, 0, 0, 0);
+    return d.toISOString();
+  }
+  return new Date(Math.max(...times) + SLOT_GAP_MS).toISOString();
+}
+
+export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
+  const { foodPlaces, activityPlaces, cityOverrides, addItem } = useTrips();
+  const theme = useMapTheme();
+  const tripId = trip.id;
+
+  const [showWishlist, setShowWishlist] = useState(true);
+  const [selectedWish, setSelectedWish] = useState<DayMapPoint | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const { points, unlocatedCount } = useMemo(
+    () =>
+      buildDayMapPoints(
+        trip,
+        dayKey,
+        foodPlaces[tripId] ?? [],
+        activityPlaces[tripId] ?? [],
+        cityOverrides[tripId] ?? [],
+      ),
+    [trip, dayKey, foodPlaces, activityPlaces, cityOverrides, tripId],
+  );
+
+  const visiblePoints = useMemo(
+    () =>
+      showWishlist
+        ? points
+        : points.filter((p) => p.kind === 'scheduled' || p.kind === 'lodging'),
+    [points, showWishlist],
+  );
+
+  const handleSelectPoint = useCallback(
+    (point: DayMapPoint) => {
+      if (point.kind === 'scheduled' || point.kind === 'lodging') {
+        const item = trip.items.find((i) => i.id === point.itemId);
+        if (item) onSelectItem(item);
+        return;
+      }
+      setSelectedWish(point);
+    },
+    [trip.items, onSelectItem],
+  );
+
+  const handleAddToDay = useCallback(async () => {
+    if (!selectedWish) return;
+    if (
+      selectedWish.kind !== 'foodWish' &&
+      selectedWish.kind !== 'activityWish'
+    )
+      return;
+
+    const draft: ItemDraft = {
+      kind: selectedWish.kind === 'foodWish' ? 'meal' : 'activity',
+      title: selectedWish.label,
+      startsAt: nextSlotIso(dayKey, points),
+      to: {
+        label: selectedWish.label,
+        address: selectedWish.address,
+        lat: selectedWish.lat,
+        lng: selectedWish.lng,
+        placeId: selectedWish.placeId,
+      },
+    };
+
+    setAdding(true);
+    try {
+      await addItem(tripId, draft);
+      toast.success(`Added ${selectedWish.label} to this day`);
+      setSelectedWish(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Add failed';
+      toast.error(`Couldn't add to day: ${message}`);
+    } finally {
+      setAdding(false);
+    }
+  }, [selectedWish, dayKey, points, addItem, tripId]);
+
+  if (!isMapConfigured()) {
+    return (
+      <div className="border-border/70 bg-secondary/20 mt-4 grid place-items-center rounded-[var(--radius-lg)] border border-dashed px-6 py-16 text-center">
+        <MapPin className="text-muted-foreground/60 mb-3 size-6" />
+        <p className="text-muted-foreground max-w-sm text-sm">
+          The map isn&apos;t configured yet. Add a{' '}
+          <code className="text-xs">NEXT_PUBLIC_MAPTILER_KEY</code> to see your
+          lodging, plan, and wishlists laid out spatially.
+        </p>
+      </div>
+    );
+  }
+
+  const wishCounts = points.reduce(
+    (acc, p) => {
+      if (p.kind === 'foodWish') acc.food += 1;
+      if (p.kind === 'activityWish') acc.activity += 1;
+      return acc;
+    },
+    { food: 0, activity: 0 },
+  );
+
+  return (
+    <div className="mt-4">
+      <div className="border-border/60 relative h-[clamp(22rem,55vh,40rem)] w-full overflow-hidden rounded-[var(--radius-lg)] border">
+        <DayMapCanvas
+          points={visiblePoints}
+          theme={theme}
+          onSelectPoint={handleSelectPoint}
+        />
+      </div>
+
+      {/* Legend + controls */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+        <LegendDot className="bg-[var(--kind-activity)]" label="Plan" />
+        <LegendDot className="bg-[var(--kind-lodging)]" label="Staying" />
+        {(wishCounts.food > 0 || wishCounts.activity > 0) && (
+          <button
+            type="button"
+            onClick={() => setShowWishlist((v) => !v)}
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 underline-offset-2 hover:underline"
+            aria-pressed={showWishlist}
+          >
+            <span
+              className={`size-2.5 rounded-full border border-dashed ${showWishlist ? 'border-[var(--kind-meal)] bg-[var(--kind-meal)]/20' : 'border-muted-foreground/40'}`}
+            />
+            {showWishlist ? 'Hide' : 'Show'} wishlists ({wishCounts.food} food ·{' '}
+            {wishCounts.activity} activity)
+          </button>
+        )}
+        {unlocatedCount > 0 && (
+          <span className="text-muted-foreground/70">
+            {unlocatedCount} {unlocatedCount === 1 ? 'item has' : 'items have'}{' '}
+            no location yet
+          </span>
+        )}
+      </div>
+
+      <AddToDaySheet
+        wish={selectedWish}
+        adding={adding}
+        onOpenChange={(open) => {
+          if (!open) setSelectedWish(null);
+        }}
+        onAdd={handleAddToDay}
+      />
+    </div>
+  );
+}
+
+function LegendDot({ className, label }: { className: string; label: string }) {
+  return (
+    <span className="text-muted-foreground inline-flex items-center gap-1.5">
+      <span className={`size-2.5 rounded-full ${className}`} />
+      {label}
+    </span>
+  );
+}
+
+interface AddToDaySheetProps {
+  wish: DayMapPoint | null;
+  adding: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAdd: () => void;
+}
+
+function AddToDaySheet({
+  wish,
+  adding,
+  onOpenChange,
+  onAdd,
+}: AddToDaySheetProps) {
+  const isWish = wish?.kind === 'foodWish' || wish?.kind === 'activityWish';
+  const Icon = wish?.kind === 'foodWish' ? UtensilsCrossed : Camera;
+
+  return (
+    <Sheet open={isWish} onOpenChange={onOpenChange}>
+      <SheetContent side="bottom">
+        {isWish && wish && (
+          <>
+            <div>
+              <SheetTitle className="flex items-center gap-2">
+                <Icon className="text-muted-foreground size-4" />
+                {wish.label}
+              </SheetTitle>
+              <SheetDescription>
+                {wish.kind === 'foodWish'
+                  ? 'Food wishlist'
+                  : 'Activity wishlist'}
+              </SheetDescription>
+            </div>
+
+            <div className="grid gap-3 py-1">
+              {'nearestPlanMeters' in wish &&
+                wish.nearestPlanMeters != null && (
+                  <p className="text-muted-foreground text-sm">
+                    {formatDistance(wish.nearestPlanMeters)} from your plan · ~
+                    {walkMinutes(wish.nearestPlanMeters)} min walk
+                  </p>
+                )}
+              {wish.address && (
+                <PlaceAddressLink
+                  place={{
+                    label: wish.label,
+                    address: wish.address,
+                    lat: wish.lat,
+                    lng: wish.lng,
+                    placeId: wish.placeId,
+                  }}
+                  className="text-muted-foreground text-sm"
+                >
+                  {wish.address}
+                </PlaceAddressLink>
+              )}
+              {'wantLevel' in wish && wish.wantLevel ? (
+                <WantLevel
+                  mode="indicator"
+                  variant="star"
+                  value={wish.wantLevel}
+                />
+              ) : null}
+            </div>
+
+            <SheetFooter>
+              <SheetClose asChild>
+                <Button variant="ghost">Cancel</Button>
+              </SheetClose>
+              <Button
+                onClick={onAdd}
+                disabled={adding}
+                style={{
+                  background:
+                    wish.kind === 'foodWish'
+                      ? 'var(--kind-meal)'
+                      : 'var(--kind-activity)',
+                }}
+              >
+                {adding ? 'Adding…' : 'Add to this day'}
+              </Button>
+            </SheetFooter>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
