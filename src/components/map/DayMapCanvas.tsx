@@ -263,6 +263,16 @@ export function DayMapCanvas({
     const markers = markersRef.current;
     const handleViewportChange = () => renderMarkers();
 
+    // MapLibre doesn't auto-resize when its container changes (e.g. expanding
+    // to full screen, or a window resize), so keep the canvas in sync. Coalesce
+    // bursts into a single resize per frame.
+    let resizeFrame = 0;
+    const resizeObserver = new ResizeObserver(() => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => map.resize());
+    });
+    resizeObserver.observe(containerRef.current);
+
     map.once('load', () => {
       readyRef.current = true;
 
@@ -291,6 +301,8 @@ export function DayMapCanvas({
 
     return () => {
       readyRef.current = false;
+      cancelAnimationFrame(resizeFrame);
+      resizeObserver.disconnect();
       map.off('moveend', handleViewportChange);
       markers.forEach((m) => m.remove());
       markers.clear();

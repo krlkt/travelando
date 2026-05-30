@@ -1,9 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
-import { Camera, MapPin, UtensilsCrossed } from 'lucide-react';
+import {
+  Camera,
+  Maximize2,
+  Minimize2,
+  MapPin,
+  UtensilsCrossed,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -87,6 +101,65 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
   const [showWishlist, setShowWishlist] = useState(true);
   const [selectedWish, setSelectedWish] = useState<DayMapPoint | null>(null);
   const [adding, setAdding] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  // The live map is portaled to <body> and stays mounted across expand/collapse
+  // (no remount, so MapLibre keeps its instance + viewport). When collapsed it
+  // is absolutely positioned over an in-column placeholder; when expanded it
+  // covers the viewport. Portaling to <body> also frees `position: fixed` from
+  // any ancestor transform/filter that would otherwise trap it to a sub-box.
+  const placeholderRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  const [collapsedRect, setCollapsedRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    height: number;
+  } | null>(null);
+
+  useEffect(() => setMounted(true), []);
+
+  // Track the placeholder's document-space box so the collapsed map sits exactly
+  // over it (and scrolls naturally with the page, since absolute boxes are
+  // anchored to the document, not the viewport). Recompute on any reflow.
+  useEffect(() => {
+    if (!mounted) return;
+    const measure = () => {
+      const el = placeholderRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setCollapsedRect({
+        top: r.top + window.scrollY,
+        left: r.left + window.scrollX,
+        width: r.width,
+        height: r.height,
+      });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    const observer = new ResizeObserver(measure);
+    if (placeholderRef.current) observer.observe(placeholderRef.current);
+    observer.observe(document.body);
+    return () => {
+      window.removeEventListener('resize', measure);
+      observer.disconnect();
+    };
+  }, [mounted]);
+
+  // While expanded, lock page scroll and let Escape collapse the map.
+  useEffect(() => {
+    if (!expanded) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setExpanded(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [expanded]);
 
   const { points, unlocatedCount } = useMemo(
     () =>
@@ -176,15 +249,62 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
     { food: 0, activity: 0 },
   );
 
+  const surfaceStyle: CSSProperties = expanded
+    ? {
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100dvh',
+        zIndex: 40,
+      }
+    : collapsedRect
+      ? {
+          position: 'absolute',
+          top: collapsedRect.top,
+          left: collapsedRect.left,
+          width: collapsedRect.width,
+          height: collapsedRect.height,
+        }
+      : { display: 'none' };
+
+  const mapSurface = (
+    <div
+      style={surfaceStyle}
+      className={`border-border/60 relative overflow-hidden ${
+        expanded ? 'rounded-none border-0' : 'rounded-[var(--radius-lg)] border'
+      }`}
+    >
+      <DayMapCanvas
+        points={visiblePoints}
+        theme={theme}
+        onSelectPoint={handleSelectPoint}
+      />
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-pressed={expanded}
+        aria-label={expanded ? 'Exit full screen' : 'Expand map'}
+        className="border-border/60 bg-background/70 text-foreground hover:bg-background/90 absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs shadow-sm backdrop-blur-md transition"
+      >
+        {expanded ? (
+          <Minimize2 className="size-3.5" />
+        ) : (
+          <Maximize2 className="size-3.5" />
+        )}
+        {expanded ? 'Exit' : 'Expand'}
+      </button>
+    </div>
+  );
+
   return (
     <div className="mt-4">
-      <div className="border-border/60 relative h-[clamp(22rem,55vh,40rem)] w-full overflow-hidden rounded-[var(--radius-lg)] border">
-        <DayMapCanvas
-          points={visiblePoints}
-          theme={theme}
-          onSelectPoint={handleSelectPoint}
-        />
-      </div>
+      {/* Reserves the in-column space; the live map is portaled on top of it. */}
+      <div
+        ref={placeholderRef}
+        className="bg-secondary/20 h-[clamp(22rem,55vh,40rem)] w-full rounded-[var(--radius-lg)]"
+      />
+      {mounted && createPortal(mapSurface, document.body)}
 
       {/* Legend + controls */}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
