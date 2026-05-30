@@ -11,6 +11,7 @@ import Supercluster from 'supercluster';
 import './day-map.css';
 import type {
   DayMapPoint,
+  LodgingMapPoint,
   ScheduledMapPoint,
   FoodWishMapPoint,
   ActivityWishMapPoint,
@@ -81,12 +82,16 @@ function fitToPoints(map: MlMap, points: DayMapPoint[]): void {
   map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: 15, animate });
 }
 
-/** Time-ordered LineString through the day's scheduled stops (the route). */
+/** Time-ordered LineString through the day's scheduled stops and lodging anchors. */
 function routeFeatureCollection(
   points: DayMapPoint[],
 ): GeoJSON.FeatureCollection<GeoJSON.LineString> {
+  type RouteAnchor = ScheduledMapPoint | (LodgingMapPoint & { order: number });
   const coordinates = points
-    .filter((p): p is ScheduledMapPoint => p.kind === 'scheduled')
+    .filter(
+      (p): p is RouteAnchor =>
+        p.kind === 'scheduled' || (p.kind === 'lodging' && p.order != null),
+    )
     .slice()
     .sort((a, b) => a.order - b.order)
     .map((p) => [p.lng, p.lat]);

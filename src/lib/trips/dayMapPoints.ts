@@ -15,6 +15,7 @@ import {
   lodgingForDay,
 } from './cities';
 import { transportEndpoints } from './transportRoute';
+import { dayKey as toDayKey } from '@/lib/time/formatDate';
 import { nearestDistanceMeters, type LngLat } from '@/lib/map/distance';
 
 /**
@@ -38,6 +39,8 @@ interface BaseDayMapPoint {
 export interface LodgingMapPoint extends BaseDayMapPoint {
   kind: 'lodging';
   itemId: string;
+  /** When set, this lodging is part of the day's route at this position. */
+  order?: number;
 }
 
 export interface ScheduledMapPoint extends BaseDayMapPoint {
@@ -197,7 +200,30 @@ export function buildDayMapPoints(
     pushScheduled(item, place as { lat: number; lng: number } & Place);
   }
 
-  // --- Lodging anchor --------------------------------------------------------
+  // --- Lodging anchors (route start / end) ----------------------------------
+
+  // Previous day's lodging as route start: pinned at order 0.
+  const prevDate = new Date(`${dayKey}T00:00:00`);
+  prevDate.setDate(prevDate.getDate() - 1);
+  const prevLodging = lodgingForDay(trip, toDayKey(prevDate.toISOString()));
+  if (prevLodging) {
+    const place = itemPlace(prevLodging);
+    if (isLocated(place)) {
+      points.push({
+        kind: 'lodging',
+        id: `lodging-prev-${prevLodging.id}`,
+        itemId: prevLodging.id,
+        order: 0,
+        lat: place.lat,
+        lng: place.lng,
+        label: place.label || prevLodging.title,
+        address: place.address,
+        placeId: place.placeId,
+      });
+    }
+  }
+
+  // Current day's lodging: anchor pin and route end point.
   const lodging = lodgingForDay(trip, dayKey);
   if (lodging) {
     const place = itemPlace(lodging);
@@ -206,6 +232,7 @@ export function buildDayMapPoints(
         kind: 'lodging',
         id: `lodging-${lodging.id}`,
         itemId: lodging.id,
+        order: order + 1,
         lat: place.lat!,
         lng: place.lng!,
         label: place.label || lodging.title,
