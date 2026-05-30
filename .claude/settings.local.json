@@ -21,7 +21,8 @@
       "WebSearch",
       "WebFetch(domain:developers.google.com)",
       "Bash(pnpm vitest *)",
-      "Bash(pnpm exec *)"
+      "Bash(pnpm exec *)",
+      "Bash(npm run *)"
     ]
   }
 }

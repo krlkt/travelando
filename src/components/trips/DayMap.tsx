@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
@@ -109,7 +110,6 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
   // covers the viewport. Portaling to <body> also frees `position: fixed` from
   // any ancestor transform/filter that would otherwise trap it to a sub-box.
   const placeholderRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
   const [collapsedRect, setCollapsedRect] = useState<{
     top: number;
     left: number;
@@ -117,7 +117,13 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
     height: number;
   } | null>(null);
 
-  useEffect(() => setMounted(true), []);
+  // Client-mount gate: false during SSR, true after hydration. Avoids
+  // setState-in-effect while keeping the portal off the server render.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   // Track the placeholder's document-space box so the collapsed map sits exactly
   // over it (and scrolls naturally with the page, since absolute boxes are
