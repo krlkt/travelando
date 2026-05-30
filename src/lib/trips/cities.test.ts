@@ -69,5 +69,22 @@ describe('deriveCitiesByDay city pair', () => {
     const arrivalKey = dayKey('2026-06-02T11:00:00.000Z');
     // City stays the trip destination; the hop doesn't change cities.
     expect(cityForDay(trip, [], arrivalKey).cityLabel).toBe('Amsterdam');
+
+    // And it must not split the day into multiple city segments.
+    const buckets = deriveCitiesByDay(trip, []);
+    expect(buckets.get(arrivalKey)?.segments).toHaveLength(1);
+  });
+
+  it('saves a transport with no cities at all (same-city hop)', () => {
+    const trip = makeTrip([
+      // e.g. a taxi within the destination city: no cities, no stations.
+      transport({ title: 'Taxi to hotel' }),
+    ]);
+
+    const arrivalKey = dayKey('2026-06-02T11:00:00.000Z');
+    expect(cityForDay(trip, [], arrivalKey).cityLabel).toBe('Amsterdam');
+    expect(deriveCitiesByDay(trip, []).get(arrivalKey)?.segments).toHaveLength(
+      1,
+    );
   });
 });

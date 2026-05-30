@@ -329,11 +329,6 @@ function ItemEditorBody({
           (toCityValue.trim() ? { label: toCityValue.trim() } : undefined))
         : undefined;
 
-    if (kind === 'transport' && !resolvedToCity) {
-      setError('Pick the city you are arriving in.');
-      return;
-    }
-
     const resolvedFrom: Place | undefined =
       kind === 'meal' || kind === 'lodging'
         ? undefined
@@ -612,7 +607,12 @@ function ItemEditorBody({
           <div className="grid gap-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-1.5">
-                <Label>From city</Label>
+                <Label className="flex items-center gap-1.5">
+                  From city
+                  <span className="text-muted-foreground text-[10px]">
+                    optional
+                  </span>
+                </Label>
                 <PlaceAutocomplete
                   value={fromCityValue}
                   onChange={(v) => {
@@ -627,7 +627,12 @@ function ItemEditorBody({
                 />
               </div>
               <div className="grid gap-1.5">
-                <Label>To city</Label>
+                <Label className="flex items-center gap-1.5">
+                  To city
+                  <span className="text-muted-foreground text-[10px]">
+                    optional
+                  </span>
+                </Label>
                 <PlaceAutocomplete
                   value={toCityValue}
                   onChange={(v) => {
