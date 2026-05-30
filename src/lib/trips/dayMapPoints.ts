@@ -14,6 +14,7 @@ import {
   foodPlaceCitiesForDay,
   lodgingForDay,
 } from './cities';
+import { transportEndpoints } from './transportRoute';
 import { nearestDistanceMeters, type LngLat } from '@/lib/map/distance';
 
 /**
@@ -46,6 +47,11 @@ export interface ScheduledMapPoint extends BaseDayMapPoint {
   /** 1-based position in the day's time-ordered route. */
   order: number;
   startsAt: string;
+  /**
+   * Transport legs are pinned at both ends. `depart` is the origin waypoint,
+   * `arrive` the destination; absent for single-location items.
+   */
+  endpoint?: 'depart' | 'arrive';
 }
 
 export interface FoodWishMapPoint extends BaseDayMapPoint {
@@ -80,9 +86,9 @@ export interface DayMapData {
   cities: Array<{ cityLabel: string; cityPlaceId?: string }>;
 }
 
-function isLocated(
-  place: Pick<Place, 'lat' | 'lng'> | undefined,
-): place is { lat: number; lng: number } {
+function isLocated<T extends Pick<Place, 'lat' | 'lng'>>(
+  place: T | undefined,
+): place is T & { lat: number; lng: number } {
   return (
     !!place &&
     typeof place.lat === 'number' &&
@@ -139,27 +145,56 @@ export function buildDayMapPoints(
 
   const scheduledPlaceIds = new Set<string>();
   let order = 0;
+
+  // Pushes one scheduled stop, advancing the route order. `idSuffix`/`endpoint`
+  // let a single transport item contribute two pins (depart + arrive).
+  const pushScheduled = (
+    item: TripItem,
+    place: { lat: number; lng: number } & Place,
+    opts: { idSuffix?: string; endpoint?: 'depart' | 'arrive' } = {},
+  ): void => {
+    order += 1;
+    if (place.placeId) scheduledPlaceIds.add(place.placeId);
+    points.push({
+      kind: 'scheduled',
+      id: `scheduled-${item.id}${opts.idSuffix ?? ''}`,
+      itemId: item.id,
+      itemKind: item.kind,
+      order,
+      startsAt: item.startsAt,
+      endpoint: opts.endpoint,
+      lat: place.lat,
+      lng: place.lng,
+      label: opts.endpoint ? place.label : item.title || place.label,
+      address: place.address,
+      placeId: place.placeId,
+    });
+  };
+
   for (const item of dayItems) {
+    // Transport legs are pinned at both ends so the route shows from → to.
+    const endpoints = transportEndpoints(item);
+    if (endpoints) {
+      const from = isLocated(endpoints.from) ? endpoints.from : undefined;
+      const to = isLocated(endpoints.to) ? endpoints.to : undefined;
+      if (from && to) {
+        pushScheduled(item, from, { idSuffix: '-depart', endpoint: 'depart' });
+        pushScheduled(item, to, { idSuffix: '-arrive', endpoint: 'arrive' });
+      } else if (from || to) {
+        // Only one end is locatable: fall back to a single stop.
+        pushScheduled(item, (from ?? to)!);
+      } else {
+        unlocatedCount += 1;
+      }
+      continue;
+    }
+
     const place = itemPlace(item);
     if (!place) {
       unlocatedCount += 1;
       continue;
     }
-    order += 1;
-    if (place.placeId) scheduledPlaceIds.add(place.placeId);
-    points.push({
-      kind: 'scheduled',
-      id: `scheduled-${item.id}`,
-      itemId: item.id,
-      itemKind: item.kind,
-      order,
-      startsAt: item.startsAt,
-      lat: place.lat!,
-      lng: place.lng!,
-      label: item.title || place.label,
-      address: place.address,
-      placeId: place.placeId,
-    });
+    pushScheduled(item, place as { lat: number; lng: number } & Place);
   }
 
   // --- Lodging anchor --------------------------------------------------------

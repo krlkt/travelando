@@ -28,3 +28,20 @@ export function routeStations(item: TripItem): {
   if (!item.from && !item.to) return null;
   return { from: item.from, to: item.to };
 }
+
+/**
+ * The depart/arrive places to pin a transport item at on the map. Each end
+ * prefers its station/airport waypoint (`from`/`to`) and falls back to the city
+ * (`fromCity`/`toCity`) so the leg can still show "from → to" when only cities
+ * are known. Returns null for non-transport items.
+ */
+export function transportEndpoints(item: TripItem): {
+  from?: Place;
+  to?: Place;
+} | null {
+  if (item.kind !== 'transport') return null;
+  return {
+    from: item.from ?? item.fromCity,
+    to: item.to ?? item.toCity,
+  };
+}

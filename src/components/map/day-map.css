@@ -66,6 +66,33 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Transport endpoints carry a directional caret so the depart/arrive pair of a
+   single leg reads as a journey rather than two unrelated stops. */
+.dm-marker--depart .dm-marker__pin--num::after,
+.dm-marker--arrive .dm-marker__pin--num::after {
+  content: '↗';
+  position: absolute;
+  top: -0.3rem;
+  right: -0.3rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  display: grid;
+  place-items: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  border-radius: 999px;
+  background: var(--background);
+  color: var(--dm-accent);
+  box-shadow: 0 0 0 1.5px var(--dm-accent);
+}
+.dm-marker--arrive .dm-marker__pin--num::after {
+  content: '↘';
+}
+.dm-marker--depart .dm-marker__pin,
+.dm-marker--arrive .dm-marker__pin {
+  position: relative;
+}
+
 /* Lodging reads as the anchor: larger, rounded-square, ringed. */
 .dm-marker--lodging {
   --dm-size: 2.35rem;

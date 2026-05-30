@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildDayMapPoints } from './dayMapPoints';
+import { buildDayMapPoints, type DayMapPoint } from './dayMapPoints';
 import { dayKey } from '@/lib/time/formatDate';
 import type { ActivityPlace, FoodPlace, Trip, TripItem } from './types';
 
@@ -28,6 +28,26 @@ function activity(over: Partial<TripItem>): TripItem {
     title: 'Senso-ji',
     startsAt: '2026-06-01T10:00:00',
     to: { label: 'Senso-ji', lat: 35.7148, lng: 139.7967, placeId: 'p-senso' },
+    ...over,
+  };
+}
+
+function transport(over: Partial<TripItem>): TripItem {
+  return {
+    id: 't-1',
+    tripId,
+    kind: 'transport',
+    title: 'Shinkansen',
+    startsAt: '2026-06-01T12:00:00',
+    fromCity: { label: 'Tokyo', lat: 35.68, lng: 139.76 },
+    toCity: { label: 'Kyoto', lat: 35.01, lng: 135.76 },
+    from: {
+      label: 'Tokyo Station',
+      lat: 35.681,
+      lng: 139.767,
+      placeId: 'p-tok',
+    },
+    to: { label: 'Kyoto Station', lat: 34.985, lng: 135.758, placeId: 'p-kyo' },
     ...over,
   };
 }
@@ -151,6 +171,104 @@ describe('buildDayMapPoints', () => {
     );
 
     expect(points.filter((p) => p.kind === 'foodWish')).toHaveLength(0);
+  });
+
+  it('pins a transport leg at both depart and arrive (stations preferred)', () => {
+    const { points } = buildDayMapPoints(
+      makeTrip([transport({})]),
+      day1,
+      [],
+      [],
+    );
+    const scheduled = points.filter(
+      (p): p is Extract<DayMapPoint, { kind: 'scheduled' }> =>
+        p.kind === 'scheduled',
+    );
+
+    expect(scheduled.map((p) => p.endpoint)).toEqual(['depart', 'arrive']);
+    expect(scheduled.map((p) => p.order)).toEqual([1, 2]);
+    expect(scheduled.map((p) => p.label)).toEqual([
+      'Tokyo Station',
+      'Kyoto Station',
+    ]);
+    expect(scheduled.map((p) => [p.lng, p.lat])).toEqual([
+      [139.767, 35.681],
+      [135.758, 34.985],
+    ]);
+  });
+
+  it('falls back to the city when a transport station is missing', () => {
+    const { points } = buildDayMapPoints(
+      makeTrip([transport({ from: undefined })]),
+      day1,
+      [],
+      [],
+    );
+    const scheduled = points.filter((p) => p.kind === 'scheduled');
+
+    expect(scheduled.map((p) => p.label)).toEqual(['Tokyo', 'Kyoto Station']);
+  });
+
+  it('renders a single stop when only one transport end is locatable', () => {
+    const { points, unlocatedCount } = buildDayMapPoints(
+      makeTrip([transport({ from: undefined, fromCity: undefined })]),
+      day1,
+      [],
+      [],
+    );
+    const scheduled = points.filter(
+      (p): p is Extract<DayMapPoint, { kind: 'scheduled' }> =>
+        p.kind === 'scheduled',
+    );
+
+    expect(scheduled).toHaveLength(1);
+    expect(scheduled[0].endpoint).toBeUndefined();
+    // Single-pin fallback keeps the leg title, matching legacy behaviour.
+    expect(scheduled[0].label).toBe('Shinkansen');
+    expect(scheduled[0].lng).toBe(135.758);
+    expect(unlocatedCount).toBe(0);
+  });
+
+  it('counts a transport leg with no locatable end as unlocated', () => {
+    const { points, unlocatedCount } = buildDayMapPoints(
+      makeTrip([
+        transport({
+          from: undefined,
+          to: undefined,
+          fromCity: undefined,
+          toCity: undefined,
+        }),
+      ]),
+      day1,
+      [],
+      [],
+    );
+
+    expect(points.filter((p) => p.kind === 'scheduled')).toHaveLength(0);
+    expect(unlocatedCount).toBe(1);
+  });
+
+  it('sequences transport endpoints among neighbouring stops', () => {
+    const { points } = buildDayMapPoints(
+      makeTrip([
+        activity({ id: 'a-1', startsAt: '2026-06-01T09:00:00' }),
+        transport({ startsAt: '2026-06-01T12:00:00' }),
+      ]),
+      day1,
+      [],
+      [],
+    );
+    const scheduled = points.filter(
+      (p): p is Extract<DayMapPoint, { kind: 'scheduled' }> =>
+        p.kind === 'scheduled',
+    );
+
+    expect(scheduled.map((p) => p.order)).toEqual([1, 2, 3]);
+    expect(scheduled.map((p) => p.endpoint)).toEqual([
+      undefined,
+      'depart',
+      'arrive',
+    ]);
   });
 
   it('excludes wishlists from other cities', () => {

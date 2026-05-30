@@ -73,6 +73,7 @@ export function createMarkerElement(point: DayMapPoint): HTMLButtonElement {
       break;
     case 'scheduled':
       el.style.setProperty('--dm-accent', accentVar(point.itemKind));
+      if (point.endpoint) el.classList.add(`dm-marker--${point.endpoint}`);
       inner = `<span class="dm-marker__pin dm-marker__pin--num">${point.order}</span>`;
       break;
     case 'foodWish':
@@ -94,6 +95,10 @@ function markerLabel(point: DayMapPoint): string {
     case 'lodging':
       return `Staying at ${point.label}`;
     case 'scheduled':
+      if (point.endpoint === 'depart')
+        return `Stop ${point.order}: depart from ${point.label}`;
+      if (point.endpoint === 'arrive')
+        return `Stop ${point.order}: arrive at ${point.label}`;
       return `Stop ${point.order}: ${point.label}`;
     case 'foodWish':
       return `Food wishlist: ${point.label}`;
