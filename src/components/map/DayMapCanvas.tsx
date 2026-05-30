@@ -261,7 +261,17 @@ export function DayMapCanvas({
     mapRef.current = map;
 
     const markers = markersRef.current;
-    const handleViewportChange = () => renderMarkers();
+    // Re-cluster *during* the gesture, not only when it settles — otherwise
+    // wishlist clusters stay frozen at the previous zoom's centroids and visibly
+    // snap into place on `moveend`. Coalesce to one pass per frame so per-frame
+    // re-clustering stays cheap; the `has(id)` guard in renderMarkers skips
+    // recreation while the cluster set is unchanged, so this only churns DOM at
+    // the zoom thresholds where clusters actually split/merge.
+    let renderFrame = 0;
+    const handleViewportChange = () => {
+      cancelAnimationFrame(renderFrame);
+      renderFrame = requestAnimationFrame(renderMarkers);
+    };
 
     // MapLibre doesn't auto-resize when its container changes (e.g. expanding
     // to full screen, or a window resize), so keep the canvas in sync. Coalesce
@@ -294,7 +304,8 @@ export function DayMapCanvas({
 
       buildIndex();
       renderMarkers();
-      // Re-cluster whenever the viewport settles (covers pan and zoom).
+      // Track the viewport continuously (every move frame) plus a final settle.
+      map.on('move', handleViewportChange);
       map.on('moveend', handleViewportChange);
       if (pointsRef.current.length > 0) fitToPoints(map, pointsRef.current);
     });
@@ -302,7 +313,9 @@ export function DayMapCanvas({
     return () => {
       readyRef.current = false;
       cancelAnimationFrame(resizeFrame);
+      cancelAnimationFrame(renderFrame);
       resizeObserver.disconnect();
+      map.off('move', handleViewportChange);
       map.off('moveend', handleViewportChange);
       markers.forEach((m) => m.remove());
       markers.clear();
