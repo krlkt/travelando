@@ -16,7 +16,11 @@ import {
 } from './cities';
 import { transportEndpoints } from './transportRoute';
 import { dayKey as toDayKey } from '@/lib/time/formatDate';
-import { nearestDistanceMeters, type LngLat } from '@/lib/map/distance';
+import {
+  haversineMeters,
+  nearestDistanceMeters,
+  type LngLat,
+} from '@/lib/map/distance';
 
 /**
  * A single point plotted on the day map. The discriminated `kind` drives both
@@ -112,6 +116,24 @@ function cityKey(city: { cityLabel: string; cityPlaceId?: string }): string {
   return city.cityPlaceId ?? city.cityLabel;
 }
 
+/** Two route stops within this distance are treated as the same location. */
+const SAME_LOCATION_M = 50;
+
+/**
+ * Returns true when `a` and `b` represent the same geographic stop. Checks
+ * `placeId` equality first (most reliable), then falls back to haversine
+ * distance so that city-vs-station pairs that are effectively the same place
+ * (e.g. a hotel and the transport departure pinned at it) collapse into one pin.
+ */
+function isSameRouteLocation(
+  a: { lat: number; lng: number; placeId?: string },
+  b: { lat: number; lng: number; placeId?: string } | null,
+): boolean {
+  if (!b) return false;
+  if (a.placeId && b.placeId && a.placeId === b.placeId) return true;
+  return haversineMeters(a, b) < SAME_LOCATION_M;
+}
+
 /**
  * Collects every map-able point for a single day: lodging, the day's scheduled
  * items (in time order), and the food/activity wishlists for the day's cities.
@@ -149,6 +171,21 @@ export function buildDayMapPoints(
   const scheduledPlaceIds = new Set<string>();
   let order = 0;
 
+  // --- Pre-compute prev lodging to seed the dedup tracker ------------------
+  // Must happen before the scheduled-items loop so the first transport leg can
+  // check its depart against the lodging location.
+  const prevDate = new Date(`${dayKey}T00:00:00`);
+  prevDate.setDate(prevDate.getDate() - 1);
+  const prevLodging = lodgingForDay(trip, toDayKey(prevDate.toISOString()));
+  const prevLodgingPlace = prevLodging ? itemPlace(prevLodging) : undefined;
+
+  // Tracks the last geographic location added to the route. Seeded from the
+  // previous day's lodging so that a transport departing from there does not
+  // produce a redundant numbered pin on top of the lodging icon. Updated after
+  // every successfully pushed scheduled point.
+  let lastLocation: { lat: number; lng: number; placeId?: string } | null =
+    isLocated(prevLodgingPlace) ? prevLodgingPlace : null;
+
   // Pushes one scheduled stop, advancing the route order. `idSuffix`/`endpoint`
   // let a single transport item contribute two pins (depart + arrive).
   const pushScheduled = (
@@ -158,6 +195,7 @@ export function buildDayMapPoints(
   ): void => {
     order += 1;
     if (place.placeId) scheduledPlaceIds.add(place.placeId);
+    lastLocation = place;
     points.push({
       kind: 'scheduled',
       id: `scheduled-${item.id}${opts.idSuffix ?? ''}`,
@@ -176,16 +214,26 @@ export function buildDayMapPoints(
 
   for (const item of dayItems) {
     // Transport legs are pinned at both ends so the route shows from → to.
+    // The depart end is skipped when it is at the same location as the previous
+    // route stop (e.g. the lodging icon, or the arrive of the preceding leg).
     const endpoints = transportEndpoints(item);
     if (endpoints) {
       const from = isLocated(endpoints.from) ? endpoints.from : undefined;
       const to = isLocated(endpoints.to) ? endpoints.to : undefined;
       if (from && to) {
-        pushScheduled(item, from, { idSuffix: '-depart', endpoint: 'depart' });
+        if (!isSameRouteLocation(from, lastLocation)) {
+          pushScheduled(item, from, {
+            idSuffix: '-depart',
+            endpoint: 'depart',
+          });
+        }
         pushScheduled(item, to, { idSuffix: '-arrive', endpoint: 'arrive' });
       } else if (from || to) {
-        // Only one end is locatable: fall back to a single stop.
-        pushScheduled(item, (from ?? to)!);
+        // Only one end is locatable: fall back to a single stop (if not a dupe).
+        const single = (from ?? to)!;
+        if (!isSameRouteLocation(single, lastLocation)) {
+          pushScheduled(item, single);
+        }
       } else {
         unlocatedCount += 1;
       }
@@ -197,15 +245,20 @@ export function buildDayMapPoints(
       unlocatedCount += 1;
       continue;
     }
-    pushScheduled(item, place as { lat: number; lng: number } & Place);
+    if (
+      !isSameRouteLocation(
+        place as { lat: number; lng: number; placeId?: string },
+        lastLocation,
+      )
+    ) {
+      pushScheduled(item, place as { lat: number; lng: number } & Place);
+    }
   }
 
   // --- Lodging anchors (route start / end) ----------------------------------
 
   // Previous day's lodging as route start: pinned at order 0.
-  const prevDate = new Date(`${dayKey}T00:00:00`);
-  prevDate.setDate(prevDate.getDate() - 1);
-  const prevLodging = lodgingForDay(trip, toDayKey(prevDate.toISOString()));
+  // (prevLodging and prevLodgingPlace already computed above.)
   if (prevLodging) {
     const place = itemPlace(prevLodging);
     if (isLocated(place)) {

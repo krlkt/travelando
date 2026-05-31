@@ -271,6 +271,151 @@ describe('buildDayMapPoints', () => {
     ]);
   });
 
+  it('skips transport depart when it matches the previous day lodging location', () => {
+    const hotelPlace = {
+      label: 'Hotel',
+      lat: 35.6671,
+      lng: 139.7415,
+      placeId: 'p-hotel',
+    };
+    const trip = makeTrip([
+      // Prev-day lodging at the hotel
+      {
+        id: 'l-prev',
+        tripId,
+        kind: 'lodging',
+        title: 'Hotel',
+        startsAt: '2026-05-31T15:00:00',
+        endsAt: '2026-06-01T11:00:00',
+        to: hotelPlace,
+      },
+      // Transport departing from the same hotel
+      transport({
+        from: hotelPlace,
+        fromCity: { label: 'Tokyo', lat: 35.68, lng: 139.76 },
+        toCity: { label: 'Tokyo', lat: 35.68, lng: 139.76 },
+        to: {
+          label: 'Narita Airport',
+          lat: 35.7647,
+          lng: 140.3864,
+          placeId: 'p-narita',
+        },
+      }),
+    ]);
+
+    const { points } = buildDayMapPoints(trip, day1, [], []);
+    const scheduled = points.filter((p) => p.kind === 'scheduled');
+
+    // Hotel depart is at the same location as the lodging icon — only the
+    // airport arrive should be numbered.
+    expect(scheduled).toHaveLength(1);
+    expect(scheduled[0].label).toBe('Narita Airport');
+    expect(scheduled[0].order).toBe(1);
+  });
+
+  it('deduplicates chained transport legs that share a layover location', () => {
+    const airport = {
+      label: 'Narita Airport',
+      lat: 35.7647,
+      lng: 140.3864,
+      placeId: 'p-narita',
+    };
+    const trip = makeTrip([
+      transport({
+        id: 't-1',
+        startsAt: '2026-06-01T08:00:00',
+        from: {
+          label: 'Hotel',
+          lat: 35.6671,
+          lng: 139.7415,
+          placeId: 'p-hotel',
+        },
+        to: airport,
+        fromCity: { label: 'Tokyo', lat: 35.68, lng: 139.76 },
+        toCity: { label: 'Tokyo', lat: 35.68, lng: 139.76 },
+      }),
+      transport({
+        id: 't-2',
+        startsAt: '2026-06-01T13:00:00',
+        from: airport,
+        to: {
+          label: 'Osaka Station',
+          lat: 34.7024,
+          lng: 135.4937,
+          placeId: 'p-osaka',
+        },
+        fromCity: { label: 'Tokyo', lat: 35.68, lng: 139.76 },
+        toCity: { label: 'Osaka', lat: 34.69, lng: 135.5 },
+      }),
+    ]);
+
+    const { points } = buildDayMapPoints(trip, day1, [], []);
+    const scheduled = points.filter((p) => p.kind === 'scheduled');
+
+    // T1.arrive (Narita) and T2.depart (Narita) are the same place — should
+    // produce 3 pins, not 4.
+    expect(scheduled.map((p) => p.label)).toEqual([
+      'Hotel',
+      'Narita Airport',
+      'Osaka Station',
+    ]);
+    expect(scheduled.map((p) => p.order)).toEqual([1, 2, 3]);
+  });
+
+  it('user scenario: lodging → airport → city shows 2 numbered stops', () => {
+    const hotelPlace = {
+      label: 'Checked-out Hotel',
+      lat: 35.6671,
+      lng: 139.7415,
+      placeId: 'p-hotel',
+    };
+    const airportPlace = {
+      label: 'Airport',
+      lat: 35.7647,
+      lng: 140.3864,
+      placeId: 'p-airport',
+    };
+    const trip = makeTrip([
+      {
+        id: 'l-prev',
+        tripId,
+        kind: 'lodging',
+        title: 'Checked-out Hotel',
+        startsAt: '2026-05-31T15:00:00',
+        endsAt: '2026-06-01T11:00:00',
+        to: hotelPlace,
+      },
+      transport({
+        id: 't-1',
+        title: 'Car to airport',
+        startsAt: '2026-06-01T08:00:00',
+        from: hotelPlace,
+        to: airportPlace,
+        fromCity: { label: 'Tokyo', lat: 35.68, lng: 139.76 },
+        toCity: { label: 'Tokyo', lat: 35.68, lng: 139.76 },
+      }),
+      transport({
+        id: 't-2',
+        title: 'Flight to Osaka',
+        startsAt: '2026-06-01T12:00:00',
+        from: airportPlace,
+        to: { label: 'Osaka', lat: 34.6937, lng: 135.5022, placeId: 'p-osaka' },
+        fromCity: { label: 'Tokyo', lat: 35.68, lng: 139.76 },
+        toCity: { label: 'Osaka', lat: 34.69, lng: 135.5 },
+      }),
+    ]);
+
+    const { points } = buildDayMapPoints(trip, day1, [], []);
+    const scheduled = points.filter((p) => p.kind === 'scheduled');
+    const lodgingPins = points.filter((p) => p.kind === 'lodging');
+
+    expect(scheduled.map((p) => p.order)).toEqual([1, 2]);
+    expect(scheduled.map((p) => p.label)).toEqual(['Airport', 'Osaka']);
+    // The lodging icon is still present as the route anchor (order 0)
+    expect(lodgingPins).toHaveLength(1);
+    expect(lodgingPins[0].order).toBe(0);
+  });
+
   it('excludes wishlists from other cities', () => {
     const food: FoodPlace[] = [
       {
