@@ -35,6 +35,7 @@ export interface TripItem {
   to?: Place;
   transportMode?: TransportMode;
   notes?: string;
+  privateToUserIds?: string[];
 }
 
 export interface TripMember {
@@ -83,6 +84,7 @@ export interface ItemPatch {
   to?: Place | null;
   transportMode?: TransportMode | null;
   notes?: string | null;
+  privateToUserIds?: string[] | null;
 }
 
 export type FoodPlaceCategory =

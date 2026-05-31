@@ -63,6 +63,7 @@ export interface TripItemRow {
   to_place: Place | null;
   transport_mode: string | null;
   notes: string | null;
+  private_to_user_ids: string[] | null;
 }
 
 export function rowToItem(row: TripItemRow): TripItem {
@@ -80,6 +81,7 @@ export function rowToItem(row: TripItemRow): TripItem {
     transportMode:
       (row.transport_mode as TripItem['transportMode']) ?? undefined,
     notes: row.notes ?? undefined,
+    privateToUserIds: row.private_to_user_ids ?? undefined,
   };
 }
 
@@ -167,6 +169,10 @@ export function itemDraftToInsert(
     to_place: draft.to ?? null,
     transport_mode: draft.transportMode ?? null,
     notes: draft.notes ?? null,
+    private_to_user_ids:
+      draft.privateToUserIds && draft.privateToUserIds.length > 0
+        ? draft.privateToUserIds
+        : null,
   };
 }
 
@@ -350,6 +356,12 @@ export function itemPatchToUpdate(
   if (patch.transportMode !== undefined)
     out.transport_mode = patch.transportMode ?? null;
   if (patch.notes !== undefined) out.notes = patch.notes ?? null;
+  if (patch.privateToUserIds !== undefined) {
+    out.private_to_user_ids =
+      patch.privateToUserIds && patch.privateToUserIds.length > 0
+        ? patch.privateToUserIds
+        : null;
+  }
   return out;
 }
 

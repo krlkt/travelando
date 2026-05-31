@@ -56,11 +56,31 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     );
   }
 
+  if (parsed.data.privateToUserIds && parsed.data.privateToUserIds.length > 0) {
+    const { data: members } = await supabase
+      .from('trip_members')
+      .select('user_id')
+      .eq('trip_id', tripId)
+      .not('user_id', 'is', null);
+    const validUserIds = new Set(
+      (members ?? []).map((m) => m.user_id as string),
+    );
+    const invalid = parsed.data.privateToUserIds.filter(
+      (uid) => !validUserIds.has(uid),
+    );
+    if (invalid.length > 0) {
+      return NextResponse.json(
+        { success: false, error: 'invalid_private_member_ids' },
+        { status: 400 },
+      );
+    }
+  }
+
   try {
     const repo = createSupabaseRepository(supabase);
     const item = await repo.updateItem(tripId, itemId, parsed.data);
     revalidatePath(`/trips/${tripId}`);
-    return NextResponse.json({ success: true, data: item });
+    return NextResponse.json({ success: true, ...(item && { data: item }) });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown_error';
     return NextResponse.json(

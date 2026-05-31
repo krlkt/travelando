@@ -50,6 +50,26 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
+  if (parsed.data.privateToUserIds && parsed.data.privateToUserIds.length > 0) {
+    const { data: members } = await supabase
+      .from('trip_members')
+      .select('user_id')
+      .eq('trip_id', tripId)
+      .not('user_id', 'is', null);
+    const validUserIds = new Set(
+      (members ?? []).map((m) => m.user_id as string),
+    );
+    const invalid = parsed.data.privateToUserIds.filter(
+      (uid) => !validUserIds.has(uid),
+    );
+    if (invalid.length > 0) {
+      return NextResponse.json(
+        { success: false, error: 'invalid_private_member_ids' },
+        { status: 400 },
+      );
+    }
+  }
+
   try {
     const repo = createSupabaseRepository(supabase);
     const item = await repo.addItem(tripId, parsed.data);

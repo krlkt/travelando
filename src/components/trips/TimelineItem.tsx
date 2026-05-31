@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'motion/react';
-import { ArrowRight, MapPin } from 'lucide-react';
+import { ArrowRight, Lock, MapPin } from 'lucide-react';
 import type { TripItem } from '@/lib/trips/types';
 import type { ItemExpenseTotal } from '@/lib/trips/itemExpenseTotals';
 import { Badge } from '@/components/ui/badge';
@@ -154,6 +154,15 @@ export function TimelineItem({
                       overlaps
                     </Badge>
                   )}
+                  {item.privateToUserIds &&
+                    item.privateToUserIds.length > 0 && (
+                      <Badge variant="muted" className="gap-1 text-[10px]">
+                        <Lock className="size-2.5" />
+                        {item.privateToUserIds.length === 1
+                          ? 'Private'
+                          : `Private · ${item.privateToUserIds.length}`}
+                      </Badge>
+                    )}
                   {expenseTotal && expenseTotal.byCurrency.length > 0 && (
                     <div className="flex flex-col items-end gap-0.5 leading-tight">
                       {expenseTotal.byCurrency.map((c) => (

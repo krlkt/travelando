@@ -63,7 +63,7 @@ const TRIP_COLUMNS =
   'id, owner_id, title, destination, cover_image, cover_gradient, start_date, end_date';
 
 const ITEM_COLUMNS =
-  'id, trip_id, kind, title, starts_at, ends_at, from_city, to_city, from_place, to_place, transport_mode, notes';
+  'id, trip_id, kind, title, starts_at, ends_at, from_city, to_city, from_place, to_place, transport_mode, notes, private_to_user_ids';
 
 const MEMBER_COLUMNS =
   'id, trip_id, user_id, display_name, email, invited_by, profiles(avatar_url, display_name)';
@@ -184,7 +184,7 @@ export function createSupabaseRepository(
       tripId: string,
       itemId: string,
       patch: ItemPatch,
-    ): Promise<TripItem> {
+    ): Promise<TripItem | null> {
       if (isDemoTrip(tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
       const update = itemPatchToUpdate(patch);
       const { data, error } = await client
@@ -193,13 +193,10 @@ export function createSupabaseRepository(
         .eq('id', itemId)
         .eq('trip_id', tripId)
         .select(ITEM_COLUMNS)
-        .single();
-      const row = unwrap(
-        data as TripItemRow | null,
-        error,
-        `update item ${itemId}`,
-      );
-      return rowToItem(row);
+        .maybeSingle();
+      if (error) throw new Error(`update item ${itemId}: ${error.message}`);
+      if (!data) return null;
+      return rowToItem(data as TripItemRow);
     },
 
     async removeItem(tripId: string, itemId: string): Promise<void> {

@@ -28,7 +28,8 @@
       "Bash(echo \"hello test\")",
       "Read(//tmp/**)",
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
-      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "Bash(node *)"
     ]
   }
 }

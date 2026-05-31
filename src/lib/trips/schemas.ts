@@ -62,6 +62,7 @@ export const itemDraftSchema = z.object({
   to: placeSchema.optional(),
   transportMode: transportModeSchema.optional(),
   notes: z.string().optional(),
+  privateToUserIds: z.array(z.string().uuid()).optional(),
 });
 
 export const itemPatchSchema = z.object({
@@ -75,6 +76,7 @@ export const itemPatchSchema = z.object({
   to: placeSchema.nullish(),
   transportMode: transportModeSchema.nullish(),
   notes: z.string().nullish(),
+  privateToUserIds: z.array(z.string().uuid()).nullish(),
 });
 
 export const foodPlaceCategorySchema = z.enum([

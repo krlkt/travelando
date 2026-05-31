@@ -46,6 +46,7 @@ interface ExpenseSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   itemId?: string;
+  privateToUserIds?: string[];
   defaultCategory?: ExpenseCategory;
   defaultTitle?: string;
   lockTitle?: boolean;
@@ -57,6 +58,7 @@ export function ExpenseSheet({
   open,
   onOpenChange,
   itemId,
+  privateToUserIds,
   defaultCategory,
   defaultTitle,
   lockTitle,
@@ -70,6 +72,7 @@ export function ExpenseSheet({
             expense={expense}
             onClose={() => onOpenChange(false)}
             itemId={itemId}
+            privateToUserIds={privateToUserIds}
             defaultCategory={defaultCategory}
             defaultTitle={defaultTitle}
             lockTitle={lockTitle}
@@ -128,11 +131,31 @@ function hydrateFromExpense(
   return { selected, parts, amounts };
 }
 
+function privateSelectionState(
+  members: TripMember[],
+  privateUserIds: string[],
+): SelectionState {
+  const privateSet = new Set(privateUserIds);
+  const selected = new Set(
+    members
+      .filter((m) => m.userId && privateSet.has(m.userId))
+      .map((m) => m.id),
+  );
+  const parts: Record<string, number> = {};
+  const amounts: Record<string, { value: number | null; locked: boolean }> = {};
+  for (const m of members) {
+    parts[m.id] = 1;
+    amounts[m.id] = { value: null, locked: false };
+  }
+  return { selected, parts, amounts };
+}
+
 interface ExpenseBodyProps {
   trip: Trip;
   expense?: Expense | null;
   onClose: () => void;
   itemId?: string;
+  privateToUserIds?: string[];
   defaultCategory?: ExpenseCategory;
   defaultTitle?: string;
   lockTitle?: boolean;
@@ -143,6 +166,7 @@ function ExpenseBody({
   expense,
   onClose,
   itemId,
+  privateToUserIds,
   defaultCategory,
   defaultTitle,
   lockTitle,
@@ -170,11 +194,12 @@ function ExpenseBody({
   const [category, setCategory] = useState<ExpenseCategory>(
     expense?.category ?? defaultCategory ?? 'other',
   );
-  const [selection, setSelection] = useState<SelectionState>(() =>
-    expense
-      ? hydrateFromExpense(expense, members)
-      : defaultSelectionState(members),
-  );
+  const [selection, setSelection] = useState<SelectionState>(() => {
+    if (expense) return hydrateFromExpense(expense, members);
+    if (privateToUserIds && privateToUserIds.length > 0)
+      return privateSelectionState(members, privateToUserIds);
+    return defaultSelectionState(members);
+  });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 

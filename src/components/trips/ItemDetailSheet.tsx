@@ -5,6 +5,7 @@ import {
   ArrowRight,
   Calendar,
   Clock,
+  LockOpen,
   MapPin,
   Pencil,
   Plus,
@@ -24,6 +25,7 @@ import { Separator } from '@/components/ui/separator';
 import { formatDateLong, formatTime } from '@/lib/time/formatDate';
 import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
 import { useTrips } from '@/lib/trips/context';
+import { useAuth } from '@/lib/auth/context';
 import {
   defaultCategoryForKind,
   defaultExpenseTitleForItem,
@@ -50,7 +52,8 @@ export function ItemDetailSheet({
   onOpenChange,
   onEdit,
 }: ItemDetailSheetProps) {
-  const { removeItem, expenses } = useTrips();
+  const { removeItem, updateItem, expenses } = useTrips();
+  const { user } = useAuth();
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
@@ -60,6 +63,28 @@ export function ItemDetailSheet({
   }, [expenses, item]);
 
   if (!item) return null;
+
+  const isInPrivateItem =
+    item.privateToUserIds?.includes(user?.id ?? '') ?? false;
+  const isLastPrivateMember =
+    isInPrivateItem && (item.privateToUserIds?.length ?? 0) === 1;
+
+  async function handleLeave() {
+    if (!item || !user?.id) return;
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/items/${item.id}/leave`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(json.error ?? `Request failed (${res.status})`);
+      }
+      onOpenChange(false);
+      toast.success('Left private item');
+    } catch {
+      toast.error("Couldn't leave item");
+    }
+  }
 
   const meta = kindMeta[item.kind];
   const Icon =
@@ -223,33 +248,53 @@ export function ItemDetailSheet({
 
         <Separator />
 
-        <div className="flex justify-between gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              const tripId = item.tripId;
-              const itemId = item.id;
-              onOpenChange(false);
-              void (async () => {
-                try {
-                  await removeItem(tripId, itemId);
-                  toast.success('Item deleted');
-                } catch (err) {
-                  const message =
-                    err instanceof Error ? err.message : 'Delete failed';
-                  toast.error(`Couldn't delete item: ${message}`);
-                }
-              })();
-            }}
-            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-          >
-            <Trash2 className="size-4" />
-            Delete
-          </Button>
-          <Button onClick={onEdit}>
-            <Pencil className="size-4" />
-            Edit
-          </Button>
+        <div className="flex flex-wrap justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                const tripId = item.tripId;
+                const itemId = item.id;
+                onOpenChange(false);
+                void (async () => {
+                  try {
+                    await removeItem(tripId, itemId);
+                    toast.success('Item deleted');
+                  } catch (err) {
+                    const message =
+                      err instanceof Error ? err.message : 'Delete failed';
+                    toast.error(`Couldn't delete item: ${message}`);
+                  }
+                })();
+              }}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="size-4" />
+              Delete
+            </Button>
+            {isInPrivateItem && !isLastPrivateMember && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => void handleLeave()}
+              >
+                <LockOpen className="size-4" />
+                Leave private item
+              </Button>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <Button onClick={onEdit}>
+              <Pencil className="size-4" />
+              Edit
+            </Button>
+            {isLastPrivateMember && (
+              <p className="text-muted-foreground text-right text-xs">
+                Only you have access.
+              </p>
+            )}
+          </div>
         </div>
       </SheetContent>
 
@@ -262,6 +307,7 @@ export function ItemDetailSheet({
           if (!o) setEditingExpense(null);
         }}
         itemId={item.id}
+        privateToUserIds={item.privateToUserIds}
         defaultCategory={defaultCategoryForKind(item.kind)}
         defaultTitle={defaultExpenseTitleForItem(item.kind, item.title)}
         lockTitle={!editingExpense}

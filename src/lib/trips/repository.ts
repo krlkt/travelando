@@ -31,7 +31,7 @@ export interface TripsRepository {
     tripId: string,
     itemId: string,
     patch: ItemPatch,
-  ): Promise<TripItem>;
+  ): Promise<TripItem | null>;
   removeItem(tripId: string, itemId: string): Promise<void>;
 
   listFoodPlaces(tripId: string): Promise<FoodPlace[]>;

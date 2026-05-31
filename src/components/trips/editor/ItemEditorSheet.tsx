@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { Lock, LockOpen } from 'lucide-react';
+import { useAuth } from '@/lib/auth/context';
 import { toast } from 'sonner';
 import {
   Sheet,
@@ -24,6 +26,7 @@ import {
 import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
 import { TimeField } from '@/components/ui/TimeField';
 import { useTrips } from '@/lib/trips/context';
+import { cn } from '@/lib/utils';
 import { itemKinds, transportModes, kindMeta } from '@/lib/trips/kindMeta';
 import {
   latestCityBefore,
@@ -122,10 +125,17 @@ function ItemEditorBody({
 }: ItemEditorBodyProps) {
   const { addItem, updateItem, foodPlaces, activityPlaces, cityOverrides } =
     useTrips();
+  const { user } = useAuth();
   const tripId = trip.id;
   const isEdit = !!item;
 
   const [kind, setKind] = useState<ItemKind>(item?.kind ?? 'activity');
+  const [isPrivate, setIsPrivate] = useState<boolean>(
+    (item?.privateToUserIds?.length ?? 0) > 0,
+  );
+  const [privateUserIds, setPrivateUserIds] = useState<string[]>(
+    item?.privateToUserIds ?? [],
+  );
   const [title, setTitle] = useState<string>(item?.title ?? '');
   const [startsAt, setStartsAt] = useState<string>(
     initialStartsAt(item, defaultDate),
@@ -226,6 +236,29 @@ function ItemEditorBody({
     });
   }
 
+  const accountMembers = trip.members.filter((m) => m.userId != null);
+
+  function handlePrivacyToggle() {
+    if (isPrivate) {
+      setIsPrivate(false);
+      setPrivateUserIds([]);
+    } else {
+      setIsPrivate(true);
+      if (user?.id && !privateUserIds.includes(user.id)) {
+        setPrivateUserIds([user.id]);
+      }
+    }
+  }
+
+  function togglePrivateMember(userId: string) {
+    if (userId === user?.id) return;
+    setPrivateUserIds((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId],
+    );
+  }
+
   const handleSave = async () => {
     const effectiveTitle =
       kind === 'lodging' ? (toPlace?.label ?? toValue.trim()) : title.trim();
@@ -286,6 +319,13 @@ function ItemEditorBody({
     const resolvedTo: Place | undefined =
       toPlace ?? (toValue.trim() ? { label: toValue.trim() } : undefined);
 
+    if (isEdit && item && !item.privateToUserIds?.length && isPrivate) {
+      const ok = window.confirm(
+        'This item will be hidden from members not in your private list. Linked expenses stay shared with everyone.',
+      );
+      if (!ok) return;
+    }
+
     setSaving(true);
     try {
       if (isEdit && item) {
@@ -300,6 +340,8 @@ function ItemEditorBody({
           to: resolvedTo ?? null,
           transportMode: kind === 'transport' ? transportMode : null,
           notes: notes.trim() || null,
+          privateToUserIds:
+            isPrivate && privateUserIds.length > 0 ? privateUserIds : null,
         };
         await updateItem(tripId, item.id, patch);
         toast.success('Item updated');
@@ -315,6 +357,8 @@ function ItemEditorBody({
           to: resolvedTo,
           transportMode: kind === 'transport' ? transportMode : undefined,
           notes: notes.trim() || undefined,
+          privateToUserIds:
+            isPrivate && privateUserIds.length > 0 ? privateUserIds : undefined,
         };
         await addItem(tripId, draft);
         toast.success('Item added');
@@ -698,6 +742,93 @@ function ItemEditorBody({
             rows={3}
           />
         </div>
+
+        <div className="flex items-center justify-between">
+          <div className="grid gap-0.5">
+            <Label>Visibility</Label>
+            {isPrivate && accountMembers.length <= 1 && (
+              <p className="text-muted-foreground text-xs">
+                No other members with accounts to share with.
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handlePrivacyToggle}
+            aria-pressed={isPrivate}
+            className={cn(
+              'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition',
+              isPrivate
+                ? 'border-foreground/20 bg-secondary text-foreground'
+                : 'border-border/60 text-muted-foreground hover:text-foreground',
+            )}
+          >
+            {isPrivate ? (
+              <Lock className="size-3.5" />
+            ) : (
+              <LockOpen className="size-3.5" />
+            )}
+            {isPrivate ? 'Private' : 'Shared with all'}
+          </button>
+        </div>
+
+        {isPrivate && accountMembers.length > 1 && (
+          <div className="grid gap-1.5">
+            <Label className="text-muted-foreground text-xs">
+              Who can see this
+            </Label>
+            <div className="border-border/60 bg-background/40 grid gap-1 rounded-md border p-2">
+              {accountMembers.map((member) => {
+                const isCurrentUser = member.userId === user?.id;
+                const isSelected =
+                  isCurrentUser || privateUserIds.includes(member.userId!);
+                return (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => togglePrivateMember(member.userId!)}
+                    disabled={isCurrentUser}
+                    aria-pressed={isSelected}
+                    className={cn(
+                      'flex items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition',
+                      isSelected ? 'opacity-100' : 'opacity-50',
+                      isCurrentUser
+                        ? 'cursor-default'
+                        : 'hover:bg-secondary/60',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'border-border grid size-4 shrink-0 place-items-center rounded border',
+                        isSelected
+                          ? 'bg-primary border-primary text-primary-foreground'
+                          : '',
+                      )}
+                    >
+                      {isSelected && (
+                        <svg
+                          viewBox="0 0 16 16"
+                          className="size-2.5"
+                          fill="currentColor"
+                        >
+                          <path d="M6.2 10.6 3.4 7.8l-.9.9 3.7 3.7 8-8-.9-.9z" />
+                        </svg>
+                      )}
+                    </span>
+                    <span className="flex-1 truncate">
+                      {member.displayName}
+                    </span>
+                    {isCurrentUser && (
+                      <span className="text-muted-foreground/60 text-[10px]">
+                        you
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {error && (
           <p role="alert" className="text-destructive text-sm">

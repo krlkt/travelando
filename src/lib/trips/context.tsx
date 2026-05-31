@@ -102,6 +102,11 @@ function applyItemPatch(item: TripItem, patch: ItemPatch): TripItem {
   if (patch.transportMode !== undefined)
     next.transportMode = patch.transportMode ?? undefined;
   if (patch.notes !== undefined) next.notes = patch.notes ?? undefined;
+  if (patch.privateToUserIds !== undefined)
+    next.privateToUserIds =
+      patch.privateToUserIds && patch.privateToUserIds.length > 0
+        ? patch.privateToUserIds
+        : undefined;
   return next;
 }
 
