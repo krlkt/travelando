@@ -26,6 +26,7 @@ import {
   type ItemExpenseTotal,
 } from '@/lib/trips/itemExpenseTotals';
 import { DayBackgroundStrip } from './DayBackgroundStrip';
+import { DayFillDot } from './DayFillDot';
 import { ItemDetailSheet } from './ItemDetailSheet';
 import { DayMap } from './DayMap';
 import { FoodWishlist } from './FoodWishlist';
@@ -42,10 +43,12 @@ import {
   findOverlappingItemIds,
   isBackgroundItem,
 } from '@/lib/trips/grouping';
+import { computeDayFillRatio, getDayFillLevel } from '@/lib/trips/dayFill';
 import { deriveCitiesByDay, lodgingForDay } from '@/lib/trips/cities';
 import {
   formatDateRange,
   formatDate,
+  formatShortDate,
   tripDayCount,
   isOngoing,
 } from '@/lib/time/formatDate';
@@ -259,20 +262,24 @@ export function TripDetail({ tripId }: TripDetailProps) {
                 >
                   <TabsList className="w-max min-w-full justify-start">
                     {dayCityBuckets.map((bucket, idx) => {
-                      const itemCount = bucket.segments.reduce(
-                        (sum, s) => sum + s.items.length,
-                        0,
+                      const allItems = bucket.segments.flatMap((s) => s.items);
+                      const itemCount = allItems.length;
+                      const fillLevel = getDayFillLevel(
+                        computeDayFillRatio(allItems, bucket.date),
                       );
                       return (
                         <TabsTrigger
                           key={bucket.key}
                           value={bucket.key}
-                          className="shrink-0"
+                          className="shrink-0 px-2.5 sm:px-4"
                         >
-                          <span className="text-muted-foreground/80 mr-2 text-[10px] tracking-[0.14em] uppercase">
-                            Day {idx + 1}
+                          <span className="sm:hidden">
+                            {formatShortDate(bucket.date.toISOString())}
                           </span>
-                          {formatDate(bucket.date.toISOString())}
+                          <span className="hidden sm:inline">
+                            {formatDate(bucket.date.toISOString())}
+                          </span>
+                          <DayFillDot level={fillLevel} />
                           {itemCount > 0 && (
                             <Badge
                               variant="muted"
@@ -288,41 +295,54 @@ export function TripDetail({ tripId }: TripDetailProps) {
                 </div>
               </div>
 
-              {/* City + lodging indicator for active day */}
+              {/* Day label + city + lodging indicator for active day */}
               {activeBucket && (
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    <MapPin className="text-muted-foreground/60 size-3 shrink-0" />
-                    <span className="text-muted-foreground truncate text-xs">
-                      {activeCityLabel}
+                <>
+                  <div className="mt-1 mb-1">
+                    <span className="text-muted-foreground/70 text-xs font-medium">
+                      Day {activeBucketIdx + 1}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setCityOverrideOpen(true)}
-                      className="text-muted-foreground/50 hover:text-muted-foreground shrink-0 text-[10px] underline-offset-2 hover:underline"
-                    >
-                      change
-                    </button>
+                    <span className="text-muted-foreground/40 mx-1.5 text-xs">
+                      ·
+                    </span>
+                    <span className="text-muted-foreground/70 text-xs">
+                      {formatDate(activeBucket.date.toISOString())}
+                    </span>
                   </div>
-                  {activeLodging ? (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedItem(activeLodging)}
-                      className="text-muted-foreground hover:text-foreground flex min-w-0 items-center gap-1.5 text-xs underline-offset-4 hover:underline"
-                      title="Where you're staying tonight"
-                    >
-                      <Bed className="size-3 shrink-0 opacity-60" />
-                      <span className="truncate">
-                        {activeLodging.to?.label ?? activeLodging.title}
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <MapPin className="text-muted-foreground/60 size-3 shrink-0" />
+                      <span className="text-muted-foreground truncate text-xs">
+                        {activeCityLabel}
                       </span>
-                    </button>
-                  ) : (
-                    <span className="text-muted-foreground/50 flex shrink-0 items-center gap-1.5 text-xs">
-                      <Bed className="size-3 opacity-60" />
-                      No lodging
-                    </span>
-                  )}
-                </div>
+                      <button
+                        type="button"
+                        onClick={() => setCityOverrideOpen(true)}
+                        className="text-muted-foreground/50 hover:text-muted-foreground shrink-0 text-[10px] underline-offset-2 hover:underline"
+                      >
+                        change
+                      </button>
+                    </div>
+                    {activeLodging ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedItem(activeLodging)}
+                        className="text-muted-foreground hover:text-foreground flex min-w-0 items-center gap-1.5 text-xs underline-offset-4 hover:underline"
+                        title="Where you're staying tonight"
+                      >
+                        <Bed className="size-3 shrink-0 opacity-60" />
+                        <span className="truncate">
+                          {activeLodging.to?.label ?? activeLodging.title}
+                        </span>
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground/50 flex shrink-0 items-center gap-1.5 text-xs">
+                        <Bed className="size-3 opacity-60" />
+                        No lodging
+                      </span>
+                    )}
+                  </div>
+                </>
               )}
 
               {/* Timeline ⇄ Map view toggle */}

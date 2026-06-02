@@ -17,6 +17,10 @@ const monthDayFmt = new Intl.DateTimeFormat('en-GB', {
   day: 'numeric',
   month: 'short',
 });
+const shortDateFmt = new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: '2-digit',
+});
 
 export const formatDate = (iso: string): string =>
   dateFmt.format(new Date(iso));
@@ -26,6 +30,10 @@ export const formatTime = (iso: string): string =>
   timeFmt.format(new Date(iso));
 export const formatMonthDay = (iso: string): string =>
   monthDayFmt.format(new Date(iso));
+
+/** Returns "DD.MM" e.g. "12.05" — compact date for narrow contexts. */
+export const formatShortDate = (iso: string): string =>
+  shortDateFmt.format(new Date(iso)).replace('/', '.');
 
 export function formatDateRange(startIso: string, endIso: string): string {
   const start = new Date(startIso);
