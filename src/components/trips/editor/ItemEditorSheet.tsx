@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Lock, LockOpen } from 'lucide-react';
 import { useAuth } from '@/lib/auth/context';
 import { toast } from 'sonner';
@@ -24,6 +24,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { TimeField } from '@/components/ui/TimeField';
 import { useTrips } from '@/lib/trips/context';
 import { cn } from '@/lib/utils';
@@ -169,6 +170,8 @@ function ItemEditorBody({
   const [notes, setNotes] = useState<string>(item?.notes ?? '');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [privacyConfirmOpen, setPrivacyConfirmOpen] = useState(false);
+  const pendingSave = useRef<(() => Promise<void>) | null>(null);
 
   function handleKindChange(newKind: ItemKind) {
     setKind(newKind);
@@ -319,58 +322,63 @@ function ItemEditorBody({
     const resolvedTo: Place | undefined =
       toPlace ?? (toValue.trim() ? { label: toValue.trim() } : undefined);
 
+    const doSave = async () => {
+      setSaving(true);
+      try {
+        if (isEdit && item) {
+          const patch: ItemPatch = {
+            kind,
+            title: effectiveTitle,
+            startsAt: fromLocalInput(startsAt),
+            endsAt: endsAt ? fromLocalInput(endsAt) : null,
+            fromCity: resolvedFromCity ?? null,
+            toCity: resolvedToCity ?? null,
+            from: resolvedFrom ?? null,
+            to: resolvedTo ?? null,
+            transportMode: kind === 'transport' ? transportMode : null,
+            notes: notes.trim() || null,
+            privateToUserIds:
+              isPrivate && privateUserIds.length > 0 ? privateUserIds : null,
+          };
+          await updateItem(tripId, item.id, patch);
+          toast.success('Item updated');
+        } else {
+          const draft: ItemDraft = {
+            kind,
+            title: effectiveTitle,
+            startsAt: fromLocalInput(startsAt),
+            endsAt: endsAt ? fromLocalInput(endsAt) : undefined,
+            fromCity: resolvedFromCity,
+            toCity: resolvedToCity,
+            from: resolvedFrom,
+            to: resolvedTo,
+            transportMode: kind === 'transport' ? transportMode : undefined,
+            notes: notes.trim() || undefined,
+            privateToUserIds:
+              isPrivate && privateUserIds.length > 0
+                ? privateUserIds
+                : undefined,
+          };
+          await addItem(tripId, draft);
+          toast.success('Item added');
+        }
+        onClose();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Save failed';
+        setError(message);
+        toast.error(`Couldn't save item: ${message}`);
+      } finally {
+        setSaving(false);
+      }
+    };
+
     if (isEdit && item && !item.privateToUserIds?.length && isPrivate) {
-      const ok = window.confirm(
-        'This item will be hidden from members not in your private list. Linked expenses stay shared with everyone.',
-      );
-      if (!ok) return;
+      pendingSave.current = doSave;
+      setPrivacyConfirmOpen(true);
+      return;
     }
 
-    setSaving(true);
-    try {
-      if (isEdit && item) {
-        const patch: ItemPatch = {
-          kind,
-          title: effectiveTitle,
-          startsAt: fromLocalInput(startsAt),
-          endsAt: endsAt ? fromLocalInput(endsAt) : null,
-          fromCity: resolvedFromCity ?? null,
-          toCity: resolvedToCity ?? null,
-          from: resolvedFrom ?? null,
-          to: resolvedTo ?? null,
-          transportMode: kind === 'transport' ? transportMode : null,
-          notes: notes.trim() || null,
-          privateToUserIds:
-            isPrivate && privateUserIds.length > 0 ? privateUserIds : null,
-        };
-        await updateItem(tripId, item.id, patch);
-        toast.success('Item updated');
-      } else {
-        const draft: ItemDraft = {
-          kind,
-          title: effectiveTitle,
-          startsAt: fromLocalInput(startsAt),
-          endsAt: endsAt ? fromLocalInput(endsAt) : undefined,
-          fromCity: resolvedFromCity,
-          toCity: resolvedToCity,
-          from: resolvedFrom,
-          to: resolvedTo,
-          transportMode: kind === 'transport' ? transportMode : undefined,
-          notes: notes.trim() || undefined,
-          privateToUserIds:
-            isPrivate && privateUserIds.length > 0 ? privateUserIds : undefined,
-        };
-        await addItem(tripId, draft);
-        toast.success('Item added');
-      }
-      onClose();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Save failed';
-      setError(message);
-      toast.error(`Couldn't save item: ${message}`);
-    } finally {
-      setSaving(false);
-    }
+    await doSave();
   };
 
   return (
@@ -845,6 +853,18 @@ function ItemEditorBody({
           {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add item'}
         </Button>
       </SheetFooter>
+
+      <ConfirmDialog
+        open={privacyConfirmOpen}
+        onOpenChange={setPrivacyConfirmOpen}
+        title="Make item private?"
+        description="This item will be hidden from members not in your private list. Linked expenses stay shared with everyone."
+        confirmLabel="Make private"
+        onConfirm={() => {
+          setPrivacyConfirmOpen(false);
+          if (pendingSave.current) void pendingSave.current();
+        }}
+      />
     </>
   );
 }

@@ -22,6 +22,7 @@ import {
   SelectItem,
 } from '@/components/ui/select';
 import { CurrencyCombobox } from '@/components/trips/editor/CurrencyCombobox';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useTrips } from '@/lib/trips/context';
 import { formatAmountInput, parseAmountInput } from '@/lib/trips/grouping';
 import {
@@ -202,6 +203,7 @@ function ExpenseBody({
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const parsedAmount = parseAmountInput(amountText);
   const selectedMembers = members.filter((m) => selection.selected.has(m.id));
@@ -406,7 +408,6 @@ function ExpenseBody({
 
   const handleDelete = async () => {
     if (!expense) return;
-    if (!confirm(`Delete "${expense.title}"?`)) return;
     setSaving(true);
     try {
       await removeExpense(trip.id, expense.id);
@@ -600,7 +601,7 @@ function ExpenseBody({
         {isEdit && (
           <Button
             variant="ghost"
-            onClick={handleDelete}
+            onClick={() => setDeleteOpen(true)}
             disabled={saving}
             className="text-destructive hover:bg-destructive/10 hover:text-destructive mr-auto"
           >
@@ -615,6 +616,19 @@ function ExpenseBody({
           {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Add expense'}
         </Button>
       </SheetFooter>
+
+      {expense && (
+        <ConfirmDialog
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          title="Delete expense"
+          description={`"${expense.title}" will be permanently removed.`}
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          destructive
+          onConfirm={handleDelete}
+        />
+      )}
     </>
   );
 }
