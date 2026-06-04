@@ -49,6 +49,7 @@ export interface TripMemberRow {
   invited_by: string | null;
   status: TripMemberStatus;
   invited_email: string | null;
+  revert_to_name_only: boolean;
   // PostgREST can return either a single related row or an array depending on
   // the inferred relationship cardinality. Accept both shapes.
   profiles?: ProfileEmbed | ProfileEmbed[] | null;
@@ -116,6 +117,7 @@ export function rowToMember(row: TripMemberRow): TripMember {
     invitedBy: row.invited_by ?? undefined,
     status: row.status ?? 'accepted',
     invitedEmail: row.invited_email ?? undefined,
+    revertToNameOnly: row.revert_to_name_only ?? false,
   };
 }
 

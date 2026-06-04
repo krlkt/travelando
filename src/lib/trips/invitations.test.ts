@@ -92,7 +92,7 @@ describe('member invitations', () => {
     expect(members.find((m) => m.id === invite.id)?.status).toBe('accepted');
   });
 
-  it('removes the invite row on decline', async () => {
+  it('removes a fresh email invite on decline (no prior member)', async () => {
     // Arrange
     const repo = createInMemoryRepository([seedTrip()]);
     const invite = await repo.addMember('trip-1', {
@@ -105,5 +105,29 @@ describe('member invitations', () => {
 
     // Assert
     expect(members.find((m) => m.id === invite.id)).toBeUndefined();
+  });
+
+  it('reverts a claimed name-only member on decline instead of deleting', async () => {
+    // Arrange — a name-only member claimed via invite.
+    const repo = createInMemoryRepository([seedTrip()]);
+    const placeholder = await repo.addMember('trip-1', {
+      displayName: 'Marta',
+    });
+    await repo.inviteMember('trip-1', placeholder.id, {
+      email: 'marta@example.com',
+    });
+
+    // Act
+    await repo.declineInvitation(placeholder.id);
+    const members = await repo.listMembers('trip-1');
+    const reverted = members.find((m) => m.id === placeholder.id);
+
+    // Assert — the original name-only member survives, account link cleared.
+    expect(reverted).toBeDefined();
+    expect(reverted?.displayName).toBe('Marta');
+    expect(reverted?.status).toBe('accepted');
+    expect(reverted?.userId).toBeUndefined();
+    expect(reverted?.invitedEmail).toBeUndefined();
+    expect(reverted?.revertToNameOnly).toBe(false);
   });
 });
