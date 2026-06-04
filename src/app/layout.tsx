@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono, Instrument_Serif } from 'next/font/google';
-import { Toaster } from 'sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AppShell } from '@/components/shell/AppShell';
+import { AppToaster } from '@/components/shell/AppToaster';
 import { AuthProvider } from '@/lib/auth/context';
 import './globals.css';
 
@@ -56,15 +56,7 @@ export default function RootLayout({
         <AuthProvider>
           <TooltipProvider delayDuration={150}>
             <AppShell>{children}</AppShell>
-            <Toaster
-              position="top-center"
-              toastOptions={{
-                classNames: {
-                  toast:
-                    'rounded-[var(--radius)] border border-border/70 bg-card text-card-foreground shadow-lg',
-                },
-              }}
-            />
+            <AppToaster />
           </TooltipProvider>
         </AuthProvider>
       </body>
