@@ -50,6 +50,9 @@ export interface TripMember {
   invitedBy?: string;
   status: TripMemberStatus;
   invitedEmail?: string;
+  // True when a pending invite was created by claiming an existing name-only
+  // member. Declining reverts to that name-only member instead of deleting it.
+  revertToNameOnly?: boolean;
 }
 
 /**

@@ -271,6 +271,8 @@ export function createInMemoryRepository(
               status: 'pending',
               invitedEmail: draft.email,
               email: m.email ?? draft.email,
+              // Claiming a name-only member: decline reverts, not deletes.
+              revertToNameOnly: true,
             };
             return updated;
           }),
@@ -320,10 +322,29 @@ export function createInMemoryRepository(
       return tripId;
     },
     async declineInvitation(memberId) {
-      store = store.map((t) => ({
-        ...t,
-        members: t.members.filter((m) => m.id !== memberId),
-      }));
+      store = store.map((t) => {
+        if (!t.members.some((m) => m.id === memberId)) return t;
+        return {
+          ...t,
+          members: t.members.flatMap((m) => {
+            if (m.id !== memberId) return [m];
+            // Reverting a claimed invite keeps the original name-only member.
+            if (m.revertToNameOnly) {
+              return [
+                {
+                  ...m,
+                  status: 'accepted' as const,
+                  userId: undefined,
+                  invitedEmail: undefined,
+                  email: undefined,
+                  revertToNameOnly: false,
+                },
+              ];
+            }
+            return [];
+          }),
+        };
+      });
     },
 
     async listExpenses(tripId) {

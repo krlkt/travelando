@@ -70,7 +70,7 @@ const ITEM_COLUMNS =
   'id, trip_id, kind, title, starts_at, ends_at, from_city, to_city, from_place, to_place, transport_mode, notes, private_to_user_ids';
 
 const MEMBER_COLUMNS =
-  'id, trip_id, user_id, display_name, email, invited_by, status, invited_email, profiles(avatar_url, display_name)';
+  'id, trip_id, user_id, display_name, email, invited_by, status, invited_email, revert_to_name_only, profiles(avatar_url, display_name)';
 
 const EXPENSE_SHARE_COLUMNS = 'id, expense_id, member_id, value, locked';
 
@@ -378,6 +378,7 @@ export function createSupabaseRepository(
           invited_by: authData.user.id,
           status: 'accepted',
           invited_email: null,
+          revert_to_name_only: false,
         };
         const { data, error } = await client
           .from('trip_members')
@@ -413,6 +414,7 @@ export function createSupabaseRepository(
         invited_by: authData.user.id,
         status: 'pending',
         invited_email: draft.email,
+        revert_to_name_only: false,
       };
 
       const { data, error } = await client
@@ -448,6 +450,8 @@ export function createSupabaseRepository(
         invited_email: draft.email,
         email: (profile?.email as string | null) ?? draft.email,
         user_id: profile ? (profile.id as string) : null,
+        // Claiming a name-only member: declining should revert to it, not delete.
+        revert_to_name_only: true,
       };
 
       const { data, error } = await client
