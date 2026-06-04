@@ -5,6 +5,7 @@ import { motion } from 'motion/react';
 import { Plus, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TripCard } from './TripCard';
+import { InvitationsBanner } from './InvitationsBanner';
 import { TripEditorSheet } from './editor/TripEditorSheet';
 import { useTrips } from '@/lib/trips/context';
 import { isDemoTrip } from '@/lib/trips/demoTrips';
@@ -72,6 +73,8 @@ export function TripsDashboard() {
             </Button>
           </motion.div>
         </motion.div>
+
+        <InvitationsBanner />
 
         {visibleTrips.length === 0 ? (
           <EmptyState onCreate={() => setEditorOpen(true)} />

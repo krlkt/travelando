@@ -9,9 +9,27 @@ import type { Expense, Settlement, TripMember } from './types';
 
 const tripId = 'trip-1';
 const members: TripMember[] = [
-  { id: 'm-a', tripId, displayName: 'Alice', userId: 'u-alice' },
-  { id: 'm-b', tripId, displayName: 'Bob', userId: 'u-bob' },
-  { id: 'm-c', tripId, displayName: 'Carol', userId: 'u-carol' },
+  {
+    id: 'm-a',
+    tripId,
+    displayName: 'Alice',
+    userId: 'u-alice',
+    status: 'accepted',
+  },
+  {
+    id: 'm-b',
+    tripId,
+    displayName: 'Bob',
+    userId: 'u-bob',
+    status: 'accepted',
+  },
+  {
+    id: 'm-c',
+    tripId,
+    displayName: 'Carol',
+    userId: 'u-carol',
+    status: 'accepted',
+  },
 ];
 
 const baseExpense = {

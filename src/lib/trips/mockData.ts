@@ -24,8 +24,18 @@ export const mockTrips: Trip[] = [
     startDate: dateOnly(-1),
     endDate: dateOnly(2),
     members: [
-      { id: 'm-l-1', tripId: 'trip-lisbon', displayName: 'Karel' },
-      { id: 'm-l-2', tripId: 'trip-lisbon', displayName: 'Marta' },
+      {
+        id: 'm-l-1',
+        tripId: 'trip-lisbon',
+        displayName: 'Karel',
+        status: 'accepted',
+      },
+      {
+        id: 'm-l-2',
+        tripId: 'trip-lisbon',
+        displayName: 'Marta',
+        status: 'accepted',
+      },
     ],
     items: [
       {
@@ -137,9 +147,24 @@ export const mockTrips: Trip[] = [
     startDate: dateOnly(28),
     endDate: dateOnly(40),
     members: [
-      { id: 'm-j-1', tripId: 'trip-japan', displayName: 'Karel' },
-      { id: 'm-j-2', tripId: 'trip-japan', displayName: 'Marta' },
-      { id: 'm-j-3', tripId: 'trip-japan', displayName: 'Niels' },
+      {
+        id: 'm-j-1',
+        tripId: 'trip-japan',
+        displayName: 'Karel',
+        status: 'accepted',
+      },
+      {
+        id: 'm-j-2',
+        tripId: 'trip-japan',
+        displayName: 'Marta',
+        status: 'accepted',
+      },
+      {
+        id: 'm-j-3',
+        tripId: 'trip-japan',
+        displayName: 'Niels',
+        status: 'accepted',
+      },
     ],
     items: [
       {
@@ -196,7 +221,14 @@ export const mockTrips: Trip[] = [
       'linear-gradient(135deg, oklch(72% 0.08 220) 0%, oklch(48% 0.06 250) 100%)',
     startDate: dateOnly(-90),
     endDate: dateOnly(-80),
-    members: [{ id: 'm-i-1', tripId: 'trip-iceland', displayName: 'Karel' }],
+    members: [
+      {
+        id: 'm-i-1',
+        tripId: 'trip-iceland',
+        displayName: 'Karel',
+        status: 'accepted',
+      },
+    ],
     items: [
       {
         id: 'i-ic-1',

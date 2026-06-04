@@ -32,6 +32,10 @@ export const tripMemberPatchSchema = z.object({
   displayName: z.string().min(1).max(80).optional(),
 });
 
+export const memberInviteSchema = z.object({
+  email: z.string().email(),
+});
+
 export const itemKindSchema = z.enum([
   'transport',
   'activity',

@@ -38,6 +38,8 @@ export interface TripItem {
   privateToUserIds?: string[];
 }
 
+export type TripMemberStatus = 'pending' | 'accepted';
+
 export interface TripMember {
   id: string;
   tripId: string;
@@ -46,6 +48,24 @@ export interface TripMember {
   email?: string;
   avatarUrl?: string;
   invitedBy?: string;
+  status: TripMemberStatus;
+  invitedEmail?: string;
+}
+
+/**
+ * A pending invitation as seen by the *invited* user, who cannot read the trip
+ * itself until they accept. Returned by the list_my_invitations RPC.
+ */
+export interface TripInvitation {
+  memberId: string;
+  tripId: string;
+  tripTitle: string;
+  tripDestination: string;
+  startDate: string;
+  endDate: string;
+  coverGradient: string;
+  ownerName: string;
+  invitedAt: string;
 }
 
 export interface Trip {
@@ -67,6 +87,11 @@ export type TripDraft = Omit<Trip, 'id' | 'items' | 'members' | 'ownerId'>;
 export interface TripMemberDraft {
   email?: string;
   displayName?: string;
+}
+
+/** Sending an invite to a specific email (used by the "invite" action). */
+export interface MemberInviteDraft {
+  email: string;
 }
 
 export interface TripMemberPatch {

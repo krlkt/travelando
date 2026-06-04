@@ -16,6 +16,36 @@ async function requireUser() {
   return { supabase, user: data.user } as const;
 }
 
+export async function GET(_request: NextRequest, context: RouteContext) {
+  const { supabase, user } = await requireUser();
+  if (!user) {
+    return NextResponse.json(
+      { success: false, error: 'unauthorized' },
+      { status: 401 },
+    );
+  }
+
+  const { id } = await context.params;
+
+  try {
+    const repo = createSupabaseRepository(supabase);
+    const trip = await repo.findById(id);
+    if (!trip) {
+      return NextResponse.json(
+        { success: false, error: 'not_found' },
+        { status: 404 },
+      );
+    }
+    return NextResponse.json({ success: true, data: trip });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown_error';
+    return NextResponse.json(
+      { success: false, error: message },
+      { status: 500 },
+    );
+  }
+}
+
 export async function PATCH(request: NextRequest, context: RouteContext) {
   const { supabase, user } = await requireUser();
   if (!user) {

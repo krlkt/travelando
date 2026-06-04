@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -20,10 +21,12 @@ import type {
   FoodPlaceDraft,
   ItemDraft,
   ItemPatch,
+  MemberInviteDraft,
   Settlement,
   SettlementDraft,
   Trip,
   TripDraft,
+  TripInvitation,
   TripItem,
   TripMember,
   TripMemberDraft,
@@ -82,6 +85,16 @@ interface TripsState {
     patch: TripMemberPatch,
   ) => Promise<void>;
   removeMember: (tripId: string, memberId: string) => Promise<void>;
+  inviteMember: (
+    tripId: string,
+    memberId: string,
+    draft: MemberInviteDraft,
+  ) => Promise<TripMember>;
+
+  invitations: TripInvitation[];
+  refreshInvitations: () => Promise<void>;
+  acceptInvitation: (memberId: string) => Promise<void>;
+  declineInvitation: (memberId: string) => Promise<void>;
 }
 
 const TripsContext = createContext<TripsState | null>(null);
@@ -152,6 +165,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   const [settlements, setSettlements] = useState<Record<string, Settlement[]>>(
     {},
   );
+  const [invitations, setInvitations] = useState<TripInvitation[]>([]);
 
   const getTrip = useCallback(
     (id: string) => trips.find((t) => t.id === id),
@@ -727,6 +741,111 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
     [],
   );
 
+  const inviteMember = useCallback(
+    async (
+      tripId: string,
+      memberId: string,
+      draft: MemberInviteDraft,
+    ): Promise<TripMember> => {
+      const updated = await callApi<TripMember>(
+        `/api/trips/${tripId}/members/${memberId}/invite`,
+        {
+          method: 'POST',
+          body: JSON.stringify(draft),
+        },
+      );
+      if (!updated) throw new Error('Member not returned');
+      setTrips((prev) =>
+        prev.map((t) =>
+          t.id === tripId
+            ? {
+                ...t,
+                members: t.members.map((m) =>
+                  m.id === memberId ? updated : m,
+                ),
+              }
+            : t,
+        ),
+      );
+      return updated;
+    },
+    [],
+  );
+
+  const refreshInvitations = useCallback(async (): Promise<void> => {
+    try {
+      const data = await callApi<TripInvitation[]>('/api/invitations');
+      setInvitations(data ?? []);
+    } catch {
+      // Anonymous / signed-out users have no invitations; stay silent.
+      setInvitations([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    callApi<TripInvitation[]>('/api/invitations')
+      .then((data) => {
+        if (active) setInvitations(data ?? []);
+      })
+      .catch(() => {
+        // Anonymous / signed-out users have no invitations; stay silent.
+        if (active) setInvitations([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const acceptInvitation = useCallback(
+    async (memberId: string): Promise<void> => {
+      const result = await callApi<{ tripId: string }>(
+        `/api/invitations/${memberId}`,
+        { method: 'POST' },
+      );
+      setInvitations((prev) => prev.filter((i) => i.memberId !== memberId));
+      // The trip is now accessible — pull it in so it shows on the dashboard.
+      const tripId = result?.tripId;
+      if (tripId) {
+        try {
+          const trip = await callApi<Trip>(`/api/trips/${tripId}`);
+          if (trip) {
+            setTrips((prev) =>
+              prev.some((t) => t.id === trip.id)
+                ? prev.map((t) => (t.id === trip.id ? trip : t))
+                : [...prev, trip],
+            );
+          }
+        } catch {
+          // Non-fatal: the trip will appear on next full load.
+        }
+      }
+    },
+    [],
+  );
+
+  const declineInvitation = useCallback(
+    async (memberId: string): Promise<void> => {
+      let snapshot: TripInvitation | undefined;
+      setInvitations((prev) => {
+        snapshot = prev.find((i) => i.memberId === memberId);
+        return prev.filter((i) => i.memberId !== memberId);
+      });
+      try {
+        await callApi<null>(`/api/invitations/${memberId}`, {
+          method: 'DELETE',
+        });
+      } catch (err) {
+        if (snapshot) {
+          const restored = snapshot;
+          setInvitations((prev) => [...prev, restored]);
+        }
+        throw err;
+      }
+    },
+    [],
+  );
+
   const removeItem = useCallback(
     async (tripId: string, itemId: string): Promise<void> => {
       let snapshot: TripItem | undefined;
@@ -789,6 +908,11 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       addMember,
       updateMember,
       removeMember,
+      inviteMember,
+      invitations,
+      refreshInvitations,
+      acceptInvitation,
+      declineInvitation,
     }),
     [
       trips,
@@ -821,6 +945,11 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       addMember,
       updateMember,
       removeMember,
+      inviteMember,
+      invitations,
+      refreshInvitations,
+      acceptInvitation,
+      declineInvitation,
     ],
   );
 

@@ -10,10 +10,12 @@ import type {
   FoodPlaceDraft,
   ItemDraft,
   ItemPatch,
+  MemberInviteDraft,
   Settlement,
   SettlementDraft,
   Trip,
   TripDraft,
+  TripInvitation,
   TripItem,
   TripMember,
   TripMemberDraft,
@@ -62,6 +64,18 @@ export interface TripsRepository {
     patch: TripMemberPatch,
   ): Promise<TripMember>;
   removeMember(tripId: string, memberId: string): Promise<void>;
+  // Convert an existing (name-only) member into a pending invite, or send a
+  // fresh pending invite. Access is granted only once the invitee accepts.
+  inviteMember(
+    tripId: string,
+    memberId: string,
+    draft: MemberInviteDraft,
+  ): Promise<TripMember>;
+
+  // Invitee-facing: invitations addressed to the current user.
+  listMyInvitations(): Promise<TripInvitation[]>;
+  acceptInvitation(memberId: string): Promise<string>;
+  declineInvitation(memberId: string): Promise<void>;
 
   listExpenses(tripId: string): Promise<Expense[]>;
   addExpense(draft: ExpenseDraft): Promise<Expense>;
