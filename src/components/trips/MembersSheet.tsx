@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Trash2, UserPlus, Crown, LogOut } from 'lucide-react';
+import { Trash2, UserPlus, Crown, LogOut, Mail, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Sheet,
@@ -55,7 +55,7 @@ function MembersSheetBody({
   onOpenChange: (open: boolean) => void;
 }) {
   const { user } = useAuth();
-  const { addMember, removeMember } = useTrips();
+  const { addMember, removeMember, inviteMember } = useTrips();
 
   const isOwner = Boolean(user && trip.ownerId && trip.ownerId === user.id);
 
@@ -64,6 +64,18 @@ function MembersSheetBody({
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  // Per-row "invite by email" for an existing name-only member.
+  const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteBusy, setInviteBusy] = useState(false);
+
+  const friendlyError = (raw: string): string =>
+    raw === 'user_not_found'
+      ? "We couldn't find an account with that email."
+      : raw.includes('unique') || raw.includes('duplicate')
+        ? 'That person is already on this trip.'
+        : raw;
 
   const handleAdd = async () => {
     if (mode === 'email' && !email.trim()) return;
@@ -75,20 +87,43 @@ function MembersSheetBody({
         email: mode === 'email' ? email.trim() : undefined,
         displayName: mode === 'name' ? name.trim() : undefined,
       });
-      toast.success(mode === 'email' ? 'Invite sent' : 'Member added');
+      toast.success(
+        mode === 'email'
+          ? 'Invite sent — they can accept it from their dashboard'
+          : 'Member added',
+      );
       setEmail('');
       setName('');
     } catch (err) {
       const raw = err instanceof Error ? err.message : 'Add failed';
-      const message =
-        raw === 'user_not_found'
-          ? "We couldn't find an account with that email."
-          : raw.includes('unique') || raw.includes('duplicate')
-            ? 'That person is already a member.'
-            : raw;
-      toast.error(message);
+      toast.error(friendlyError(raw));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const startInvite = (member: TripMember) => {
+    setInvitingId(member.id);
+    setInviteEmail('');
+  };
+
+  const cancelInvite = () => {
+    setInvitingId(null);
+    setInviteEmail('');
+  };
+
+  const handleInvite = async (member: TripMember) => {
+    if (!inviteEmail.trim()) return;
+    setInviteBusy(true);
+    try {
+      await inviteMember(trip.id, member.id, { email: inviteEmail.trim() });
+      toast.success(`Invite sent to ${inviteEmail.trim()}`);
+      cancelInvite();
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : 'Invite failed';
+      toast.error(friendlyError(raw));
+    } finally {
+      setInviteBusy(false);
     }
   };
 
@@ -172,8 +207,8 @@ function MembersSheetBody({
                 </Button>
               </div>
               <p className="text-muted-foreground text-xs">
-                They&apos;ll see the trip in their dashboard next time they open
-                the app.
+                They&apos;ll get an invitation to accept or decline. No account
+                yet? It waits for them and links when they sign up.
               </p>
             </TabsContent>
             <TabsContent value="name" className="grid gap-2">
@@ -198,8 +233,8 @@ function MembersSheetBody({
                 </Button>
               </div>
               <p className="text-muted-foreground text-xs">
-                For people who don&apos;t use the app. They won&apos;t get
-                access — they&apos;re just listed.
+                For people who don&apos;t use the app — just listed for now. You
+                can invite them by email later to give them access.
               </p>
             </TabsContent>
           </Tabs>
@@ -232,56 +267,118 @@ function MembersSheetBody({
           {additionalMembers.map((member) => {
             const isMe = Boolean(user && member.userId === user.id);
             const canRemove = isOwner || isMe;
+            const isPending = member.status === 'pending';
+            const isNameOnly = !member.userId && !isPending;
+            const canInvite = isOwner && isNameOnly;
+            const isInviting = invitingId === member.id;
             return (
               <div
                 key={member.id}
-                className="hover:bg-muted/50 flex items-center gap-3 rounded-[var(--radius)] px-2 py-2 transition-colors"
+                className="hover:bg-muted/50 rounded-[var(--radius)] px-2 py-2 transition-colors"
               >
-                <div className="bg-muted text-foreground grid size-9 place-items-center overflow-hidden rounded-full text-sm font-medium">
-                  {member.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={member.avatarUrl}
-                      alt=""
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    initialsFor(member)
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {member.displayName}
-                      {isMe ? ' (you)' : ''}
-                    </span>
-                    {!member.userId && (
-                      <span className="text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide uppercase">
-                        Name only
-                      </span>
+                <div className="flex items-center gap-3">
+                  <div className="bg-muted text-foreground grid size-9 place-items-center overflow-hidden rounded-full text-sm font-medium">
+                    {member.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={member.avatarUrl}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      initialsFor(member)
                     )}
                   </div>
-                  {member.email && (
-                    <div className="text-muted-foreground truncate text-xs">
-                      {member.email}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium">
+                        {member.displayName}
+                        {isMe ? ' (you)' : ''}
+                      </span>
+                      {isPending && (
+                        <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] tracking-wide text-amber-600 uppercase dark:text-amber-400">
+                          Invited
+                        </span>
+                      )}
+                      {isNameOnly && (
+                        <span className="text-muted-foreground rounded-full border px-1.5 py-0.5 text-[10px] tracking-wide uppercase">
+                          Name only
+                        </span>
+                      )}
                     </div>
+                    {(member.invitedEmail ?? member.email) && (
+                      <div className="text-muted-foreground truncate text-xs">
+                        {member.invitedEmail ?? member.email}
+                        {isPending ? ' · awaiting reply' : ''}
+                      </div>
+                    )}
+                  </div>
+                  {canInvite && !isInviting && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => startInvite(member)}
+                      aria-label={`Invite ${member.displayName} by email`}
+                      className="text-muted-foreground hover:text-primary"
+                    >
+                      <Mail className="size-4" />
+                    </Button>
+                  )}
+                  {canRemove && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemove(member)}
+                      disabled={removingId === member.id}
+                      aria-label={
+                        isMe
+                          ? 'Leave trip'
+                          : isPending
+                            ? 'Cancel invite'
+                            : 'Remove member'
+                      }
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      {isMe ? (
+                        <LogOut className="size-4" />
+                      ) : (
+                        <Trash2 className="size-4" />
+                      )}
+                    </Button>
                   )}
                 </div>
-                {canRemove && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleRemove(member)}
-                    disabled={removingId === member.id}
-                    aria-label={isMe ? 'Leave trip' : 'Remove member'}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    {isMe ? (
-                      <LogOut className="size-4" />
-                    ) : (
-                      <Trash2 className="size-4" />
-                    )}
-                  </Button>
+
+                {isInviting && (
+                  <div className="mt-2 flex gap-2 pl-12">
+                    <Input
+                      type="email"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      placeholder={`Email for ${member.displayName}`}
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && inviteEmail.trim())
+                          handleInvite(member);
+                        if (e.key === 'Escape') cancelInvite();
+                      }}
+                    />
+                    <Button
+                      onClick={() => handleInvite(member)}
+                      disabled={inviteBusy || !inviteEmail.trim()}
+                      size="icon"
+                      aria-label="Send invite"
+                    >
+                      <Check className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={cancelInvite}
+                      aria-label="Cancel"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
                 )}
               </div>
             );

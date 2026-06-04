@@ -14,6 +14,7 @@ import {
   rowToCityOverride,
   rowToExpense,
   rowToFoodPlace,
+  rowToInvitation,
   rowToItem,
   rowToMember,
   rowToSettlement,
@@ -26,6 +27,7 @@ import {
   type ExpenseRow,
   type FoodPlaceRow,
   type SettlementRow,
+  type TripInvitationRow,
   type TripItemRow,
   type TripMemberRow,
   type TripRow,
@@ -43,10 +45,12 @@ import type {
   FoodPlaceDraft,
   ItemDraft,
   ItemPatch,
+  MemberInviteDraft,
   Settlement,
   SettlementDraft,
   Trip,
   TripDraft,
+  TripInvitation,
   TripItem,
   TripMember,
   TripMemberDraft,
@@ -66,7 +70,7 @@ const ITEM_COLUMNS =
   'id, trip_id, kind, title, starts_at, ends_at, from_city, to_city, from_place, to_place, transport_mode, notes, private_to_user_ids';
 
 const MEMBER_COLUMNS =
-  'id, trip_id, user_id, display_name, email, invited_by, profiles(avatar_url, display_name)';
+  'id, trip_id, user_id, display_name, email, invited_by, status, invited_email, profiles(avatar_url, display_name)';
 
 const EXPENSE_SHARE_COLUMNS = 'id, expense_id, member_id, value, locked';
 
@@ -363,41 +367,52 @@ export function createSupabaseRepository(
       const { data: authData, error: authError } = await client.auth.getUser();
       if (authError || !authData.user) throw new Error('unauthorized');
 
-      let userId: string | null = null;
-      let resolvedName: string | null = draft.displayName ?? null;
-      let email: string | null = draft.email ?? null;
-
-      if (draft.email) {
-        // SECURITY DEFINER RPC — the `profiles owner read` policy blocks
-        // direct SELECTs on other users' rows, so we go through a function
-        // that returns only the single matching profile.
-        const { data: profiles, error: profileError } = await client.rpc(
-          'find_profile_by_email',
-          { p_email: draft.email },
-        );
-        if (profileError) {
-          throw new Error(`addMember lookup: ${profileError.message}`);
-        }
-        const profile = Array.isArray(profiles) ? profiles[0] : profiles;
-        if (profile) {
-          userId = profile.id as string;
-          email = (profile.email as string | null) ?? draft.email;
-          resolvedName =
-            draft.displayName ??
-            (profile.display_name as string | null) ??
-            (profile.email as string | null) ??
-            draft.email;
-        } else {
-          throw new Error('user_not_found');
-        }
+      // Name-only members are listed (e.g. for expense splits) but never get
+      // access — they have no account to grant it to, so they're 'accepted'.
+      if (!draft.email) {
+        const insert: Omit<TripMemberRow, 'id' | 'profiles'> = {
+          trip_id: tripId,
+          user_id: null,
+          display_name: draft.displayName ?? 'Member',
+          email: null,
+          invited_by: authData.user.id,
+          status: 'accepted',
+          invited_email: null,
+        };
+        const { data, error } = await client
+          .from('trip_members')
+          .insert(insert)
+          .select(MEMBER_COLUMNS)
+          .single();
+        const row = unwrap(data as TripMemberRow | null, error, 'addMember');
+        return rowToMember(row);
       }
+
+      // Email invite → pending. The invitee gets access only after accepting.
+      // Look up an existing profile so we can link user_id eagerly; if there's
+      // no account yet, the invite waits on invited_email and is linked when
+      // that person signs up (handle_new_user trigger).
+      const { data: profiles, error: profileError } = await client.rpc(
+        'find_profile_by_email',
+        { p_email: draft.email },
+      );
+      if (profileError) {
+        throw new Error(`addMember lookup: ${profileError.message}`);
+      }
+      const profile = Array.isArray(profiles) ? profiles[0] : profiles;
+      const localPart = draft.email.split('@')[0] || draft.email;
 
       const insert: Omit<TripMemberRow, 'id' | 'profiles'> = {
         trip_id: tripId,
-        user_id: userId,
-        display_name: resolvedName ?? draft.email ?? 'Member',
-        email,
+        user_id: profile ? (profile.id as string) : null,
+        display_name:
+          draft.displayName ??
+          (profile?.display_name as string | null) ??
+          localPart,
+        email: (profile?.email as string | null) ?? draft.email,
         invited_by: authData.user.id,
+        status: 'pending',
+        invited_email: draft.email,
       };
 
       const { data, error } = await client
@@ -407,6 +422,78 @@ export function createSupabaseRepository(
         .single();
       const row = unwrap(data as TripMemberRow | null, error, 'addMember');
       return rowToMember(row);
+    },
+
+    async inviteMember(
+      tripId: string,
+      memberId: string,
+      draft: MemberInviteDraft,
+    ): Promise<TripMember> {
+      if (isDemoTrip(tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
+
+      // Convert an existing name-only row into a pending invite. The owner has
+      // update rights via RLS. Display name stays the placeholder until the
+      // invitee accepts, at which point it's replaced with their real name.
+      const { data: profiles, error: profileError } = await client.rpc(
+        'find_profile_by_email',
+        { p_email: draft.email },
+      );
+      if (profileError) {
+        throw new Error(`inviteMember lookup: ${profileError.message}`);
+      }
+      const profile = Array.isArray(profiles) ? profiles[0] : profiles;
+
+      const update: Partial<Omit<TripMemberRow, 'id' | 'profiles'>> = {
+        status: 'pending',
+        invited_email: draft.email,
+        email: (profile?.email as string | null) ?? draft.email,
+        user_id: profile ? (profile.id as string) : null,
+      };
+
+      const { data, error } = await client
+        .from('trip_members')
+        .update(update)
+        .eq('id', memberId)
+        .eq('trip_id', tripId)
+        .select(MEMBER_COLUMNS)
+        .single();
+      const row = unwrap(
+        data as TripMemberRow | null,
+        error,
+        `inviteMember ${memberId}`,
+      );
+      return rowToMember(row);
+    },
+
+    async listMyInvitations(): Promise<TripInvitation[]> {
+      const { data, error } = await client.rpc('list_my_invitations');
+      if (error) throw new Error(`listMyInvitations: ${error.message}`);
+      return ((data as TripInvitationRow[] | null) ?? []).map(rowToInvitation);
+    },
+
+    async acceptInvitation(memberId: string): Promise<string> {
+      const { data, error } = await client.rpc('accept_trip_invitation', {
+        p_member_id: memberId,
+      });
+      if (error) {
+        const message = error.message.includes('invitation_not_found')
+          ? 'invitation_not_found'
+          : `acceptInvitation: ${error.message}`;
+        throw new Error(message);
+      }
+      return data as string;
+    },
+
+    async declineInvitation(memberId: string): Promise<void> {
+      const { error } = await client.rpc('decline_trip_invitation', {
+        p_member_id: memberId,
+      });
+      if (error) {
+        const message = error.message.includes('invitation_not_found')
+          ? 'invitation_not_found'
+          : `declineInvitation: ${error.message}`;
+        throw new Error(message);
+      }
     },
 
     async updateMember(

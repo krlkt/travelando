@@ -18,8 +18,10 @@ import type {
   SettlementDraft,
   Trip,
   TripDraft,
+  TripInvitation,
   TripItem,
   TripMember,
+  TripMemberStatus,
 } from './types';
 
 export interface TripRow {
@@ -45,9 +47,23 @@ export interface TripMemberRow {
   display_name: string;
   email: string | null;
   invited_by: string | null;
+  status: TripMemberStatus;
+  invited_email: string | null;
   // PostgREST can return either a single related row or an array depending on
   // the inferred relationship cardinality. Accept both shapes.
   profiles?: ProfileEmbed | ProfileEmbed[] | null;
+}
+
+export interface TripInvitationRow {
+  member_id: string;
+  trip_id: string;
+  trip_title: string;
+  trip_destination: string;
+  trip_start_date: string;
+  trip_end_date: string;
+  cover_gradient: string;
+  owner_name: string;
+  invited_at: string;
 }
 
 export interface TripItemRow {
@@ -98,6 +114,22 @@ export function rowToMember(row: TripMemberRow): TripMember {
     email: row.email ?? undefined,
     avatarUrl: profile?.avatar_url ?? undefined,
     invitedBy: row.invited_by ?? undefined,
+    status: row.status ?? 'accepted',
+    invitedEmail: row.invited_email ?? undefined,
+  };
+}
+
+export function rowToInvitation(row: TripInvitationRow): TripInvitation {
+  return {
+    memberId: row.member_id,
+    tripId: row.trip_id,
+    tripTitle: row.trip_title,
+    tripDestination: row.trip_destination,
+    startDate: row.trip_start_date,
+    endDate: row.trip_end_date,
+    coverGradient: row.cover_gradient,
+    ownerName: row.owner_name,
+    invitedAt: row.invited_at,
   };
 }
 

@@ -12,10 +12,12 @@ import type {
   FoodPlaceDraft,
   ItemDraft,
   ItemPatch,
+  MemberInviteDraft,
   Settlement,
   SettlementDraft,
   Trip,
   TripDraft,
+  TripInvitation,
   TripItem,
   TripMember,
   TripMemberDraft,
@@ -212,11 +214,17 @@ export function createInMemoryRepository(
     async addMember(tripId, draft: TripMemberDraft) {
       const trip = store.find((t) => t.id === tripId);
       if (!trip) throw new Error(`Trip ${tripId} not found`);
+      const isInvite = Boolean(draft.email);
       const member: TripMember = {
         id: randomId('mem'),
         tripId,
-        displayName: draft.displayName ?? draft.email ?? 'Member',
+        displayName:
+          draft.displayName ?? draft.email?.split('@')[0] ?? 'Member',
         email: draft.email,
+        // Email invites start pending (no access until accepted); name-only
+        // members are listed but never granted access, so they're accepted.
+        status: isInvite ? 'pending' : 'accepted',
+        invitedEmail: isInvite ? draft.email : undefined,
       };
       store = store.map((t) =>
         t.id === tripId ? { ...t, members: [...t.members, member] } : t,
@@ -249,6 +257,73 @@ export function createInMemoryRepository(
           ? { ...t, members: t.members.filter((m) => m.id !== memberId) }
           : t,
       );
+    },
+    async inviteMember(tripId, memberId, draft: MemberInviteDraft) {
+      let updated: TripMember | null = null;
+      store = store.map((t) => {
+        if (t.id !== tripId) return t;
+        return {
+          ...t,
+          members: t.members.map((m) => {
+            if (m.id !== memberId) return m;
+            updated = {
+              ...m,
+              status: 'pending',
+              invitedEmail: draft.email,
+              email: m.email ?? draft.email,
+            };
+            return updated;
+          }),
+        };
+      });
+      if (!updated)
+        throw new Error(`Member ${memberId} not found in trip ${tripId}`);
+      return { ...(updated as TripMember) };
+    },
+    async listMyInvitations() {
+      // No auth context in memory; surface every pending invite as an
+      // invitation so tests can assert on the transition.
+      const invitations: TripInvitation[] = [];
+      for (const trip of store) {
+        for (const m of trip.members) {
+          if (m.status !== 'pending') continue;
+          invitations.push({
+            memberId: m.id,
+            tripId: trip.id,
+            tripTitle: trip.title,
+            tripDestination: trip.destination,
+            startDate: trip.startDate,
+            endDate: trip.endDate,
+            coverGradient: trip.coverGradient,
+            ownerName: 'Trip owner',
+            invitedAt: new Date(0).toISOString(),
+          });
+        }
+      }
+      return invitations;
+    },
+    async acceptInvitation(memberId) {
+      let tripId: string | null = null;
+      store = store.map((t) => {
+        if (!t.members.some((m) => m.id === memberId)) return t;
+        tripId = t.id;
+        return {
+          ...t,
+          members: t.members.map((m) =>
+            m.id === memberId
+              ? { ...m, status: 'accepted', invitedEmail: undefined }
+              : m,
+          ),
+        };
+      });
+      if (!tripId) throw new Error('invitation_not_found');
+      return tripId;
+    },
+    async declineInvitation(memberId) {
+      store = store.map((t) => ({
+        ...t,
+        members: t.members.filter((m) => m.id !== memberId),
+      }));
     },
 
     async listExpenses(tripId) {
