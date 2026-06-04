@@ -162,7 +162,9 @@ export function TripCard({ trip, highlight }: TripCardProps) {
               <span className="text-muted-foreground">
                 {upcoming
                   ? `Starts ${relativeFromNow(trip.startDate, now)}`
-                  : 'Past trip'}
+                  : ongoing
+                    ? 'Happening now'
+                    : 'Past trip'}
               </span>
               <div className="flex -space-x-1.5">
                 {trip.members.slice(0, 3).map((m) => (
