@@ -26,7 +26,12 @@ export function PlaceAddressLink({
 
   function handleClick(e: MouseEvent<HTMLButtonElement>) {
     e.stopPropagation();
-    window.open(url!, '_blank', 'noopener,noreferrer');
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (isMobile) {
+      window.location.href = url!;
+    } else {
+      window.open(url!, '_blank', 'noopener,noreferrer');
+    }
   }
 
   return (
