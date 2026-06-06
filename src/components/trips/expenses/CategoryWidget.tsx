@@ -1,18 +1,30 @@
 'use client';
 
 import { useMemo } from 'react';
-import { convertToEur, type EurRates } from '@/lib/trips/fx';
+import { type EurRates } from '@/lib/trips/fx';
 import {
   EXPENSE_CATEGORIES,
   categoryAccents,
   categoryLabels,
 } from '@/lib/trips/expenseCategory';
+import { aggregateByCategory } from '@/lib/trips/expenseTotals';
 import { cn } from '@/lib/utils';
 import type { Expense, ExpenseCategory } from '@/lib/trips/types';
+import type { ExpenseViewMode } from './ShareToggle';
+
+// Compact whole-euro format keeps category tiles tight even with large,
+// multi-currency totals (e.g. "€12,346").
+const eurCompact = new Intl.NumberFormat('en-GB', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+});
 
 interface CategoryWidgetProps {
   expenses: Expense[];
   rates: EurRates | null;
+  mode: ExpenseViewMode;
+  currentMemberId: string | null;
   selected: ExpenseCategory | null;
   onSelect: (category: ExpenseCategory | null) => void;
 }
@@ -20,9 +32,16 @@ interface CategoryWidgetProps {
 export function CategoryWidget({
   expenses,
   rates,
+  mode,
+  currentMemberId,
   selected,
   onSelect,
 }: CategoryWidgetProps) {
+  const categoryTotals = useMemo(
+    () => aggregateByCategory(expenses, rates, currentMemberId),
+    [expenses, rates, currentMemberId],
+  );
+
   const buckets = useMemo(() => {
     const totals: Record<ExpenseCategory, number> = {
       accommodation: 0,
@@ -33,18 +52,23 @@ export function CategoryWidget({
       transport: 0,
       other: 0,
     };
-    if (!rates) return totals;
-    for (const e of expenses) {
-      const eur = convertToEur(e.amount, e.currency, rates);
-      if (eur === null) continue;
-      totals[e.category] += eur;
+    for (const c of EXPENSE_CATEGORIES) {
+      totals[c] =
+        mode === 'mine' ? categoryTotals[c].mine : categoryTotals[c].total;
     }
     return totals;
-  }, [expenses, rates]);
+  }, [categoryTotals, mode]);
 
   const grandTotal = useMemo(
     () => EXPENSE_CATEGORIES.reduce((s, c) => s + buckets[c], 0),
     [buckets],
+  );
+
+  // Buckets are normalised to EUR, so the displayed sums are exact only when
+  // every expense is already in EUR; otherwise they are converted approximations.
+  const hasForeign = useMemo(
+    () => expenses.some((e) => e.currency.toUpperCase() !== 'EUR'),
+    [expenses],
   );
 
   return (
@@ -54,7 +78,12 @@ export function CategoryWidget({
     >
       <div className="mb-2 flex items-center justify-between px-1">
         <span className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">
-          By category
+          {mode === 'mine'
+            ? 'Your spend by category'
+            : 'Trip spend by category'}
+          {hasForeign && (
+            <span className="ml-1.5 normal-case opacity-70">≈ EUR</span>
+          )}
         </span>
         {selected && (
           <button
@@ -95,9 +124,16 @@ export function CategoryWidget({
                   {categoryLabels[c]}
                 </span>
               </span>
-              <span className="font-display text-base tabular-nums">
-                {rates ? `${pct}%` : '—'}
-              </span>
+              <div className="flex items-baseline justify-between gap-1.5">
+                <span className="font-display truncate text-base tabular-nums">
+                  {rates ? eurCompact.format(amount) : '—'}
+                </span>
+                {rates && (
+                  <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+                    {pct}%
+                  </span>
+                )}
+              </div>
             </button>
           );
         })}

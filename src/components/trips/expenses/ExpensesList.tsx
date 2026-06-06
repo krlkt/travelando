@@ -6,12 +6,16 @@ import { ArrowRight, Users } from 'lucide-react';
 import { formatMoney } from '@/lib/trips/grouping';
 import { formatDateLong } from '@/lib/time/formatDate';
 import { fadeUp, stagger } from '@/lib/motion/presets';
+import { shareForMember } from '@/lib/trips/balances';
 import { categoryAccents, categoryLabels } from '@/lib/trips/expenseCategory';
 import type { Expense, TripMember } from '@/lib/trips/types';
+import type { ExpenseViewMode } from './ShareToggle';
 
 interface ExpensesListProps {
   expenses: Expense[];
   members: TripMember[];
+  mode: ExpenseViewMode;
+  currentMemberId: string | null;
   onSelect: (expense: Expense) => void;
 }
 
@@ -39,6 +43,8 @@ function groupByDay(expenses: Expense[]): DayBucket[] {
 export function ExpensesList({
   expenses,
   members,
+  mode,
+  currentMemberId,
   onSelect,
 }: ExpensesListProps) {
   const memberById = useMemo(
@@ -101,8 +107,18 @@ export function ExpensesList({
                   </div>
                   <div className="text-right">
                     <div className="text-sm tabular-nums">
-                      {formatMoney(expense.amount, expense.currency)}
+                      {formatMoney(
+                        mode === 'mine'
+                          ? shareForMember(expense, currentMemberId)
+                          : expense.amount,
+                        expense.currency,
+                      )}
                     </div>
+                    {mode === 'mine' && (
+                      <div className="text-muted-foreground mt-0.5 text-[11px] tabular-nums">
+                        of {formatMoney(expense.amount, expense.currency)}
+                      </div>
+                    )}
                   </div>
                 </button>
               );

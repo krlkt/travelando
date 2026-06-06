@@ -13,6 +13,7 @@ import { getEurRates, type EurRates } from '@/lib/trips/fx';
 import {
   computeBalances,
   findMemberIdForUser,
+  shareForMember,
   summarizeForUser,
 } from '@/lib/trips/balances';
 import { aggregateByCurrency } from '@/lib/trips/expenseTotals';
@@ -22,8 +23,11 @@ import { ExpenseSheet } from './ExpenseSheet';
 import { ExpensesList } from './ExpensesList';
 import { BalancesTab } from './BalancesTab';
 import { CategoryWidget } from './CategoryWidget';
+import { ShareToggle, type ExpenseViewMode } from './ShareToggle';
 import { fadeUp, stagger } from '@/lib/motion/presets';
 import type { ExpenseCategory } from '@/lib/trips/types';
+
+const SHARE_EPSILON = 0.005;
 
 interface ExpensesPageProps {
   tripId: string;
@@ -39,6 +43,7 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedCategory, setSelectedCategory] =
     useState<ExpenseCategory | null>(null);
+  const [viewMode, setViewMode] = useState<ExpenseViewMode>('mine');
 
   useEffect(() => {
     loadTripExtras(tripId);
@@ -64,14 +69,24 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
     () => settlements[tripId] ?? [],
     [settlements, tripId],
   );
-  const visibleExpenses = useMemo(
+  const currentMemberId = findMemberIdForUser(trip.members, user?.id);
+  const categoryExpenses = useMemo(
     () =>
       selectedCategory
         ? tripExpenses.filter((e) => e.category === selectedCategory)
         : tripExpenses,
     [tripExpenses, selectedCategory],
   );
-  const currentMemberId = findMemberIdForUser(trip.members, user?.id);
+  // In "my share" mode, only expenses the current member is part of appear.
+  const visibleExpenses = useMemo(
+    () =>
+      viewMode === 'mine'
+        ? categoryExpenses.filter(
+            (e) => shareForMember(e, currentMemberId) > SHARE_EPSILON,
+          )
+        : categoryExpenses,
+    [categoryExpenses, viewMode, currentMemberId],
+  );
 
   const totals = useMemo(
     () => aggregateByCurrency(tripExpenses, currentMemberId),
@@ -149,46 +164,36 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
       </header>
 
       <div className="mx-auto max-w-[var(--container-page)] px-4 pb-24 sm:px-6 md:px-10">
-        <section className="border-border/70 bg-card mt-4 grid grid-cols-2 gap-2 overflow-hidden rounded-[var(--radius-xl)] border p-4 shadow-[0_1px_2px_oklch(20%_0.02_250_/_0.04),0_18px_42px_-24px_oklch(20%_0.02_250_/_0.18)] sm:p-6">
-          <div className="flex flex-col gap-1.5">
+        <section className="border-border/70 bg-card mt-4 overflow-hidden rounded-[var(--radius-xl)] border p-5 shadow-[0_1px_2px_oklch(20%_0.02_250_/_0.04),0_18px_42px_-24px_oklch(20%_0.02_250_/_0.18)] sm:p-6">
+          <div className="flex items-center justify-between gap-3">
             <span className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">
-              My share
+              {viewMode === 'mine' ? 'My share' : 'Trip total'}
             </span>
-            {totals.byCurrency.length === 0 ? (
-              <span className="font-display text-2xl tabular-nums sm:text-3xl">
-                —
-              </span>
-            ) : (
-              <div className="flex flex-col gap-0.5">
-                {totals.byCurrency.map((c) => (
-                  <span
-                    key={c.currency}
-                    className="font-display text-2xl tabular-nums sm:text-3xl"
-                  >
-                    {formatMoney(c.mine, c.currency)}
-                  </span>
-                ))}
-              </div>
-            )}
+            <ShareToggle value={viewMode} onChange={setViewMode} />
           </div>
-          <div className="border-border/60 flex flex-col gap-1.5 border-l pl-4">
-            <span className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">
-              Trip total
-            </span>
+          <div className="mt-3">
             {totals.byCurrency.length === 0 ? (
-              <span className="font-display text-2xl tabular-nums sm:text-3xl">
+              <span className="font-display text-3xl tabular-nums sm:text-4xl">
                 —
               </span>
             ) : (
-              <div className="flex flex-col gap-0.5">
-                {totals.byCurrency.map((c) => (
-                  <span
-                    key={c.currency}
-                    className="font-display text-2xl tabular-nums sm:text-3xl"
-                  >
-                    {formatMoney(c.total, c.currency)}
-                  </span>
-                ))}
+              <div className="flex flex-col gap-2">
+                {totals.byCurrency.map((c) => {
+                  const primary = viewMode === 'mine' ? c.mine : c.total;
+                  const secondary = viewMode === 'mine' ? c.total : c.mine;
+                  return (
+                    <div key={c.currency} className="flex flex-col gap-0.5">
+                      <span className="font-display text-3xl leading-none tabular-nums sm:text-4xl">
+                        {formatMoney(primary, c.currency)}
+                      </span>
+                      <span className="text-muted-foreground text-xs tabular-nums">
+                        {viewMode === 'mine'
+                          ? `of ${formatMoney(secondary, c.currency)} trip total`
+                          : `your share ${formatMoney(secondary, c.currency)}`}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -197,6 +202,8 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
         <CategoryWidget
           expenses={tripExpenses}
           rates={rates}
+          mode={viewMode}
+          currentMemberId={currentMemberId}
           selected={selectedCategory}
           onSelect={setSelectedCategory}
         />
@@ -215,11 +222,17 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
 
           <TabsContent value="expenses" className="mt-4">
             {visibleExpenses.length === 0 ? (
-              <EmptyState onAdd={handleAdd} />
+              <EmptyState
+                onAdd={handleAdd}
+                mode={viewMode}
+                hasAny={categoryExpenses.length > 0}
+              />
             ) : (
               <ExpensesList
                 expenses={visibleExpenses}
                 members={trip.members}
+                mode={viewMode}
+                currentMemberId={currentMemberId}
                 onSelect={handleEdit}
               />
             )}
@@ -252,19 +265,31 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
   );
 }
 
-function EmptyState({ onAdd }: { onAdd: () => void }) {
+interface EmptyStateProps {
+  onAdd: () => void;
+  mode: ExpenseViewMode;
+  hasAny: boolean;
+}
+
+function EmptyState({ onAdd, mode, hasAny }: EmptyStateProps) {
+  // "mine" mode with expenses present means none of them involve the user.
+  const noneForMe = mode === 'mine' && hasAny;
   return (
     <div className="border-border/70 bg-secondary/20 grid place-items-center rounded-[var(--radius-lg)] border border-dashed px-6 py-16 text-center">
       <span className="bg-primary/15 text-primary mb-3 grid size-10 place-items-center rounded-full">
         <Wallet className="size-5" />
       </span>
       <p className="text-muted-foreground max-w-sm text-sm">
-        No expenses yet. Track what gets spent, who paid, and how to split it.
+        {noneForMe
+          ? 'None of these expenses are split with you. Switch to Trip total to see them all.'
+          : 'No expenses yet. Track what gets spent, who paid, and how to split it.'}
       </p>
-      <Button size="sm" variant="outline" className="mt-4" onClick={onAdd}>
-        <Plus className="size-4" />
-        Add first expense
-      </Button>
+      {!noneForMe && (
+        <Button size="sm" variant="outline" className="mt-4" onClick={onAdd}>
+          <Plus className="size-4" />
+          Add first expense
+        </Button>
+      )}
     </div>
   );
 }

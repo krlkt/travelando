@@ -5,6 +5,9 @@
   "permissions": {
     "allow": [
       "Bash(npx *)",
+      "Bash(ls *)",
+      "Bash(find *)",
+      "Bash(cat *)",
       "Bash(pnpm install *)",
       "Bash(pnpm add *)",
       "Bash(git init *)",
@@ -12,8 +15,7 @@
       "Bash(env)",
       "Bash(pnpm eslint *)",
       "Bash(pnpm lint *)",
-      "Bash(echo \"EXIT=$?\")",
-      "Bash(echo \"---tsc-exit: $?\")",
+      "Bash(echo *)",
       "Bash(pnpm build *)",
       "Bash(pnpm next *)",
       "Bash(cp /tmp/repro.mjs /Users/karelkarunia/Code/travelando/repro.mjs)",
@@ -21,14 +23,14 @@
       "WebSearch",
       "WebFetch(domain:developers.google.com)",
       "Bash(pnpm vitest *)",
+      "Bash(pnpm test *)",
       "Bash(pnpm exec *)",
+      "Bash(sed *)",
       "Bash(npm run *)",
       "Bash(pnpm prettier *)",
       "Bash(git log *)",
-      "Bash(echo \"hello test\")",
       "Read(//tmp/**)",
-      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
-      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "Bash(grep *)",
       "Bash(node *)"
     ]
   }

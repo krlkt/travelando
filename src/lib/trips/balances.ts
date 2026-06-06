@@ -83,6 +83,18 @@ export function expandShares(expense: Expense): ExpandedShare[] {
   }));
 }
 
+/**
+ * The given member's share of a single expense in its native currency.
+ * Returns 0 when the member isn't part of the split.
+ */
+export function shareForMember(
+  expense: Expense,
+  memberId: string | null,
+): number {
+  if (!memberId) return 0;
+  return expandShares(expense).find((s) => s.memberId === memberId)?.share ?? 0;
+}
+
 interface CurrencyAcc {
   paid: number;
   owed: number;

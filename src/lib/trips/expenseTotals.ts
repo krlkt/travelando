@@ -1,5 +1,7 @@
 import { expandShares } from './balances';
-import type { Expense } from './types';
+import { EXPENSE_CATEGORIES } from './expenseCategory';
+import { convertToEur, type EurRates } from './fx';
+import type { Expense, ExpenseCategory } from './types';
 
 export interface CurrencyTotal {
   currency: string;
@@ -55,6 +57,50 @@ export function aggregateByCurrency(
     addToBucket(buckets, expense, currentMemberId);
   }
   return { byCurrency: toSortedList(buckets) };
+}
+
+export type CategoryTotals = Record<ExpenseCategory, Bucket>;
+
+function emptyCategoryTotals(): CategoryTotals {
+  const out = {} as CategoryTotals;
+  for (const category of EXPENSE_CATEGORIES) {
+    out[category] = emptyBucket();
+  }
+  return out;
+}
+
+/**
+ * Sum expenses per category in EUR. Each bucket carries both the trip `total`
+ * and the current member's `mine` share (via the same per-row split logic as
+ * balances). Expenses in non-convertible currencies are skipped, mirroring the
+ * category widget's prior behaviour. When `rates` is null every bucket is zero.
+ */
+export function aggregateByCategory(
+  expenses: Expense[],
+  rates: EurRates | null,
+  currentMemberId: string | null,
+): CategoryTotals {
+  const totals = emptyCategoryTotals();
+  if (!rates) return totals;
+
+  for (const expense of expenses) {
+    const eurTotal = convertToEur(expense.amount, expense.currency, rates);
+    if (eurTotal === null) continue;
+
+    const bucket = totals[expense.category];
+    bucket.total += eurTotal;
+
+    if (currentMemberId && expense.amount > 0) {
+      const shares = expandShares(expense);
+      const mineShare = shares.find((s) => s.memberId === currentMemberId);
+      if (mineShare) {
+        // Convert the native-currency share to EUR using the row's own rate.
+        bucket.mine += eurTotal * (mineShare.share / expense.amount);
+      }
+    }
+  }
+
+  return totals;
 }
 
 /**
