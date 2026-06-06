@@ -14,19 +14,28 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
 import { useTrips } from '@/lib/trips/context';
-import { formatAmountInput, parseAmountInput } from '@/lib/trips/grouping';
+import { parseAmountInput } from '@/lib/trips/grouping';
 import type { Trip, TripMember } from '@/lib/trips/types';
+
+const FALLBACK_CURRENCY = 'EUR';
 
 interface SettleSheetProps {
   trip: Trip;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  currentMemberId: string;
-  otherMember: TripMember | null;
-  currency: string;
-  /** Positive = current user is owed; negative = current user owes. */
-  signedNet: number;
+  members: TripMember[];
+  /** Distinct currencies used in the trip; first is the default. */
+  currencies: string[];
+  /** Defaults the "from" side to the current user when they have a member row. */
+  currentMemberId: string | null;
 }
 
 function todayLocalDate(): string {
@@ -39,23 +48,20 @@ export function SettleSheet({
   trip,
   open,
   onOpenChange,
+  members,
+  currencies,
   currentMemberId,
-  otherMember,
-  currency,
-  signedNet,
 }: SettleSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:w-[420px]">
-        {open && otherMember && (
+        {open && (
           <SettleBody
-            key={`${otherMember.id}-${currency}`}
             trip={trip}
             onClose={() => onOpenChange(false)}
+            members={members}
+            currencies={currencies}
             currentMemberId={currentMemberId}
-            otherMember={otherMember}
-            currency={currency}
-            signedNet={signedNet}
           />
         )}
       </SheetContent>
@@ -66,52 +72,57 @@ export function SettleSheet({
 interface SettleBodyProps {
   trip: Trip;
   onClose: () => void;
-  currentMemberId: string;
-  otherMember: TripMember;
-  currency: string;
-  signedNet: number;
+  members: TripMember[];
+  currencies: string[];
+  currentMemberId: string | null;
 }
 
 function SettleBody({
   trip,
   onClose,
+  members,
+  currencies,
   currentMemberId,
-  otherMember,
-  currency,
-  signedNet,
 }: SettleBodyProps) {
   const { addSettlement } = useTrips();
-  const me = useMemo(
-    () => trip.members.find((m) => m.id === currentMemberId) ?? null,
-    [trip.members, currentMemberId],
-  );
 
-  // Direction defaults from the sign of the net:
-  //  signedNet < 0 → I owe them → I paid them (fromMe = true)
-  //  signedNet > 0 → They owe me → They paid me (fromMe = false)
-  const initialFromMe = signedNet <= 0;
-  const [fromMe, setFromMe] = useState(initialFromMe);
-  const [amountInput, setAmountInput] = useState(
-    formatAmountInput(Math.abs(signedNet)),
-  );
+  // Default: from = me (if I have a member row), else the first member.
+  const defaultFromId = useMemo(() => {
+    if (currentMemberId && members.some((m) => m.id === currentMemberId)) {
+      return currentMemberId;
+    }
+    return members[0]?.id ?? '';
+  }, [currentMemberId, members]);
+
+  const [fromId, setFromId] = useState(defaultFromId);
+  const [toId, setToId] = useState('');
+  const [amountInput, setAmountInput] = useState('');
+  const [currency, setCurrency] = useState(currencies[0] ?? FALLBACK_CURRENCY);
   const [settledOn, setSettledOn] = useState(todayLocalDate());
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const amount = parseAmountInput(amountInput);
-  const canSubmit = !!me && amount !== null && amount > 0 && !submitting;
+  const fromMember = members.find((m) => m.id === fromId) ?? null;
+  const toMember = members.find((m) => m.id === toId) ?? null;
 
-  const fromMember = fromMe ? me : otherMember;
-  const toMember = fromMe ? otherMember : me;
+  const amount = parseAmountInput(amountInput);
+  const sameParty = fromId !== '' && fromId === toId;
+  const canSubmit =
+    !!fromMember &&
+    !!toMember &&
+    !sameParty &&
+    amount !== null &&
+    amount > 0 &&
+    !submitting;
 
   async function handleSubmit() {
-    if (!canSubmit || !me || amount === null) return;
+    if (!canSubmit || !fromMember || !toMember || amount === null) return;
     setSubmitting(true);
     try {
       await addSettlement({
         tripId: trip.id,
-        fromMemberId: fromMe ? me.id : otherMember.id,
-        toMemberId: fromMe ? otherMember.id : me.id,
+        fromMemberId: fromMember.id,
+        toMemberId: toMember.id,
         amount,
         currency,
         settledOn,
@@ -126,11 +137,11 @@ function SettleBody({
     }
   }
 
-  if (!me) {
+  if (members.length < 2) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center">
         <p className="text-muted-foreground text-sm">
-          Sign in as a trip member to record a settlement.
+          Add at least two trip members to record a settlement.
         </p>
       </div>
     );
@@ -141,32 +152,51 @@ function SettleBody({
       <div className="border-border/60 border-b px-6 py-5">
         <SheetTitle className="text-lg">Settle up</SheetTitle>
         <SheetDescription className="text-muted-foreground mt-1 text-xs">
-          Record a real-world money transfer to close out the balance.
+          Record a real-world money transfer between any two members.
         </SheetDescription>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
         <div className="flex flex-col gap-5">
-          <section className="border-border/70 bg-card overflow-hidden rounded-[var(--radius-lg)] border">
-            <button
-              type="button"
-              onClick={() => setFromMe(!fromMe)}
-              className="hover:bg-secondary/40 flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition"
-            >
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <span className="min-w-0 truncate text-sm font-medium">
-                  {fromMember?.displayName ?? '—'}
-                </span>
-                <ArrowRight className="text-muted-foreground size-4 shrink-0" />
-                <span className="min-w-0 truncate text-sm font-medium">
-                  {toMember?.displayName ?? '—'}
-                </span>
-              </div>
-              <span className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">
-                Switch
-              </span>
-            </button>
+          <section className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="settle-from">From</Label>
+              <Select value={fromId} onValueChange={setFromId}>
+                <SelectTrigger id="settle-from">
+                  <SelectValue placeholder="Who paid" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <ArrowRight className="text-muted-foreground mb-2.5 size-4 shrink-0" />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="settle-to">To</Label>
+              <Select value={toId} onValueChange={setToId}>
+                <SelectTrigger id="settle-to">
+                  <SelectValue placeholder="Who received" />
+                </SelectTrigger>
+                <SelectContent>
+                  {members.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </section>
+
+          {sameParty && (
+            <p className="text-destructive text-xs">
+              Pick two different members.
+            </p>
+          )}
 
           <div className="grid grid-cols-[1fr_auto] gap-3">
             <div className="flex flex-col gap-1.5">
@@ -181,10 +211,25 @@ function SettleBody({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Currency</Label>
-              <div className="border-input bg-card flex h-9 items-center rounded-md border px-3 text-sm font-medium tabular-nums">
-                {currency}
-              </div>
+              <Label htmlFor="settle-currency">Currency</Label>
+              {currencies.length > 1 ? (
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger id="settle-currency" className="min-w-[88px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currencies.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="border-input bg-card flex h-9 items-center rounded-md border px-3 text-sm font-medium tabular-nums">
+                  {currency}
+                </div>
+              )}
             </div>
           </div>
 

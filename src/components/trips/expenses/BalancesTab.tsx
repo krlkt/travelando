@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Scale } from 'lucide-react';
+import { Scale, ArrowLeftRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatMoney } from '@/lib/trips/grouping';
 import { fadeUp, stagger } from '@/lib/motion/presets';
+import { simplifyDebts, tripCurrencies } from '@/lib/trips/balances';
 import type {
   BalancesResult,
-  CurrencyBalance,
   UserSummary,
   UserSummaryEntry,
 } from '@/lib/trips/balances';
@@ -26,14 +26,6 @@ interface BalancesTabProps {
   onRemoveSettlement: (id: string) => Promise<void>;
 }
 
-const SETTLED_EPSILON = 0.005;
-
-interface SettleTarget {
-  otherMember: TripMember;
-  currency: string;
-  signedNet: number;
-}
-
 export function BalancesTab({
   trip,
   result,
@@ -43,7 +35,7 @@ export function BalancesTab({
   settlements,
   onRemoveSettlement,
 }: BalancesTabProps) {
-  const [settleTarget, setSettleTarget] = useState<SettleTarget | null>(null);
+  const [settleOpen, setSettleOpen] = useState(false);
 
   if (!result) {
     return (
@@ -54,12 +46,30 @@ export function BalancesTab({
   }
 
   const memberById = new Map(members.map((m) => [m.id, m]));
-  const myBalance = currentMemberId
-    ? result.balances.find((b) => b.memberId === currentMemberId)
-    : null;
+  const currencies = tripCurrencies(result);
+  const canSettle = members.length >= 2;
+  const debts = simplifyDebts(result);
 
-  function netForMeIn(currency: string): number {
-    return myBalance?.byCurrency.find((c) => c.currency === currency)?.net ?? 0;
+  function debtLinesFor(memberId: string): DebtLine[] {
+    const lines: DebtLine[] = [];
+    for (const debt of debts) {
+      if (debt.fromMemberId === memberId) {
+        lines.push({
+          kind: 'owes',
+          other: memberById.get(debt.toMemberId)?.displayName ?? 'Unknown',
+          currency: debt.currency,
+          amount: debt.amount,
+        });
+      } else if (debt.toMemberId === memberId) {
+        lines.push({
+          kind: 'owed',
+          other: memberById.get(debt.fromMemberId)?.displayName ?? 'Unknown',
+          currency: debt.currency,
+          amount: debt.amount,
+        });
+      }
+    }
+    return lines;
   }
 
   return (
@@ -85,6 +95,18 @@ export function BalancesTab({
             <div className="min-w-0 flex-1">
               <SummarySentence summary={summary} />
             </div>
+            {canSettle && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="shrink-0"
+                onClick={() => setSettleOpen(true)}
+              >
+                <ArrowLeftRight className="size-4" />
+                Settle up
+              </Button>
+            )}
           </motion.section>
         )}
 
@@ -97,11 +119,7 @@ export function BalancesTab({
               const member = memberById.get(balance.memberId);
               if (!member) return null;
               const isMe = balance.memberId === currentMemberId;
-              const rows = balance.byCurrency.filter(
-                (c) =>
-                  Math.abs(c.paid) >= SETTLED_EPSILON ||
-                  Math.abs(c.owed) >= SETTLED_EPSILON,
-              );
+              const lines = debtLinesFor(balance.memberId);
               return (
                 <div
                   key={balance.memberId}
@@ -117,40 +135,13 @@ export function BalancesTab({
                       </span>
                     )}
                   </div>
-                  {rows.length === 0 ? (
+                  {lines.length === 0 ? (
                     <div className="text-muted-foreground text-xs">Settled</div>
                   ) : (
                     <div className="flex flex-col gap-1.5">
-                      {rows.map((c) => {
-                        const myNet = netForMeIn(c.currency);
-                        const canSettle =
-                          !isMe &&
-                          currentMemberId !== null &&
-                          Math.abs(c.net) >= SETTLED_EPSILON &&
-                          Math.abs(myNet) >= SETTLED_EPSILON &&
-                          Math.sign(myNet) !== Math.sign(c.net);
-                        const suggested = Math.min(
-                          Math.abs(myNet),
-                          Math.abs(c.net),
-                        );
-                        return (
-                          <CurrencyRow
-                            key={c.currency}
-                            row={c}
-                            canSettle={canSettle}
-                            onSettle={
-                              canSettle
-                                ? () =>
-                                    setSettleTarget({
-                                      otherMember: member,
-                                      currency: c.currency,
-                                      signedNet: -Math.sign(c.net) * suggested,
-                                    })
-                                : undefined
-                            }
-                          />
-                        );
-                      })}
+                      {lines.map((line, i) => (
+                        <DebtRow key={i} line={line} isMe={isMe} />
+                      ))}
                     </div>
                   )}
                 </div>
@@ -167,68 +158,49 @@ export function BalancesTab({
         />
       </motion.div>
 
-      {currentMemberId && (
-        <SettleSheet
-          trip={trip}
-          open={settleTarget !== null}
-          onOpenChange={(o) => {
-            if (!o) setSettleTarget(null);
-          }}
-          currentMemberId={currentMemberId}
-          otherMember={settleTarget?.otherMember ?? null}
-          currency={settleTarget?.currency ?? 'EUR'}
-          signedNet={settleTarget?.signedNet ?? 0}
-        />
-      )}
+      <SettleSheet
+        trip={trip}
+        open={settleOpen}
+        onOpenChange={setSettleOpen}
+        members={members}
+        currencies={currencies}
+        currentMemberId={currentMemberId}
+      />
     </>
   );
 }
 
-interface CurrencyRowProps {
-  row: CurrencyBalance;
-  canSettle: boolean;
-  onSettle?: () => void;
+interface DebtLine {
+  kind: 'owes' | 'owed';
+  /** Display name of the counterparty. */
+  other: string;
+  currency: string;
+  amount: number;
 }
 
-function CurrencyRow({ row, canSettle, onSettle }: CurrencyRowProps) {
-  const isPositive = row.net > SETTLED_EPSILON;
-  const isNegative = row.net < -SETTLED_EPSILON;
+interface DebtRowProps {
+  line: DebtLine;
+  isMe: boolean;
+}
+
+function DebtRow({ line, isMe }: DebtRowProps) {
+  const owes = line.kind === 'owes';
+  // "owes" = money flowing out (debt); "owed" = money flowing in (credit).
+  const label = owes
+    ? `${isMe ? 'You owe' : 'Owes'} ${line.other}`
+    : `${isMe ? "You're owed by" : 'Owed by'} ${line.other}`;
   return (
     <div className="flex items-center justify-between gap-3">
-      <div className="text-muted-foreground text-xs tabular-nums">
-        Paid {formatMoney(row.paid, row.currency)} ·{' '}
-        {isPositive ? (
-          <>Owed {formatMoney(row.net, row.currency)}</>
-        ) : isNegative ? (
-          <>Owes {formatMoney(-row.net, row.currency)}</>
-        ) : (
-          <>Settled</>
-        )}
+      <div className="text-muted-foreground min-w-0 truncate text-xs">
+        {label}
       </div>
-      <div className="flex items-center gap-2">
-        {canSettle && onSettle && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-primary hover:text-primary h-7 px-2 text-xs"
-            onClick={onSettle}
-          >
-            Settle
-          </Button>
-        )}
-        <div
-          className={`text-right text-sm font-medium tabular-nums ${
-            isPositive
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : isNegative
-                ? 'text-destructive'
-                : 'text-muted-foreground'
-          }`}
-        >
-          {isPositive && '+'}
-          {formatMoney(row.net, row.currency)}
-        </div>
+      <div
+        className={`shrink-0 text-right text-sm font-medium tabular-nums ${
+          owes ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'
+        }`}
+      >
+        {owes ? '−' : '+'}
+        {formatMoney(line.amount, line.currency)}
       </div>
     </div>
   );

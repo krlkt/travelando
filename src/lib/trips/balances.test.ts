@@ -3,7 +3,9 @@ import {
   computeBalances,
   expandShares,
   findMemberIdForUser,
+  simplifyDebts,
   summarizeForUser,
+  tripCurrencies,
 } from './balances';
 import type { Expense, Settlement, TripMember } from './types';
 
@@ -193,6 +195,147 @@ describe('computeBalances', () => {
     const { balances } = computeBalances([expense], members);
     const alice = balances.find((b) => b.memberId === 'm-a')!;
     expect(alice.byCurrency[0].currency).toBe('EUR');
+  });
+});
+
+describe('tripCurrencies', () => {
+  it('returns an empty list when there are no balances', () => {
+    expect(tripCurrencies(computeBalances([], members))).toEqual([]);
+  });
+
+  it('returns distinct currencies sorted alphabetically', () => {
+    const eurExpense: Expense = {
+      ...baseExpense,
+      currency: 'EUR',
+      mode: 'equally',
+      shares: [
+        { memberId: 'm-a', value: null, locked: false },
+        { memberId: 'm-b', value: null, locked: false },
+      ],
+    };
+    const usdExpense: Expense = {
+      ...baseExpense,
+      id: 'e-usd',
+      currency: 'USD',
+      payerMemberId: 'm-b',
+      mode: 'equally',
+      shares: [
+        { memberId: 'm-a', value: null, locked: false },
+        { memberId: 'm-b', value: null, locked: false },
+      ],
+    };
+    expect(
+      tripCurrencies(computeBalances([usdExpense, eurExpense], members)),
+    ).toEqual(['EUR', 'USD']);
+  });
+});
+
+describe('simplifyDebts', () => {
+  it('returns no transactions when everyone is settled', () => {
+    expect(simplifyDebts(computeBalances([], members))).toEqual([]);
+  });
+
+  it('emits a single A → B debt for a two-person split', () => {
+    // Alice pays 60, split evenly with Bob → Bob owes Alice 30.
+    const expense: Expense = {
+      ...baseExpense,
+      amount: 60,
+      payerMemberId: 'm-a',
+      mode: 'equally',
+      shares: [
+        { memberId: 'm-a', value: null, locked: false },
+        { memberId: 'm-b', value: null, locked: false },
+      ],
+    };
+    expect(simplifyDebts(computeBalances([expense], members))).toEqual([
+      { fromMemberId: 'm-b', toMemberId: 'm-a', currency: 'EUR', amount: 30 },
+    ]);
+  });
+
+  it('splits one debtor across two creditors', () => {
+    // Bob pays 30 (own share 10 → owed 20), Carol pays 30 (owed 20),
+    // Alice pays nothing (owes 20). Alice settles 20 to whichever creditor.
+    const fromBob: Expense = {
+      ...baseExpense,
+      id: 'e-bob',
+      amount: 30,
+      payerMemberId: 'm-b',
+      mode: 'equally',
+      shares: [
+        { memberId: 'm-a', value: null, locked: false },
+        { memberId: 'm-b', value: null, locked: false },
+        { memberId: 'm-c', value: null, locked: false },
+      ],
+    };
+    const fromCarol: Expense = {
+      ...fromBob,
+      id: 'e-carol',
+      payerMemberId: 'm-c',
+    };
+    const debts = simplifyDebts(computeBalances([fromBob, fromCarol], members));
+    // Alice owes 20 total; Bob and Carol are each owed 10.
+    const total = debts.reduce((s, d) => s + d.amount, 0);
+    expect(total).toBeCloseTo(20, 5);
+    expect(debts.every((d) => d.fromMemberId === 'm-a')).toBe(true);
+    expect(new Set(debts.map((d) => d.toMemberId))).toEqual(
+      new Set(['m-b', 'm-c']),
+    );
+  });
+
+  it('keeps currencies independent', () => {
+    const eur: Expense = {
+      ...baseExpense,
+      id: 'e-eur',
+      amount: 60,
+      currency: 'EUR',
+      payerMemberId: 'm-a',
+      mode: 'equally',
+      shares: [
+        { memberId: 'm-a', value: null, locked: false },
+        { memberId: 'm-b', value: null, locked: false },
+      ],
+    };
+    const usd: Expense = {
+      ...baseExpense,
+      id: 'e-usd',
+      amount: 100,
+      currency: 'USD',
+      payerMemberId: 'm-b',
+      mode: 'equally',
+      shares: [
+        { memberId: 'm-a', value: null, locked: false },
+        { memberId: 'm-b', value: null, locked: false },
+      ],
+    };
+    expect(simplifyDebts(computeBalances([eur, usd], members))).toEqual([
+      { fromMemberId: 'm-b', toMemberId: 'm-a', currency: 'EUR', amount: 30 },
+      { fromMemberId: 'm-a', toMemberId: 'm-b', currency: 'USD', amount: 50 },
+    ]);
+  });
+
+  it('drops a debt once a settlement zeroes the pair', () => {
+    const expense: Expense = {
+      ...baseExpense,
+      amount: 60,
+      payerMemberId: 'm-a',
+      mode: 'equally',
+      shares: [
+        { memberId: 'm-a', value: null, locked: false },
+        { memberId: 'm-b', value: null, locked: false },
+      ],
+    };
+    const settlement: Settlement = {
+      id: 's-1',
+      tripId,
+      fromMemberId: 'm-b',
+      toMemberId: 'm-a',
+      amount: 30,
+      currency: 'EUR',
+      settledOn: '2026-05-29',
+    };
+    expect(
+      simplifyDebts(computeBalances([expense], members, [settlement])),
+    ).toEqual([]);
   });
 });
 

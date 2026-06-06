@@ -168,6 +168,100 @@ export function computeBalances(
 }
 
 /**
+ * Distinct currencies touched anywhere in the trip's balances, sorted
+ * alphabetically. Used to populate the currency picker when recording a
+ * settlement that isn't tied to a specific balance row.
+ */
+export function tripCurrencies(result: BalancesResult): string[] {
+  const seen = new Set<string>();
+  for (const balance of result.balances) {
+    for (const row of balance.byCurrency) {
+      seen.add(row.currency);
+    }
+  }
+  return [...seen].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * A directed debt: `from` should pay `to` `amount` in `currency` to settle.
+ * Derived from net balances, so it does not map 1:1 to any single expense.
+ */
+export interface DebtTransaction {
+  fromMemberId: string;
+  toMemberId: string;
+  currency: string;
+  amount: number;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Reduce per-currency net balances to a minimal set of directed transfers
+ * that settle everyone ("who owes whom"). For each currency independently,
+ * greedily matches the largest debtor to the largest creditor until all nets
+ * fall within `SETTLED_EPSILON`.
+ *
+ * This minimises the number of transfers, so a resulting debt may pair two
+ * members who never directly split an expense — the same any-to-any model the
+ * Settle sheet uses. Ordering is deterministic: nets are matched by descending
+ * magnitude with a stable `memberId` tie-break.
+ */
+export function simplifyDebts(result: BalancesResult): DebtTransaction[] {
+  const byCurrency = new Map<string, Map<string, number>>();
+  for (const balance of result.balances) {
+    for (const row of balance.byCurrency) {
+      if (Math.abs(row.net) < SETTLED_EPSILON) continue;
+      const nets = byCurrency.get(row.currency) ?? new Map<string, number>();
+      if (!byCurrency.has(row.currency)) byCurrency.set(row.currency, nets);
+      nets.set(balance.memberId, row.net);
+    }
+  }
+
+  const transactions: DebtTransaction[] = [];
+  const currencies = [...byCurrency.keys()].sort((a, b) => a.localeCompare(b));
+
+  for (const currency of currencies) {
+    const nets = byCurrency.get(currency)!;
+    // Mutable working copies: creditors (net > 0), debtors (net < 0).
+    const creditors = [...nets.entries()]
+      .filter(([, net]) => net > 0)
+      .map(([memberId, net]) => ({ memberId, amount: net }));
+    const debtors = [...nets.entries()]
+      .filter(([, net]) => net < 0)
+      .map(([memberId, net]) => ({ memberId, amount: -net }));
+
+    const sortByAmount = (
+      a: { memberId: string; amount: number },
+      b: { memberId: string; amount: number },
+    ) => b.amount - a.amount || a.memberId.localeCompare(b.memberId);
+
+    while (creditors.length > 0 && debtors.length > 0) {
+      creditors.sort(sortByAmount);
+      debtors.sort(sortByAmount);
+      const creditor = creditors[0];
+      const debtor = debtors[0];
+      const settled = Math.min(creditor.amount, debtor.amount);
+
+      transactions.push({
+        fromMemberId: debtor.memberId,
+        toMemberId: creditor.memberId,
+        currency,
+        amount: round2(settled),
+      });
+
+      creditor.amount -= settled;
+      debtor.amount -= settled;
+      if (creditor.amount < SETTLED_EPSILON) creditors.shift();
+      if (debtor.amount < SETTLED_EPSILON) debtors.shift();
+    }
+  }
+
+  return transactions.filter((t) => t.amount >= SETTLED_EPSILON);
+}
+
+/**
  * Resolve the current user's member id from the trip members list.
  */
 export function findMemberIdForUser(
