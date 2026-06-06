@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
-import { Radio, MoreHorizontal, Trash2, Calendar } from 'lucide-react';
+import { Radio, MoreHorizontal, Trash2, LogOut, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -29,6 +29,7 @@ import {
 } from '@/lib/trips/grouping';
 import { aggregateByCurrency } from '@/lib/trips/expenseTotals';
 import { useTrips } from '@/lib/trips/context';
+import { useAuth } from '@/lib/auth/context';
 import type { Trip } from '@/lib/trips/types';
 
 interface TripCardProps {
@@ -37,9 +38,26 @@ interface TripCardProps {
 }
 
 export function TripCard({ trip, highlight }: TripCardProps) {
-  const { removeTrip, expenses } = useTrips();
+  const { removeTrip, removeMember, expenses } = useTrips();
+  const { user, loading: authLoading } = useAuth();
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const now = new Date();
+
+  const isOwner = Boolean(user && trip.ownerId && trip.ownerId === user.id);
+  const myMembership = user
+    ? trip.members.find((m) => m.userId === user.id)
+    : undefined;
+  // Owner deletes; a non-owner member leaves. Until auth resolves (or for a
+  // user with no membership), show no destructive action at all.
+  const destructiveAction: 'delete' | 'leave' | null = authLoading
+    ? null
+    : isOwner
+      ? 'delete'
+      : myMembership
+        ? 'leave'
+        : null;
+
   const tripExpenses = expenses[trip.id] ?? [];
   const expenseTotals =
     tripExpenses.length > 0 ? aggregateByCurrency(tripExpenses, null) : null;
@@ -108,30 +126,45 @@ export function TripCard({ trip, highlight }: TripCardProps) {
                 {days} {days === 1 ? 'day' : 'days'}
               </span>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`More for ${trip.title}`}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <MoreHorizontal className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    setDeleteOpen(true);
-                  }}
-                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                >
-                  <Trash2 className="size-4" />
-                  Delete trip
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {destructiveAction && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`More for ${trip.title}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreHorizontal className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {destructiveAction === 'delete' ? (
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setDeleteOpen(true);
+                      }}
+                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                    >
+                      <Trash2 className="size-4" />
+                      Delete trip
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setLeaveOpen(true);
+                      }}
+                      className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                    >
+                      <LogOut className="size-4" />
+                      Leave trip
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           {ongoing && (currentItem || nextItem) ? (
@@ -225,6 +258,31 @@ export function TripCard({ trip, highlight }: TripCardProps) {
             const message =
               err instanceof Error ? err.message : 'Delete failed';
             toast.error(`Couldn't delete trip: ${message}`);
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={leaveOpen}
+        onOpenChange={setLeaveOpen}
+        title="Leave this trip?"
+        description="You'll lose access to this trip. If you have expense history, you'll be kept as a name-only entry so the splits and balances stay intact."
+        confirmLabel="Leave trip"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={async () => {
+          setLeaveOpen(false);
+          if (!myMembership) return;
+          try {
+            const result = await removeMember(trip.id, myMembership.id);
+            toast.success(
+              result.retired
+                ? 'You left the trip — your expenses stay on it'
+                : 'You left the trip',
+            );
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Leave failed';
+            toast.error(`Couldn't leave trip: ${message}`);
           }
         }}
       />
