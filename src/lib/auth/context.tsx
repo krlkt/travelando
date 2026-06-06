@@ -139,7 +139,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await fetch('/auth/signout', { method: 'POST' });
     } finally {
       await client.auth.signOut();
-      router.refresh();
+      // Redirect home rather than refreshing in place: refreshing on a
+      // trip detail page would re-run the server component, which calls
+      // notFound() for the now-signed-out user and yields a 404. replace()
+      // also drops the invalid URL from history.
+      router.replace('/');
     }
   }, [client, router]);
 
