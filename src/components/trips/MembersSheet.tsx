@@ -16,8 +16,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useTrips } from '@/lib/trips/context';
 import { useAuth } from '@/lib/auth/context';
+import { memberHasFootprint } from '@/lib/trips/memberRetire';
 import type { Trip, TripMember } from '@/lib/trips/types';
 
 interface MembersSheetProps {
@@ -55,7 +57,8 @@ function MembersSheetBody({
   onOpenChange: (open: boolean) => void;
 }) {
   const { user } = useAuth();
-  const { addMember, removeMember, inviteMember } = useTrips();
+  const { addMember, removeMember, inviteMember, expenses, settlements } =
+    useTrips();
 
   const isOwner = Boolean(user && trip.ownerId && trip.ownerId === user.id);
 
@@ -64,6 +67,7 @@ function MembersSheetBody({
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<TripMember | null>(null);
 
   // Per-row "invite by email" for an existing name-only member.
   const [invitingId, setInvitingId] = useState<string | null>(null);
@@ -127,24 +131,43 @@ function MembersSheetBody({
     }
   };
 
-  const handleRemove = async (member: TripMember) => {
+  const performRemove = async (member: TripMember) => {
+    const isLeaving = Boolean(member.userId && user?.id === member.userId);
     setRemovingId(member.id);
     try {
-      await removeMember(trip.id, member.id);
+      const result = await removeMember(trip.id, member.id);
       toast.success(
-        member.userId && user?.id === member.userId
-          ? 'You left the trip'
-          : 'Member removed',
+        result.retired
+          ? `Kept ${member.displayName} as a name-only entry — their expenses stay on the trip`
+          : isLeaving
+            ? 'You left the trip'
+            : 'Member removed',
       );
-      if (member.userId && user?.id === member.userId) {
-        onOpenChange(false);
-      }
+      if (isLeaving) onOpenChange(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Remove failed';
       toast.error(message);
     } finally {
       setRemovingId(null);
     }
+  };
+
+  // A member with expense history can't be deleted without corrupting splits
+  // and balances, so confirm that they'll be kept as a name-only entry first.
+  // Pending invites and footprint-free members are removed instantly.
+  const requestRemove = (member: TripMember) => {
+    const hasHistory =
+      member.status !== 'pending' &&
+      memberHasFootprint(
+        member.id,
+        expenses[trip.id] ?? [],
+        settlements[trip.id] ?? [],
+      );
+    if (hasHistory) {
+      setPendingRemoval(member);
+      return;
+    }
+    void performRemove(member);
   };
 
   const myMembership = user
@@ -328,7 +351,7 @@ function MembersSheetBody({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => handleRemove(member)}
+                      onClick={() => requestRemove(member)}
                       disabled={removingId === member.id}
                       aria-label={
                         isMe
@@ -390,7 +413,7 @@ function MembersSheetBody({
         {!isOwner && myMembership && (
           <Button
             variant="ghost"
-            onClick={() => handleRemove(myMembership)}
+            onClick={() => requestRemove(myMembership)}
             disabled={removingId === myMembership.id}
             className="text-muted-foreground hover:text-destructive"
           >
@@ -404,6 +427,34 @@ function MembersSheetBody({
           </Button>
         </SheetClose>
       </SheetFooter>
+
+      <ConfirmDialog
+        open={pendingRemoval !== null}
+        onOpenChange={(next) => {
+          if (!next) setPendingRemoval(null);
+        }}
+        title={
+          pendingRemoval && user?.id === pendingRemoval.userId
+            ? 'Leave this trip?'
+            : 'Remove this member?'
+        }
+        description={
+          pendingRemoval
+            ? `${pendingRemoval.displayName} has expense history on this trip. They'll be kept as a name-only entry so the splits and balances stay intact, but they'll lose access to the trip.`
+            : undefined
+        }
+        confirmLabel={
+          pendingRemoval && user?.id === pendingRemoval.userId
+            ? 'Leave trip'
+            : 'Remove member'
+        }
+        destructive
+        onConfirm={() => {
+          const member = pendingRemoval;
+          setPendingRemoval(null);
+          if (member) void performRemove(member);
+        }}
+      />
     </>
   );
 }

@@ -1,3 +1,4 @@
+import type { RemoveMemberResult } from './memberRetire';
 import type {
   ActivityPlace,
   ActivityPlaceDraft,
@@ -63,7 +64,10 @@ export interface TripsRepository {
     memberId: string,
     patch: TripMemberPatch,
   ): Promise<TripMember>;
-  removeMember(tripId: string, memberId: string): Promise<void>;
+  // Removes a member. A member with no financial footprint is deleted; one who
+  // paid, appears in a split, or settled is retired into a name-only member so
+  // expense history and balances stay intact.
+  removeMember(tripId: string, memberId: string): Promise<RemoveMemberResult>;
   // Convert an existing (name-only) member into a pending invite, or send a
   // fresh pending invite. Access is granted only once the invitee accepts.
   inviteMember(

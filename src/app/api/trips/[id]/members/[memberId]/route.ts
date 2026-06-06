@@ -90,10 +90,10 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
 
   try {
     const repo = createSupabaseRepository(supabase);
-    await repo.removeMember(id, memberId);
+    const result = await repo.removeMember(id, memberId);
     revalidatePath(`/trips/${id}`);
     revalidatePath('/trips');
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, data: result });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown_error';
     return NextResponse.json(

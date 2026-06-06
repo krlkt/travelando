@@ -33,6 +33,7 @@ import {
   type TripRow,
 } from './mappers';
 import type { TripsRepository } from './repository';
+import type { RemoveMemberResult } from './memberRetire';
 import type {
   ActivityPlace,
   ActivityPlaceDraft,
@@ -524,16 +525,37 @@ export function createSupabaseRepository(
       return rowToMember(row);
     },
 
-    async removeMember(tripId: string, memberId: string): Promise<void> {
+    async removeMember(
+      tripId: string,
+      memberId: string,
+    ): Promise<RemoveMemberResult> {
       if (isDemoTrip(tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
-      const { error } = await client
-        .from('trip_members')
-        .delete()
-        .eq('id', memberId)
-        .eq('trip_id', tripId);
+
+      // The RPC deletes footprint-free members and retires the rest into a
+      // name-only member so expense history and balances stay intact. It returns
+      // the retired row directly: a self-leave nulls the caller's user_id, which
+      // revokes their access, so a follow-up SELECT would be hidden by RLS.
+      const { data, error } = await client.rpc('remove_trip_member', {
+        p_trip_id: tripId,
+        p_member_id: memberId,
+      });
       if (error) {
-        throw new Error(`removeMember ${memberId}: ${error.message}`);
+        const known = [
+          'owner_cannot_leave',
+          'not_authorized',
+          'member_not_found',
+          'trip_not_found',
+        ];
+        const match = known.find((k) => error.message.includes(k));
+        throw new Error(match ?? `removeMember ${memberId}: ${error.message}`);
       }
+
+      const result = data as
+        | { outcome: 'deleted' }
+        | { outcome: 'retired'; member: TripMemberRow }
+        | null;
+      if (result?.outcome !== 'retired') return { retired: false };
+      return { retired: true, member: rowToMember(result.member) };
     },
 
     async listExpenses(tripId: string): Promise<Expense[]> {

@@ -32,6 +32,7 @@ import type {
   TripMemberDraft,
   TripMemberPatch,
 } from './types';
+import type { RemoveMemberResult } from './memberRetire';
 import { DEMO_TRIP_PROTECTED_ERROR, isDemoTrip } from './demoTrips';
 
 interface TripsState {
@@ -84,7 +85,10 @@ interface TripsState {
     memberId: string,
     patch: TripMemberPatch,
   ) => Promise<void>;
-  removeMember: (tripId: string, memberId: string) => Promise<void>;
+  removeMember: (
+    tripId: string,
+    memberId: string,
+  ) => Promise<RemoveMemberResult>;
   inviteMember: (
     tripId: string,
     memberId: string,
@@ -710,7 +714,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   );
 
   const removeMember = useCallback(
-    async (tripId: string, memberId: string): Promise<void> => {
+    async (tripId: string, memberId: string): Promise<RemoveMemberResult> => {
       let snapshot: TripMember | undefined;
       setTrips((prev) =>
         prev.map((t) => {
@@ -723,9 +727,22 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
         }),
       );
       try {
-        await callApi<null>(`/api/trips/${tripId}/members/${memberId}`, {
-          method: 'DELETE',
-        });
+        const result = await callApi<RemoveMemberResult>(
+          `/api/trips/${tripId}/members/${memberId}`,
+          { method: 'DELETE' },
+        );
+        // A retired member keeps their row as a name-only participant so their
+        // expense history and balances stay intact — re-insert it in place of
+        // the optimistic removal.
+        if (result?.retired) {
+          const retired = result.member;
+          setTrips((prev) =>
+            prev.map((t) =>
+              t.id === tripId ? { ...t, members: [...t.members, retired] } : t,
+            ),
+          );
+        }
+        return result ?? { retired: false };
       } catch (err) {
         if (snapshot) {
           const restored = snapshot;

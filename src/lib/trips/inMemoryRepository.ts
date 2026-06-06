@@ -257,6 +257,7 @@ export function createInMemoryRepository(
           ? { ...t, members: t.members.filter((m) => m.id !== memberId) }
           : t,
       );
+      return { retired: false };
     },
     async inviteMember(tripId, memberId, draft: MemberInviteDraft) {
       let updated: TripMember | null = null;
