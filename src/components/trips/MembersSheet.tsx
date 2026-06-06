@@ -93,7 +93,7 @@ function MembersSheetBody({
       });
       toast.success(
         mode === 'email'
-          ? 'Invite sent — they can accept it from their dashboard'
+          ? 'Invite email sent — they can also accept it from their dashboard'
           : 'Member added',
       );
       setEmail('');

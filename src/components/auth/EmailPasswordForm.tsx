@@ -32,7 +32,11 @@ export function EmailPasswordForm({ mode }: EmailPasswordFormProps) {
       ? nextParam
       : '/trips';
 
-  const [email, setEmail] = useState('');
+  // Invite links land here with the invited address; pre-fill it (still
+  // editable) so the trigger can link the pending invite at sign-up.
+  const emailParam = search.get('email')?.trim() ?? '';
+
+  const [email, setEmail] = useState(emailParam);
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});

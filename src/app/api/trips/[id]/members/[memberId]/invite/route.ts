@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createSupabaseRepository } from '@/lib/trips/supabaseRepository';
 import { memberInviteSchema } from '@/lib/trips/schemas';
 import { DEMO_TRIP_PROTECTED_ERROR, isDemoTrip } from '@/lib/trips/demoTrips';
+import { notifyInvitedMember } from '@/lib/email/notifyInvitedMember';
 
 interface RouteContext {
   params: Promise<{ id: string; memberId: string }>;
@@ -60,8 +61,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
   try {
     const repo = createSupabaseRepository(supabase);
     const member = await repo.inviteMember(id, memberId, parsed.data);
+    const emailSent = await notifyInvitedMember(repo, id, member, user);
     revalidatePath(`/trips/${id}`);
-    return NextResponse.json({ success: true, data: member });
+    return NextResponse.json({
+      success: true,
+      data: member,
+      meta: { emailSent },
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown_error';
     const status =

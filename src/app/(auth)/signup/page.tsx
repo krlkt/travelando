@@ -7,7 +7,18 @@ import { Separator } from '@/components/ui/separator';
 
 export const metadata = { title: 'Sign up · Travelando' };
 
-export default function SignUpPage() {
+interface SignUpPageProps {
+  searchParams: Promise<{ email?: string; next?: string }>;
+}
+
+export default async function SignUpPage({ searchParams }: SignUpPageProps) {
+  const params = await searchParams;
+  const invitedEmail = params.email?.trim();
+  const next =
+    params.next?.startsWith('/') && !params.next.startsWith('//')
+      ? params.next
+      : '/trips';
+
   return (
     <AuthCard
       eyebrow="Get started"
@@ -27,7 +38,8 @@ export default function SignUpPage() {
       }
     >
       <div className="space-y-4">
-        <GoogleButton label="Sign up with Google" />
+        {invitedEmail && <InviteNotice email={invitedEmail} />}
+        <GoogleButton label="Sign up with Google" redirectTo={next} />
         <DividerWithLabel label="or with email" />
         <Suspense fallback={null}>
           <EmailPasswordForm mode="sign-up" />
@@ -38,6 +50,18 @@ export default function SignUpPage() {
         </p>
       </div>
     </AuthCard>
+  );
+}
+
+function InviteNotice({ email }: { email: string }) {
+  return (
+    <div className="rounded-[var(--radius)] border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-relaxed text-amber-700 dark:text-amber-300">
+      <p className="font-medium">You&apos;ve been invited to a trip</p>
+      <p className="text-amber-700/80 dark:text-amber-300/80">
+        Finish signing up with <strong>{email}</strong> — by email or with
+        Google — and the invite will be waiting on your dashboard.
+      </p>
+    </div>
   );
 }
 
