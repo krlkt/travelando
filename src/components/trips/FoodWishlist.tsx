@@ -1,12 +1,24 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
-import { Pencil, Plus, Trash2, UtensilsCrossed } from 'lucide-react';
+import {
+  CalendarCheck,
+  Pencil,
+  Plus,
+  Trash2,
+  UtensilsCrossed,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { FoodPlaceSheet } from './FoodPlaceSheet';
 import { WantLevel } from './WantLevel';
 import { useTrips } from '@/lib/trips/context';
 import { deriveCitiesByDay, foodPlaceCitiesForDay } from '@/lib/trips/cities';
+import { isPlaceInTimeline } from '@/lib/trips/wishlistStatus';
 import { toast } from 'sonner';
 import type { FoodPlace, Trip } from '@/lib/trips/types';
 import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
@@ -35,6 +47,15 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
   const placesForTrip = foodPlaces[tripId];
 
   const places = useMemo(() => placesForTrip ?? [], [placesForTrip]);
+
+  // Places already represented by a timeline item (matched by location).
+  const plannedIds = useMemo(
+    () =>
+      new Set(
+        places.filter((p) => isPlaceInTimeline(p, trip.items)).map((p) => p.id),
+      ),
+    [places, trip.items],
+  );
 
   const cities = useMemo(() => {
     if (dayKey) {
@@ -71,13 +92,18 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
       if (!byCity.has(key)) byCity.set(key, []);
       byCity.get(key)!.push(place);
     }
-    // Highest want level first within each city; unrated sink to the bottom.
-    // Array.sort is stable, so equal levels keep their original order.
+    // Places already in the timeline sink to the bottom; otherwise highest want
+    // level first. Array.sort is stable, so ties keep their original order.
     for (const cityPlaces of byCity.values()) {
-      cityPlaces.sort((a, b) => (b.wantLevel ?? 0) - (a.wantLevel ?? 0));
+      cityPlaces.sort((a, b) => {
+        const aPlanned = plannedIds.has(a.id);
+        const bPlanned = plannedIds.has(b.id);
+        if (aPlanned !== bPlanned) return aPlanned ? 1 : -1;
+        return (b.wantLevel ?? 0) - (a.wantLevel ?? 0);
+      });
     }
     return byCity;
-  }, [places, cities]);
+  }, [places, cities, plannedIds]);
 
   function openAdd(city: { cityLabel: string; cityPlaceId?: string }) {
     setEditingPlace(null);
@@ -194,6 +220,22 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
                           </PlaceAddressLink>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
+                          {plannedIds.has(place.id) && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  tabIndex={0}
+                                  aria-label="Already in your itinerary"
+                                  className="text-primary flex items-center"
+                                >
+                                  <CalendarCheck className="size-3.5" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Already in your itinerary
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                           <WantLevel mode="indicator" value={place.wantLevel} />
                           <div className="flex items-center gap-1 sm:opacity-0 sm:transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
                             <Button
