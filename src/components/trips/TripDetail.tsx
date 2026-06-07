@@ -579,7 +579,7 @@ function DayContent({
             ))}
             <div className="ml-[3.25rem] sm:ml-[4rem]">
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 onClick={() => onAdd(bucket.date)}
                 className="text-muted-foreground hover:text-foreground"
