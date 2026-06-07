@@ -3,6 +3,7 @@ import {
   activityPlaceDraftToInsert,
   activityPlacePatchToUpdate,
   cityOverrideDraftToInsert,
+  dayPlanDraftToInsert,
   expenseDraftToInsert,
   expensePatchToUpdate,
   expenseSharesToInsert,
@@ -12,6 +13,7 @@ import {
   itemPatchToUpdate,
   rowToActivityPlace,
   rowToCityOverride,
+  rowToDayPlan,
   rowToExpense,
   rowToFoodPlace,
   rowToInvitation,
@@ -24,6 +26,7 @@ import {
   tripPatchToUpdate,
   type ActivityPlaceRow,
   type CityOverrideRow,
+  type DayPlanRow,
   type ExpenseRow,
   type FoodPlaceRow,
   type SettlementRow,
@@ -39,6 +42,8 @@ import type {
   ActivityPlaceDraft,
   CityOverride,
   CityOverrideDraft,
+  DayPlan,
+  DayPlanDraft,
   Expense,
   ExpenseDraft,
   ExpensePatch,
@@ -344,6 +349,32 @@ export function createSupabaseRepository(
         .delete()
         .eq('id', id);
       if (error) throw new Error(`removeCityOverride ${id}: ${error.message}`);
+    },
+
+    async listDayPlans(tripId: string): Promise<DayPlan[]> {
+      const { data, error } = await client
+        .from('day_plans')
+        .select('*')
+        .eq('trip_id', tripId);
+      if (error) throw new Error(`listDayPlans: ${error.message}`);
+      return (data ?? []).map((r) => rowToDayPlan(r as DayPlanRow));
+    },
+
+    async upsertDayPlan(draft: DayPlanDraft): Promise<DayPlan> {
+      if (isDemoTrip(draft.tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
+      const insert = dayPlanDraftToInsert(draft);
+      const { data, error } = await client
+        .from('day_plans')
+        .upsert(insert, { onConflict: 'trip_id,day_key' })
+        .select('*')
+        .single();
+      const row = unwrap(data as DayPlanRow | null, error, 'upsertDayPlan');
+      return rowToDayPlan(row);
+    },
+
+    async removeDayPlan(id: string): Promise<void> {
+      const { error } = await client.from('day_plans').delete().eq('id', id);
+      if (error) throw new Error(`removeDayPlan ${id}: ${error.message}`);
     },
 
     async listMembers(tripId: string): Promise<TripMember[]> {

@@ -142,6 +142,11 @@ export const cityOverrideDraftSchema = z.object({
   cityPlaceId: z.string().optional(),
 });
 
+export const dayPlanDraftSchema = z.object({
+  tripId: z.string().min(1),
+  dayKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
 export const expenseSplitModeSchema = z.enum(['equally', 'parts', 'amounts']);
 
 export const expenseCategorySchema = z.enum([

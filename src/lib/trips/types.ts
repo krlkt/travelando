@@ -160,6 +160,15 @@ export interface DayCityBucket {
   segments: CitySegment[];
 }
 
+/** A trip day the user has marked as "planned enough" (done). */
+export interface DayPlan {
+  id: string;
+  tripId: string;
+  dayKey: string;
+}
+
+export type DayPlanDraft = Omit<DayPlan, 'id'>;
+
 export type FoodPlaceDraft = Omit<FoodPlace, 'id'>;
 
 export type ActivityPlaceCategory =

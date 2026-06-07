@@ -1,6 +1,8 @@
 import type {
   CityOverride,
   CityOverrideDraft,
+  DayPlan,
+  DayPlanDraft,
   ActivityPlace,
   ActivityPlaceDraft,
   Expense,
@@ -372,6 +374,29 @@ export function cityOverrideDraftToInsert(
     day_key: draft.dayKey,
     city_label: draft.cityLabel,
     city_place_id: draft.cityPlaceId ?? null,
+  };
+}
+
+export interface DayPlanRow {
+  id: string;
+  trip_id: string;
+  day_key: string;
+}
+
+export function rowToDayPlan(row: DayPlanRow): DayPlan {
+  return {
+    id: row.id,
+    tripId: row.trip_id,
+    dayKey: row.day_key,
+  };
+}
+
+export function dayPlanDraftToInsert(
+  draft: DayPlanDraft,
+): Omit<DayPlanRow, 'id'> {
+  return {
+    trip_id: draft.tripId,
+    day_key: draft.dayKey,
   };
 }
 

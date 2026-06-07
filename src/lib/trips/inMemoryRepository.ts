@@ -5,6 +5,8 @@ import type {
   ActivityPlaceDraft,
   CityOverride,
   CityOverrideDraft,
+  DayPlan,
+  DayPlanDraft,
   Expense,
   ExpenseDraft,
   ExpensePatch,
@@ -40,6 +42,7 @@ export function createInMemoryRepository(
   let foodPlaces: FoodPlace[] = [];
   let activityPlaces: ActivityPlace[] = [];
   let cityOverrides: CityOverride[] = [];
+  let dayPlans: DayPlan[] = [];
   let expenses: Expense[] = [];
   let settlements: Settlement[] = [];
 
@@ -205,6 +208,22 @@ export function createInMemoryRepository(
     },
     async removeCityOverride(id) {
       cityOverrides = cityOverrides.filter((o) => o.id !== id);
+    },
+
+    async listDayPlans(tripId) {
+      return dayPlans.filter((p) => p.tripId === tripId).map((p) => ({ ...p }));
+    },
+    async upsertDayPlan(draft: DayPlanDraft) {
+      const existing = dayPlans.find(
+        (p) => p.tripId === draft.tripId && p.dayKey === draft.dayKey,
+      );
+      if (existing) return { ...existing };
+      const plan: DayPlan = { ...draft, id: randomId('dp') };
+      dayPlans = [...dayPlans, plan];
+      return { ...plan };
+    },
+    async removeDayPlan(id) {
+      dayPlans = dayPlans.filter((p) => p.id !== id);
     },
 
     async listMembers(tripId) {

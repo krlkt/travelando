@@ -8,6 +8,8 @@ import {
   ArrowLeft,
   Bed,
   CalendarDays,
+  Check,
+  CircleCheck,
   Map as MapIcon,
   MapPin,
   Plus,
@@ -27,6 +29,7 @@ import {
 } from '@/lib/trips/itemExpenseTotals';
 import { DayBackgroundStrip } from './DayBackgroundStrip';
 import { DayFillDot } from './DayFillDot';
+import { DayFinishedMark } from './DayFinishedMark';
 import { ItemDetailSheet } from './ItemDetailSheet';
 import { DayMap } from './DayMap';
 import { FoodWishlist } from './FoodWishlist';
@@ -60,7 +63,14 @@ interface TripDetailProps {
 }
 
 export function TripDetail({ tripId }: TripDetailProps) {
-  const { getTrip, loadTripExtras, cityOverrides, expenses } = useTrips();
+  const {
+    getTrip,
+    loadTripExtras,
+    cityOverrides,
+    dayPlans,
+    toggleDayPlan,
+    expenses,
+  } = useTrips();
   const { user } = useAuth();
   const trip = getTrip(tripId);
 
@@ -80,6 +90,11 @@ export function TripDetail({ tripId }: TripDetailProps) {
       (a, b) => a.date.getTime() - b.date.getTime(),
     );
   }, [trip, cityOverrides, tripId]);
+
+  const doneDayKeys = useMemo(
+    () => new Set((dayPlans[tripId] ?? []).map((p) => p.dayKey)),
+    [dayPlans, tripId],
+  );
 
   const defaultDay = useMemo(() => {
     if (current) {
@@ -261,17 +276,19 @@ export function TripDetail({ tripId }: TripDetailProps) {
                   className="no-scrollbar -mx-1 overflow-x-auto px-1"
                 >
                   <TabsList className="w-max min-w-full justify-start">
-                    {dayCityBuckets.map((bucket, idx) => {
+                    {dayCityBuckets.map((bucket) => {
                       const allItems = bucket.segments.flatMap((s) => s.items);
                       const itemCount = allItems.length;
                       const fillLevel = getDayFillLevel(
                         computeDayFillRatio(allItems, bucket.date),
                       );
+                      const isDone = doneDayKeys.has(bucket.key);
                       return (
                         <TabsTrigger
                           key={bucket.key}
                           value={bucket.key}
-                          className="shrink-0 px-2.5 sm:px-4"
+                          data-done={isDone || undefined}
+                          className="shrink-0 px-2.5 data-[done]:text-emerald-600 sm:px-4 dark:data-[done]:text-emerald-400"
                         >
                           <span className="sm:hidden">
                             {formatShortDate(bucket.date.toISOString())}
@@ -279,7 +296,11 @@ export function TripDetail({ tripId }: TripDetailProps) {
                           <span className="hidden sm:inline">
                             {formatDate(bucket.date.toISOString())}
                           </span>
-                          <DayFillDot level={fillLevel} />
+                          {isDone ? (
+                            <DayFinishedMark />
+                          ) : (
+                            <DayFillDot level={fillLevel} />
+                          )}
                           {itemCount > 0 && (
                             <Badge
                               variant="muted"
@@ -298,16 +319,47 @@ export function TripDetail({ tripId }: TripDetailProps) {
               {/* Day label + city + lodging indicator for active day */}
               {activeBucket && (
                 <>
-                  <div className="mt-1 mb-1">
-                    <span className="text-muted-foreground/70 text-xs font-medium">
-                      Day {activeBucketIdx + 1}
-                    </span>
-                    <span className="text-muted-foreground/40 mx-1.5 text-xs">
-                      ·
-                    </span>
-                    <span className="text-muted-foreground/70 text-xs">
-                      {formatDate(activeBucket.date.toISOString())}
-                    </span>
+                  <div className="mt-1 mb-1 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <span className="text-muted-foreground/70 text-xs font-medium">
+                        Day {activeBucketIdx + 1}
+                      </span>
+                      <span className="text-muted-foreground/40 mx-1.5 text-xs">
+                        ·
+                      </span>
+                      <span className="text-muted-foreground/70 text-xs">
+                        {formatDate(activeBucket.date.toISOString())}
+                      </span>
+                    </div>
+                    {(() => {
+                      const isDone = doneDayKeys.has(activeBucket.key);
+                      return (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toggleDayPlan(tripId, activeBucket.key)
+                          }
+                          aria-pressed={isDone}
+                          title={
+                            isDone
+                              ? 'Marked as planned — click to undo'
+                              : 'Mark this day as planned enough'
+                          }
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                            isDone
+                              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-400'
+                              : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
+                          }`}
+                        >
+                          {isDone ? (
+                            <CircleCheck className="size-3.5" />
+                          ) : (
+                            <Check className="size-3.5" />
+                          )}
+                          {isDone ? 'Planned' : 'Mark planned'}
+                        </button>
+                      );
+                    })()}
                   </div>
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-1.5">

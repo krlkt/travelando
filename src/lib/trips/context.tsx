@@ -14,6 +14,7 @@ import type {
   ActivityPlaceDraft,
   CityOverride,
   CityOverrideDraft,
+  DayPlan,
   Expense,
   ExpenseDraft,
   ExpensePatch,
@@ -52,6 +53,7 @@ interface TripsState {
   foodPlaces: Record<string, FoodPlace[]>;
   activityPlaces: Record<string, ActivityPlace[]>;
   cityOverrides: Record<string, CityOverride[]>;
+  dayPlans: Record<string, DayPlan[]>;
   expenses: Record<string, Expense[]>;
   settlements: Record<string, Settlement[]>;
   loadTripExtras: (tripId: string) => Promise<void>;
@@ -69,6 +71,8 @@ interface TripsState {
   removeActivityPlace: (tripId: string, id: string) => Promise<void>;
   upsertCityOverride: (draft: CityOverrideDraft) => Promise<void>;
   removeCityOverride: (tripId: string, id: string) => Promise<void>;
+  /** Mark a day planned (no existing plan) or unmark it (toggle). */
+  toggleDayPlan: (tripId: string, dayKey: string) => Promise<void>;
   addExpense: (draft: ExpenseDraft) => Promise<Expense>;
   updateExpense: (
     tripId: string,
@@ -165,6 +169,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   const [cityOverrides, setCityOverrides] = useState<
     Record<string, CityOverride[]>
   >({});
+  const [dayPlans, setDayPlans] = useState<Record<string, DayPlan[]>>({});
   const [expenses, setExpenses] = useState<Record<string, Expense[]>>({});
   const [settlements, setSettlements] = useState<Record<string, Settlement[]>>(
     {},
@@ -354,16 +359,18 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   );
 
   const loadTripExtras = useCallback(async (tripId: string): Promise<void> => {
-    const [fp, ap, co, ex, st] = await Promise.all([
+    const [fp, ap, co, dp, ex, st] = await Promise.all([
       callApi<FoodPlace[]>(`/api/trips/${tripId}/food-places`),
       callApi<ActivityPlace[]>(`/api/trips/${tripId}/activity-places`),
       callApi<CityOverride[]>(`/api/trips/${tripId}/city-overrides`),
+      callApi<DayPlan[]>(`/api/trips/${tripId}/day-plans`),
       callApi<Expense[]>(`/api/trips/${tripId}/expenses`),
       callApi<Settlement[]>(`/api/trips/${tripId}/settlements`),
     ]);
     setFoodPlaces((prev) => ({ ...prev, [tripId]: fp ?? [] }));
     setActivityPlaces((prev) => ({ ...prev, [tripId]: ap ?? [] }));
     setCityOverrides((prev) => ({ ...prev, [tripId]: co ?? [] }));
+    setDayPlans((prev) => ({ ...prev, [tripId]: dp ?? [] }));
     setExpenses((prev) => ({ ...prev, [tripId]: ex ?? [] }));
     setSettlements((prev) => ({ ...prev, [tripId]: st ?? [] }));
   }, []);
@@ -523,6 +530,41 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       }
     },
     [loadTripExtras],
+  );
+
+  const toggleDayPlan = useCallback(
+    async (tripId: string, dayKey: string): Promise<void> => {
+      const existing = (dayPlans[tripId] ?? []).find(
+        (p) => p.dayKey === dayKey,
+      );
+      if (existing) {
+        setDayPlans((prev) => ({
+          ...prev,
+          [tripId]: (prev[tripId] ?? []).filter((p) => p.id !== existing.id),
+        }));
+        try {
+          await callApi<null>(`/api/day-plans/${existing.id}`, {
+            method: 'DELETE',
+          });
+        } catch (err) {
+          await loadTripExtras(tripId);
+          throw err;
+        }
+        return;
+      }
+      const result = await callApi<DayPlan>(`/api/trips/${tripId}/day-plans`, {
+        method: 'POST',
+        body: JSON.stringify({ dayKey }),
+      });
+      if (result) {
+        setDayPlans((prev) => {
+          const current = prev[tripId] ?? [];
+          const filtered = current.filter((p) => p.dayKey !== dayKey);
+          return { ...prev, [tripId]: [...filtered, result] };
+        });
+      }
+    },
+    [dayPlans, loadTripExtras],
   );
 
   const addExpense = useCallback(
@@ -906,6 +948,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       foodPlaces,
       activityPlaces,
       cityOverrides,
+      dayPlans,
       expenses,
       settlements,
       loadTripExtras,
@@ -917,6 +960,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       removeActivityPlace,
       upsertCityOverride,
       removeCityOverride,
+      toggleDayPlan,
       addExpense,
       updateExpense,
       removeExpense,
@@ -943,6 +987,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       foodPlaces,
       activityPlaces,
       cityOverrides,
+      dayPlans,
       expenses,
       settlements,
       loadTripExtras,
@@ -954,6 +999,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       removeActivityPlace,
       upsertCityOverride,
       removeCityOverride,
+      toggleDayPlan,
       addExpense,
       updateExpense,
       removeExpense,

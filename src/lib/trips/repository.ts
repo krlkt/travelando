@@ -4,6 +4,8 @@ import type {
   ActivityPlaceDraft,
   CityOverride,
   CityOverrideDraft,
+  DayPlan,
+  DayPlanDraft,
   Expense,
   ExpenseDraft,
   ExpensePatch,
@@ -56,6 +58,10 @@ export interface TripsRepository {
   listCityOverrides(tripId: string): Promise<CityOverride[]>;
   upsertCityOverride(draft: CityOverrideDraft): Promise<CityOverride>;
   removeCityOverride(id: string): Promise<void>;
+
+  listDayPlans(tripId: string): Promise<DayPlan[]>;
+  upsertDayPlan(draft: DayPlanDraft): Promise<DayPlan>;
+  removeDayPlan(id: string): Promise<void>;
 
   listMembers(tripId: string): Promise<TripMember[]>;
   addMember(tripId: string, draft: TripMemberDraft): Promise<TripMember>;
