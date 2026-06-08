@@ -24,21 +24,13 @@ import {
 import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
 import { WantLevel } from './WantLevel';
 import { useTrips } from '@/lib/trips/context';
+import { FOOD_CATEGORIES as CATEGORIES } from '@/lib/trips/categoryLabels';
 import type {
   FoodPlace,
   FoodPlaceCategory,
   FoodPlaceDraft,
   Place,
 } from '@/lib/trips/types';
-
-const CATEGORIES: { value: FoodPlaceCategory; label: string }[] = [
-  { value: 'restaurant', label: 'Restaurant' },
-  { value: 'cafe', label: 'Café' },
-  { value: 'bar', label: 'Bar' },
-  { value: 'food', label: 'Street food' },
-  { value: 'drink', label: 'Drinks' },
-  { value: 'other', label: 'Other' },
-];
 
 interface FoodPlaceSheetProps {
   tripId: string;

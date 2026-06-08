@@ -31,8 +31,15 @@ import {
   SheetClose,
 } from '@/components/ui/sheet';
 import { WantLevel } from './WantLevel';
+import { WishlistFilterControls } from './WishlistFilterControls';
 import { useTrips } from '@/lib/trips/context';
 import { buildDayMapPoints, type DayMapPoint } from '@/lib/trips/dayMapPoints';
+import {
+  availableWishCategories,
+  DEFAULT_WISHLIST_FILTER,
+  filterDayMapPoints,
+  type WishlistFilter,
+} from '@/lib/trips/wishlistFilter';
 import { isMapConfigured, type MapTheme } from '@/lib/map/style';
 import { formatDistance, walkMinutes } from '@/lib/map/distance';
 import {
@@ -111,7 +118,9 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
   const theme = useMapTheme();
   const tripId = trip.id;
 
-  const [showWishlist, setShowWishlist] = useState(true);
+  const [wishFilter, setWishFilter] = useState<WishlistFilter>(
+    DEFAULT_WISHLIST_FILTER,
+  );
   const [selectedWish, setSelectedWish] = useState<DayMapPoint | null>(null);
   const [time, setTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -194,11 +203,13 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
   );
 
   const visiblePoints = useMemo(
-    () =>
-      showWishlist
-        ? points
-        : points.filter((p) => p.kind === 'scheduled' || p.kind === 'lodging'),
-    [points, showWishlist],
+    () => filterDayMapPoints(points, wishFilter),
+    [points, wishFilter],
+  );
+
+  const wishCategories = useMemo(
+    () => availableWishCategories(points),
+    [points],
   );
 
   const handleSelectPoint = useCallback(
@@ -277,14 +288,8 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
     );
   }
 
-  const wishCounts = points.reduce(
-    (acc, p) => {
-      if (p.kind === 'foodWish') acc.food += 1;
-      if (p.kind === 'activityWish') acc.activity += 1;
-      return acc;
-    },
-    { food: 0, activity: 0 },
-  );
+  const hasWishes =
+    wishCategories.foodTotal > 0 || wishCategories.activityTotal > 0;
 
   const surfaceStyle: CSSProperties = expanded
     ? {
@@ -344,28 +349,23 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
       {mounted && createPortal(mapSurface, document.body)}
 
       {/* Legend + controls */}
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-        <LegendDot className="bg-[var(--kind-activity)]" label="Plan" />
-        <LegendDot className="bg-[var(--kind-lodging)]" label="Staying" />
-        {(wishCounts.food > 0 || wishCounts.activity > 0) && (
-          <button
-            type="button"
-            onClick={() => setShowWishlist((v) => !v)}
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 underline-offset-2 hover:underline"
-            aria-pressed={showWishlist}
-          >
-            <span
-              className={`size-2.5 rounded-full border border-dashed ${showWishlist ? 'border-[var(--kind-meal)] bg-[var(--kind-meal)]/20' : 'border-muted-foreground/40'}`}
-            />
-            {showWishlist ? 'Hide' : 'Show'} wishlists ({wishCounts.food} food ·{' '}
-            {wishCounts.activity} activity)
-          </button>
-        )}
-        {unlocatedCount > 0 && (
-          <span className="text-muted-foreground/70">
-            {unlocatedCount} {unlocatedCount === 1 ? 'item has' : 'items have'}{' '}
-            no location yet
-          </span>
+      <div className="mt-3 flex flex-col gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <LegendDot className="bg-[var(--kind-activity)]" label="Plan" />
+          <LegendDot className="bg-[var(--kind-lodging)]" label="Staying" />
+          {unlocatedCount > 0 && (
+            <span className="text-muted-foreground/70">
+              {unlocatedCount}{' '}
+              {unlocatedCount === 1 ? 'item has' : 'items have'} no location yet
+            </span>
+          )}
+        </div>
+        {hasWishes && (
+          <WishlistFilterControls
+            available={wishCategories}
+            filter={wishFilter}
+            onChange={setWishFilter}
+          />
         )}
       </div>
 

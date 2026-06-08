@@ -24,23 +24,13 @@ import {
 import { PlaceAutocomplete } from '@/components/places/PlaceAutocomplete';
 import { WantLevel } from './WantLevel';
 import { useTrips } from '@/lib/trips/context';
+import { ACTIVITY_CATEGORIES as CATEGORIES } from '@/lib/trips/categoryLabels';
 import type {
   ActivityPlace,
   ActivityPlaceCategory,
   ActivityPlaceDraft,
   Place,
 } from '@/lib/trips/types';
-
-const CATEGORIES: { value: ActivityPlaceCategory; label: string }[] = [
-  { value: 'sightseeing', label: 'Sightseeing' },
-  { value: 'museum', label: 'Museum' },
-  { value: 'outdoor', label: 'Outdoor' },
-  { value: 'entertainment', label: 'Entertainment' },
-  { value: 'tour', label: 'Tour' },
-  { value: 'shopping', label: 'Shopping' },
-  { value: 'nightlife', label: 'Nightlife' },
-  { value: 'other', label: 'Other' },
-];
 
 interface ActivityPlaceSheetProps {
   tripId: string;
