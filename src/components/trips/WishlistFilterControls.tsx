@@ -83,7 +83,7 @@ export function WishlistFilterControls({
                 : 'border-[var(--kind-meal)] bg-[var(--kind-meal)]/20'
             }`}
           />
-          {hidden ? 'Show wishlists' : 'Hide'}
+          {hidden ? 'Show' : 'Hide'}
         </button>
       </div>
 

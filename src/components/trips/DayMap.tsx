@@ -336,6 +336,17 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
         )}
         {expanded ? 'Exit' : 'Expand'}
       </button>
+      {expanded && hasWishes && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="border-border/60 bg-background/80 pointer-events-auto w-[min(34rem,calc(100vw-2rem))] rounded-[var(--radius-lg)] border px-4 py-3 shadow-lg backdrop-blur-md">
+            <WishlistFilterControls
+              available={wishCategories}
+              filter={wishFilter}
+              onChange={setWishFilter}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 
