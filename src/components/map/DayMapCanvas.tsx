@@ -17,6 +17,7 @@ import type {
   ActivityWishMapPoint,
 } from '@/lib/trips/dayMapPoints';
 import { buildStyleUrl, type MapTheme } from '@/lib/map/style';
+import { buildDirectionsUrl } from '@/lib/places/maps-link';
 import { createMarkerElement } from './markers/createMarkerElement';
 import { createClusterElement } from './markers/createClusterElement';
 
@@ -30,6 +31,20 @@ const FIT_PADDING = 64;
 const SINGLE_POINT_ZOOM = 14;
 const ROUTE_SOURCE_ID = 'dm-route';
 const ROUTE_LAYER_ID = 'dm-route-line';
+// Transparent, wider line stacked over the visible route purely as a click
+// target — a 3px line is too thin to tap reliably.
+const ROUTE_HIT_LAYER_ID = 'dm-route-hit';
+const ROUTE_HIT_WIDTH = 20;
+
+/** Opens a Google Maps directions link, mirroring PlaceAddressLink's behavior. */
+function openExternal(url: string): void {
+  const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  if (isMobile) {
+    window.location.href = url;
+  } else {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
 // Pixel radius within which wishlist pins collapse into a "+N" cluster.
 const CLUSTER_RADIUS = 48;
 const CLUSTER_MAX_ZOOM = 18;
@@ -82,33 +97,47 @@ function fitToPoints(map: MlMap, points: DayMapPoint[]): void {
   map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: 15, animate });
 }
 
-/** Time-ordered LineString through the day's scheduled stops and lodging anchors. */
+/**
+ * Time-ordered route through the day's scheduled stops and lodging anchors,
+ * emitted as one LineString *per consecutive leg* so each segment can carry — and
+ * be clicked to open — its own A → B Google Maps directions link.
+ */
 function routeFeatureCollection(
   points: DayMapPoint[],
 ): GeoJSON.FeatureCollection<GeoJSON.LineString> {
   type RouteAnchor = ScheduledMapPoint | (LodgingMapPoint & { order: number });
-  const coordinates = points
+  const anchors = points
     .filter(
       (p): p is RouteAnchor =>
         p.kind === 'scheduled' || (p.kind === 'lodging' && p.order != null),
     )
     .slice()
-    .sort((a, b) => a.order - b.order)
-    .map((p) => [p.lng, p.lat]);
+    .sort((a, b) => a.order - b.order);
 
-  return {
-    type: 'FeatureCollection',
-    features:
-      coordinates.length >= 2
-        ? [
-            {
-              type: 'Feature',
-              properties: {},
-              geometry: { type: 'LineString', coordinates },
-            },
-          ]
-        : [],
-  };
+  const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+  for (let i = 0; i < anchors.length - 1; i += 1) {
+    const from = anchors[i];
+    const to = anchors[i + 1];
+    const directionsUrl = buildDirectionsUrl(from, to);
+    if (!directionsUrl) continue;
+    features.push({
+      type: 'Feature',
+      properties: {
+        directionsUrl,
+        originLabel: from.label,
+        destLabel: to.label,
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [from.lng, from.lat],
+          [to.lng, to.lat],
+        ],
+      },
+    });
+  }
+
+  return { type: 'FeatureCollection', features };
 }
 
 /**
@@ -305,6 +334,28 @@ export function DayMapCanvas({
           'line-width': 3,
           'line-opacity': 0.55,
         },
+      });
+      map.addLayer({
+        id: ROUTE_HIT_LAYER_ID,
+        type: 'line',
+        source: ROUTE_SOURCE_ID,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#000',
+          'line-width': ROUTE_HIT_WIDTH,
+          'line-opacity': 0,
+        },
+      });
+
+      map.on('click', ROUTE_HIT_LAYER_ID, (e) => {
+        const url = e.features?.[0]?.properties?.directionsUrl;
+        if (typeof url === 'string' && url) openExternal(url);
+      });
+      map.on('mouseenter', ROUTE_HIT_LAYER_ID, () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', ROUTE_HIT_LAYER_ID, () => {
+        map.getCanvas().style.cursor = '';
       });
 
       buildIndex();

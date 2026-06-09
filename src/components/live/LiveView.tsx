@@ -3,12 +3,20 @@
 import { useMemo } from 'react';
 import { notFound } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowRight, MapPin, Radio } from 'lucide-react';
+import {
+  ArrowRight,
+  ArrowUpRight,
+  MapPin,
+  Navigation,
+  Radio,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useTrips } from '@/lib/trips/context';
 import { findCurrentItem, findNextItem } from '@/lib/trips/grouping';
 import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
 import { routeHeadline, routeStations } from '@/lib/trips/transportRoute';
+import { directionsForItem } from '@/lib/trips/itemDirections';
+import { openMapsLink } from '@/lib/places/maps-link';
 import { formatTime, dayKey, relativeFromNow } from '@/lib/time/formatDate';
 import { useNow } from '@/lib/time/useNow';
 import { spring } from '@/lib/motion/presets';
@@ -190,6 +198,63 @@ function DayList({
   );
 }
 
+/**
+ * Tactile Google Maps CTA, adapted to the item:
+ *  - normal stops get a "Get directions" link that routes from the device's
+ *    live location to the place;
+ *  - a transport item is itself an A → B journey, so it shows that leg's own
+ *    "{from} → {to}" route instead of a redundant "navigate to it" link.
+ * Renders nothing when the item has no usable location.
+ */
+function DirectionsCta({ item, accent }: { item: TripItem; accent: string }) {
+  const directions = directionsForItem(item);
+  if (!directions) return null;
+
+  const isRoute = directions.kind === 'route';
+  const Icon =
+    isRoute && item.transportMode
+      ? transportIcons[item.transportMode]
+      : Navigation;
+
+  return (
+    <button
+      type="button"
+      onClick={() => openMapsLink(directions.url)}
+      aria-label={
+        isRoute
+          ? `View route from ${directions.fromLabel} to ${directions.toLabel} in Google Maps`
+          : `Get directions to ${directions.toLabel} in Google Maps`
+      }
+      className="group/dir border-border/60 bg-background/70 hover:border-foreground/15 focus-visible:ring-ring/60 relative mt-4 flex w-full items-center gap-3 rounded-full border py-2 pr-3 pl-2 text-left transition-[transform,border-color,box-shadow] hover:-translate-y-px hover:shadow-[0_14px_30px_-18px_oklch(20%_0.02_250_/_0.35)] focus-visible:ring-2 focus-visible:outline-none active:translate-y-0"
+    >
+      <span
+        aria-hidden
+        className="text-background grid size-9 shrink-0 place-items-center rounded-full transition-transform group-hover/dir:scale-105"
+        style={{ background: accent }}
+      >
+        <Icon className="size-4" strokeWidth={2} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm leading-tight font-medium">
+          {isRoute ? 'View route' : 'Get directions'}
+        </span>
+        {isRoute ? (
+          <span className="text-muted-foreground flex min-w-0 items-center gap-1 text-xs leading-tight">
+            <span className="truncate">{directions.fromLabel}</span>
+            <ArrowRight className="size-3 shrink-0 opacity-60" />
+            <span className="truncate">{directions.toLabel}</span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground block truncate text-xs leading-tight">
+            to {directions.toLabel}
+          </span>
+        )}
+      </span>
+      <ArrowUpRight className="text-muted-foreground/70 mr-1 size-4 shrink-0 transition-transform group-hover/dir:translate-x-0.5 group-hover/dir:-translate-y-0.5" />
+    </button>
+  );
+}
+
 function NowCard({ item, now }: { item: TripItem; now: Date }) {
   const meta = kindMeta[item.kind];
   const Icon =
@@ -340,6 +405,7 @@ function NextCard({ item, now }: { item: TripItem; now: Date }) {
           {formatTime(item.startsAt)}
         </span>
       </div>
+      <DirectionsCta item={item} accent={meta.accent} />
     </motion.section>
   );
 }
@@ -360,13 +426,18 @@ function DowntimeCard({ next, now }: { next: TripItem | null; now: Date }) {
         Nothing scheduled right now. Stretch, get a coffee, breathe.
       </p>
       {next && (
-        <div className="border-border/70 bg-background mt-5 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm">
-          <span className="text-muted-foreground">Next:</span>
-          <span className="font-medium">{next.title}</span>
-          <span className="text-muted-foreground">
-            · {relativeFromNow(next.startsAt, now)}
-          </span>
-        </div>
+        <>
+          <div className="border-border/70 bg-background mt-5 inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm">
+            <span className="text-muted-foreground">Next:</span>
+            <span className="font-medium">{next.title}</span>
+            <span className="text-muted-foreground">
+              · {relativeFromNow(next.startsAt, now)}
+            </span>
+          </div>
+          <div className="mx-auto max-w-xs">
+            <DirectionsCta item={next} accent={kindMeta[next.kind].accent} />
+          </div>
+        </>
       )}
     </motion.section>
   );

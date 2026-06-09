@@ -623,6 +623,7 @@ function DayContent({
                         bucketDate={bucket.date}
                         onSelect={() => onSelect(item)}
                         expenseTotal={itemExpenseTotals.get(item.id)}
+                        nextItem={seg.events[idx + 1]}
                       />
                     ))}
                   </motion.ol>
