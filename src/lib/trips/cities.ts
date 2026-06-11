@@ -217,6 +217,35 @@ export function lodgingForDay(trip: Trip, key: string): TripItem | null {
   );
 }
 
+/**
+ * The lodging you *woke up in* on `key` — checked in before the day began and
+ * still checked in at its start (typically a check-out later this morning).
+ * Distinct from {@link lodgingForDay}, which is where you sleep *that* night;
+ * the two coincide on the middle nights of a multi-night stay. Used to anchor
+ * the morning "hotel → first stop" leg.
+ */
+export function lodgingWakeUpForDay(trip: Trip, key: string): TripItem | null {
+  const date = new Date(`${key}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return null;
+  const dayStart = date.getTime();
+
+  const candidates = trip.items.filter((i) => {
+    if (i.kind !== 'lodging') return false;
+    if (!i.endsAt) return false;
+    const startTs = new Date(i.startsAt).getTime();
+    if (startTs >= dayStart) return false;
+    const endTs = new Date(i.endsAt).getTime();
+    return endTs > dayStart;
+  });
+
+  if (candidates.length === 0) return null;
+  return candidates.reduce((latest, item) =>
+    new Date(item.startsAt).getTime() > new Date(latest.startsAt).getTime()
+      ? item
+      : latest,
+  );
+}
+
 export function findLodgingConflict(
   trip: Trip,
   checkInIso: string,

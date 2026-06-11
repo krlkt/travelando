@@ -3,20 +3,17 @@
 import type { MouseEvent } from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Lock, MapPin, Navigation } from 'lucide-react';
-import type { Place, TripItem } from '@/lib/trips/types';
+import type { TripItem } from '@/lib/trips/types';
 import type { ItemExpenseTotal } from '@/lib/trips/itemExpenseTotals';
+import type { TransportPrefill } from '@/lib/trips/legGap';
 import { Badge } from '@/components/ui/badge';
 import { dayOffsetFrom, formatTime } from '@/lib/time/formatDate';
 import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
 import { routeHeadline, routeStations } from '@/lib/trips/transportRoute';
-import { itemEndPlace, itemStartPlace } from '@/lib/trips/itemLocation';
-import {
-  buildDirectionsUrl,
-  canRouteBetween,
-  openMapsLink,
-} from '@/lib/places/maps-link';
+import { timelineLegGap } from '@/lib/trips/legGap';
+import { openMapsLink } from '@/lib/places/maps-link';
 import { directionsForItem } from '@/lib/trips/itemDirections';
-import { isSamePlace } from '@/lib/places/samePlace';
+import { LegActions } from './LegActions';
 import { formatMoney } from '@/lib/trips/grouping';
 import { fadeUp, spring } from '@/lib/motion/presets';
 import { cn } from '@/lib/utils';
@@ -31,48 +28,8 @@ interface TimelineItemProps {
   expenseTotal?: ItemExpenseTotal;
   /** The next event in the timeline, used to offer A → B directions. */
   nextItem?: TripItem;
-}
-
-/**
- * Icon-only pill sitting on the connector rail between two items. Opens Google
- * Maps directions from the previous stop (A) to the next (B). The label is
- * hidden until hover/focus so dense days stay uncluttered.
- */
-function DirectionsLeg({
-  origin,
-  destination,
-  url,
-}: {
-  origin: Place;
-  destination: Place;
-  url: string;
-}) {
-  function handleClick(e: MouseEvent<HTMLAnchorElement>) {
-    e.stopPropagation();
-    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    if (isMobile) {
-      e.preventDefault();
-      window.location.href = url;
-    }
-  }
-
-  return (
-    <div className="group/leg absolute bottom-[0.9rem] left-[15px] z-10 -translate-x-1/2">
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={handleClick}
-        aria-label={`Directions from ${origin.label} to ${destination.label} in Google Maps`}
-        className="border-border bg-background text-muted-foreground/70 hover:border-foreground/25 hover:text-foreground focus-visible:ring-ring/60 relative grid size-5 place-items-center rounded-full border transition-[color,border-color,transform] hover:scale-110 focus-visible:ring-2 focus-visible:outline-none"
-      >
-        <Navigation className="size-2.5" strokeWidth={2.25} />
-        <span className="bg-foreground text-background pointer-events-none absolute left-full ml-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap opacity-0 transition-opacity group-focus-within/leg:opacity-100 group-hover/leg:opacity-100">
-          Directions
-        </span>
-      </a>
-    </div>
-  );
+  /** Opens the editor pre-filled with a transport item for the leg to nextItem. */
+  onAddTransport?: (prefill: TransportPrefill) => void;
 }
 
 function dayOffsetSuffix(offset: number): string {
@@ -90,6 +47,7 @@ export function TimelineItem({
   onSelect,
   expenseTotal,
   nextItem,
+  onAddTransport,
 }: TimelineItemProps) {
   const meta = kindMeta[item.kind];
   const Icon =
@@ -97,15 +55,9 @@ export function TimelineItem({
       ? transportIcons[item.transportMode]
       : meta.icon;
 
-  const legOrigin = itemEndPlace(item);
-  const legDestination = nextItem ? itemStartPlace(nextItem) : undefined;
-  const directionsUrl =
-    legOrigin &&
-    legDestination &&
-    !isSamePlace(legOrigin, legDestination) &&
-    canRouteBetween(legOrigin, legDestination)
-      ? buildDirectionsUrl(legOrigin, legDestination)
-      : null;
+  // The connector leg to the next stop: a directions link and/or a quick-add
+  // transport prefill when nothing already bridges the two places.
+  const leg = nextItem ? timelineLegGap(item, nextItem) : null;
 
   // A transport item is itself an A → B journey, so its route line doubles as a
   // directions link. It uses the "Depart from"/"Arrive at" waypoints (falling
@@ -159,7 +111,7 @@ export function TimelineItem({
         )}
       </div>
 
-      <div className={cn('relative pb-6', directionsUrl && 'pb-12')}>
+      <div className={cn('relative pb-6', !isLast && leg && 'pb-12')}>
         {!isLast && (
           <span
             aria-hidden
@@ -291,12 +243,19 @@ export function TimelineItem({
             </div>
           </div>
         </div>
-        {!isLast && directionsUrl && legOrigin && legDestination && (
-          <DirectionsLeg
-            origin={legOrigin}
-            destination={legDestination}
-            url={directionsUrl}
-          />
+        {!isLast && leg && (
+          <div className="absolute bottom-[0.7rem] left-[15px] z-10 -translate-x-1/2">
+            <LegActions
+              originLabel={leg.origin.label}
+              destinationLabel={leg.destination.label}
+              directionsUrl={leg.directionsUrl}
+              onAddTransport={
+                leg.prefill && onAddTransport
+                  ? () => onAddTransport(leg.prefill!)
+                  : undefined
+              }
+            />
+          </div>
         )}
       </div>
     </motion.li>

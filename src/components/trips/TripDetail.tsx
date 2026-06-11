@@ -47,7 +47,17 @@ import {
   isBackgroundItem,
 } from '@/lib/trips/grouping';
 import { computeDayFillRatio, getDayFillLevel } from '@/lib/trips/dayFill';
-import { deriveCitiesByDay, lodgingForDay } from '@/lib/trips/cities';
+import {
+  deriveCitiesByDay,
+  lodgingForDay,
+  lodgingWakeUpForDay,
+} from '@/lib/trips/cities';
+import {
+  hotelLegGap,
+  type LegGap,
+  type TransportPrefill,
+} from '@/lib/trips/legGap';
+import { LegActions } from './LegActions';
 import {
   formatDateRange,
   formatDate,
@@ -56,7 +66,12 @@ import {
   isOngoing,
 } from '@/lib/time/formatDate';
 import { fadeUp, stagger } from '@/lib/motion/presets';
-import type { CityOverride, DayCityBucket, TripItem } from '@/lib/trips/types';
+import type {
+  CityOverride,
+  DayCityBucket,
+  Trip,
+  TripItem,
+} from '@/lib/trips/types';
 
 interface TripDetailProps {
   tripId: string;
@@ -140,6 +155,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
   const [tripEditorOpen, setTripEditorOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<TripItem | null>(null);
   const [defaultDayDate, setDefaultDayDate] = useState<Date | null>(null);
+  const [itemPrefill, setItemPrefill] = useState<TransportPrefill | null>(null);
   const [cityOverrideOpen, setCityOverrideOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [view, setView] = useState<'timeline' | 'map'>('timeline');
@@ -437,12 +453,20 @@ export function TripDetail({ tripId }: TripDetailProps) {
                 dayCityBuckets.map((bucket) => (
                   <TabsContent key={bucket.key} value={bucket.key}>
                     <DayContent
+                      trip={trip}
                       bucket={bucket}
                       currentItemId={current?.id ?? null}
                       onSelect={(item) => setSelectedItem(item)}
                       onAdd={(dayDate) => {
                         setEditingItem(null);
+                        setItemPrefill(null);
                         setDefaultDayDate(dayDate);
+                        setItemEditorOpen(true);
+                      }}
+                      onAddTransport={(prefill, dayDate) => {
+                        setEditingItem(null);
+                        setDefaultDayDate(dayDate);
+                        setItemPrefill(prefill);
                         setItemEditorOpen(true);
                       }}
                       itemExpenseTotals={itemExpenseTotals}
@@ -492,12 +516,14 @@ export function TripDetail({ tripId }: TripDetailProps) {
         trip={trip}
         item={editingItem}
         defaultDate={editingItem ? null : defaultDayDate}
+        prefill={editingItem ? null : itemPrefill}
         open={itemEditorOpen}
         onOpenChange={(o) => {
           setItemEditorOpen(o);
           if (!o) {
             setEditingItem(null);
             setDefaultDayDate(null);
+            setItemPrefill(null);
           }
         }}
       />
@@ -530,16 +556,20 @@ export function TripDetail({ tripId }: TripDetailProps) {
 }
 
 function DayContent({
+  trip,
   bucket,
   currentItemId,
   onSelect,
   onAdd,
+  onAddTransport,
   itemExpenseTotals,
 }: {
+  trip: Trip;
   bucket: DayCityBucket;
   currentItemId: string | null;
   onSelect: (item: TripItem) => void;
   onAdd: (dayDate: Date) => void;
+  onAddTransport: (prefill: TransportPrefill, dayDate: Date) => void;
   itemExpenseTotals: Map<string, ItemExpenseTotal>;
 }) {
   const partitionedSegments = bucket.segments.map((seg) => {
@@ -560,6 +590,23 @@ function DayContent({
     (s) => s.background.length > 0 || s.events.length > 0,
   );
   const multiCity = bucket.segments.length > 1;
+
+  // Hotel "legs": the morning trip from where you woke up to the first stop, and
+  // the night trip from the last stop back to where you sleep. Each only shows
+  // when the hotel and the stop are genuinely different places.
+  const dayEvents = partitionedSegments.flatMap((s) => s.events);
+  const firstEvent = dayEvents[0];
+  const lastEvent = dayEvents[dayEvents.length - 1];
+  const wakeLodging = lodgingWakeUpForDay(trip, bucket.key);
+  const nightLodging = lodgingForDay(trip, bucket.key);
+  const departLeg =
+    wakeLodging && firstEvent
+      ? hotelLegGap(wakeLodging, firstEvent, 'depart')
+      : null;
+  const arriveLeg =
+    nightLodging && lastEvent
+      ? hotelLegGap(nightLodging, lastEvent, 'arrive')
+      : null;
 
   return (
     <AnimatePresence mode="wait">
@@ -589,6 +636,15 @@ function DayContent({
           </div>
         ) : (
           <>
+            {departLeg && wakeLodging && (
+              <HotelLegRow
+                leg={departLeg}
+                hotelLabel={wakeLodging.title}
+                direction="depart"
+                dayDate={bucket.date}
+                onAddTransport={onAddTransport}
+              />
+            )}
             {partitionedSegments.map((seg, segIdx) => (
               <div key={segIdx}>
                 {multiCity && (
@@ -624,12 +680,24 @@ function DayContent({
                         onSelect={() => onSelect(item)}
                         expenseTotal={itemExpenseTotals.get(item.id)}
                         nextItem={seg.events[idx + 1]}
+                        onAddTransport={(prefill) =>
+                          onAddTransport(prefill, bucket.date)
+                        }
                       />
                     ))}
                   </motion.ol>
                 )}
               </div>
             ))}
+            {arriveLeg && nightLodging && (
+              <HotelLegRow
+                leg={arriveLeg}
+                hotelLabel={nightLodging.title}
+                direction="arrive"
+                dayDate={bucket.date}
+                onAddTransport={onAddTransport}
+              />
+            )}
             <div className="ml-[3.25rem] sm:ml-[4rem]">
               <Button
                 variant="outline"
@@ -645,5 +713,51 @@ function DayContent({
         )}
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+/**
+ * A slim row bridging the day's lodging and its first/last stop. Mirrors the
+ * timeline's time-column grid so the dashed hotel marker lands on the rail, then
+ * offers the same directions + quick-add transport cluster as a between-stops
+ * leg.
+ */
+function HotelLegRow({
+  leg,
+  hotelLabel,
+  direction,
+  dayDate,
+  onAddTransport,
+}: {
+  leg: LegGap;
+  hotelLabel: string;
+  direction: 'depart' | 'arrive';
+  dayDate: Date;
+  onAddTransport: (prefill: TransportPrefill, dayDate: Date) => void;
+}) {
+  return (
+    <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3 sm:grid-cols-[4rem_minmax(0,1fr)] sm:gap-4">
+      <div aria-hidden />
+      <div className="flex min-w-0 items-center gap-2.5 py-1.5 pl-[5px]">
+        <span className="border-border/70 text-muted-foreground/70 grid size-5 shrink-0 place-items-center rounded-full border border-dashed">
+          <Bed className="size-3" />
+        </span>
+        <LegActions
+          originLabel={leg.origin.label}
+          destinationLabel={leg.destination.label}
+          directionsUrl={leg.directionsUrl}
+          onAddTransport={
+            leg.prefill
+              ? () => onAddTransport(leg.prefill!, dayDate)
+              : undefined
+          }
+        />
+        <span className="text-muted-foreground/70 min-w-0 truncate text-xs">
+          {direction === 'depart'
+            ? `Leave ${hotelLabel}`
+            : `Back to ${hotelLabel}`}
+        </span>
+      </div>
+    </div>
   );
 }

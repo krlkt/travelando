@@ -53,11 +53,14 @@ import type {
   Trip,
   TripItem,
 } from '@/lib/trips/types';
+import type { TransportPrefill } from '@/lib/trips/legGap';
 
 interface ItemEditorSheetProps {
   trip: Trip;
   item?: TripItem | null;
   defaultDate?: Date | null;
+  /** Seeds a brand-new item (e.g. quick-add transport between two stops). */
+  prefill?: TransportPrefill | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -65,8 +68,10 @@ interface ItemEditorSheetProps {
 function initialStartsAt(
   item: TripItem | null | undefined,
   defaultDate: Date | null | undefined,
+  prefill: TransportPrefill | null | undefined,
 ): string {
   if (item) return toLocalInput(item.startsAt);
+  if (prefill?.startsAt) return toLocalInput(prefill.startsAt);
   if (defaultDate) {
     const start = new Date(defaultDate);
     start.setHours(9, 0, 0, 0);
@@ -78,8 +83,10 @@ function initialStartsAt(
 function initialEndsAt(
   item: TripItem | null | undefined,
   defaultDate: Date | null | undefined,
+  prefill: TransportPrefill | null | undefined,
 ): string {
   if (item) return toLocalInput(item.endsAt);
+  if (prefill?.endsAt) return toLocalInput(prefill.endsAt);
   if (defaultDate) {
     const end = new Date(defaultDate);
     end.setHours(10, 0, 0, 0);
@@ -92,6 +99,7 @@ export function ItemEditorSheet({
   trip,
   item,
   defaultDate,
+  prefill,
   open,
   onOpenChange,
 }: ItemEditorSheetProps) {
@@ -103,6 +111,7 @@ export function ItemEditorSheet({
             trip={trip}
             item={item}
             defaultDate={defaultDate}
+            prefill={prefill}
             onClose={() => onOpenChange(false)}
           />
         )}
@@ -115,6 +124,7 @@ interface ItemEditorBodyProps {
   trip: Trip;
   item?: TripItem | null;
   defaultDate?: Date | null;
+  prefill?: TransportPrefill | null;
   onClose: () => void;
 }
 
@@ -122,6 +132,7 @@ function ItemEditorBody({
   trip,
   item,
   defaultDate,
+  prefill,
   onClose,
 }: ItemEditorBodyProps) {
   const { addItem, updateItem, foodPlaces, activityPlaces, cityOverrides } =
@@ -130,7 +141,25 @@ function ItemEditorBody({
   const tripId = trip.id;
   const isEdit = !!item;
 
-  const [kind, setKind] = useState<ItemKind>(item?.kind ?? 'activity');
+  // A transport prefill (quick-add between two stops) seeds the leg's cities
+  // from wherever the trip places you at that time, mirroring handleKindChange.
+  const prefillCity =
+    !item && prefill?.kind === 'transport'
+      ? (() => {
+          const isoTs =
+            prefill.startsAt ?? prefill.endsAt ?? new Date().toISOString();
+          const city = latestCityBefore(
+            trip,
+            cityOverrides[tripId] ?? [],
+            isoTs,
+          );
+          return { label: city.cityLabel, placeId: city.cityPlaceId };
+        })()
+      : null;
+
+  const [kind, setKind] = useState<ItemKind>(
+    item?.kind ?? prefill?.kind ?? 'activity',
+  );
   const [isPrivate, setIsPrivate] = useState<boolean>(
     (item?.privateToUserIds?.length ?? 0) > 0,
   );
@@ -139,16 +168,16 @@ function ItemEditorBody({
   );
   const [title, setTitle] = useState<string>(item?.title ?? '');
   const [startsAt, setStartsAt] = useState<string>(
-    initialStartsAt(item, defaultDate),
+    initialStartsAt(item, defaultDate, prefill),
   );
   const [endsAt, setEndsAt] = useState<string>(
-    initialEndsAt(item, defaultDate),
+    initialEndsAt(item, defaultDate, prefill),
   );
   const [fromCityValue, setFromCityValue] = useState<string>(
-    item?.fromCity?.label ?? '',
+    item?.fromCity?.label ?? prefillCity?.label ?? '',
   );
   const [fromCityPlace, setFromCityPlace] = useState<Place | undefined>(
-    item?.fromCity ?? undefined,
+    item?.fromCity ?? prefillCity ?? undefined,
   );
   const [toCityValue, setToCityValue] = useState<string>(
     item?.toCity?.label ?? '',
@@ -156,13 +185,17 @@ function ItemEditorBody({
   const [toCityPlace, setToCityPlace] = useState<Place | undefined>(
     item?.toCity ?? undefined,
   );
-  const [fromValue, setFromValue] = useState<string>(item?.from?.label ?? '');
-  const [fromPlace, setFromPlace] = useState<Place | undefined>(
-    item?.from ?? undefined,
+  const [fromValue, setFromValue] = useState<string>(
+    item?.from?.label ?? prefill?.from.label ?? '',
   );
-  const [toValue, setToValue] = useState<string>(item?.to?.label ?? '');
+  const [fromPlace, setFromPlace] = useState<Place | undefined>(
+    item?.from ?? prefill?.from ?? undefined,
+  );
+  const [toValue, setToValue] = useState<string>(
+    item?.to?.label ?? prefill?.to.label ?? '',
+  );
   const [toPlace, setToPlace] = useState<Place | undefined>(
-    item?.to ?? undefined,
+    item?.to ?? prefill?.to ?? undefined,
   );
   const [transportMode, setTransportMode] = useState<TransportMode>(
     (item?.transportMode as TransportMode) ?? 'flight',
