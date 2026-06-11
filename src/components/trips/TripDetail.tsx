@@ -64,6 +64,7 @@ import {
   formatShortDate,
   tripDayCount,
   isOngoing,
+  isSameDay,
 } from '@/lib/time/formatDate';
 import { fadeUp, stagger } from '@/lib/motion/presets';
 import type {
@@ -299,19 +300,32 @@ export function TripDetail({ tripId }: TripDetailProps) {
                         computeDayFillRatio(allItems, bucket.date),
                       );
                       const isDone = doneDayKeys.has(bucket.key);
+                      const isToday = isSameDay(bucket.date, new Date());
                       return (
                         <TabsTrigger
                           key={bucket.key}
                           value={bucket.key}
                           data-done={isDone || undefined}
-                          className="shrink-0 px-2.5 data-[done]:text-emerald-600 sm:px-4 dark:data-[done]:text-emerald-400"
+                          data-today={isToday || undefined}
+                          className="data-[today]:ring-primary/45 shrink-0 px-2.5 data-[done]:text-emerald-600 data-[today]:ring-1 data-[today]:ring-inset sm:px-4 dark:data-[done]:text-emerald-400"
                         >
+                          {isToday && (
+                            <span
+                              className="bg-primary mr-0.5 size-1.5 shrink-0 animate-pulse rounded-full"
+                              aria-hidden
+                            />
+                          )}
                           <span className="sm:hidden">
                             {formatShortDate(bucket.date.toISOString())}
                           </span>
                           <span className="hidden sm:inline">
                             {formatDate(bucket.date.toISOString())}
                           </span>
+                          {isToday && (
+                            <span className="text-primary ml-1 hidden text-[11px] font-semibold tracking-wide sm:inline">
+                              Today
+                            </span>
+                          )}
                           {isDone ? (
                             <DayFinishedMark />
                           ) : (
@@ -346,6 +360,15 @@ export function TripDetail({ tripId }: TripDetailProps) {
                       <span className="text-muted-foreground/70 text-xs">
                         {formatDate(activeBucket.date.toISOString())}
                       </span>
+                      {isSameDay(activeBucket.date, new Date()) && (
+                        <span className="bg-primary/12 text-primary ml-1.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide">
+                          <span
+                            className="bg-primary size-1.5 animate-pulse rounded-full"
+                            aria-hidden
+                          />
+                          Today
+                        </span>
+                      )}
                     </div>
                     {(() => {
                       const isDone = doneDayKeys.has(activeBucket.key);

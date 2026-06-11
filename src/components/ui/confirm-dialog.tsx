@@ -41,7 +41,9 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [inputValue, setInputValue] = useState('');
 
-  const canConfirm = !requiredInput || inputValue === requiredInput;
+  const canConfirm =
+    !requiredInput ||
+    inputValue.trim().toLowerCase() === requiredInput.trim().toLowerCase();
 
   function handleOpenChange(next: boolean) {
     if (!next) setInputValue('');
