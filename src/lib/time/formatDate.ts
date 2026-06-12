@@ -1,3 +1,14 @@
+// Formatters for floating wall-time values (see `naive.ts`). Strings are
+// parsed by components — never via bare `new Date(string)` — so an itinerary
+// time reads the same on every device regardless of its timezone.
+
+import { parseNaive, stripOffset } from './naive';
+
+type DateInput = string | Date;
+
+const asDate = (value: DateInput): Date =>
+  value instanceof Date ? value : parseNaive(value);
+
 const dateFmt = new Intl.DateTimeFormat('en-GB', {
   weekday: 'short',
   day: 'numeric',
@@ -22,39 +33,39 @@ const shortDateFmt = new Intl.DateTimeFormat('en-GB', {
   month: '2-digit',
 });
 
-export const formatDate = (iso: string): string =>
-  dateFmt.format(new Date(iso));
-export const formatDateLong = (iso: string): string =>
-  dateFmtLong.format(new Date(iso));
-export const formatTime = (iso: string): string =>
-  timeFmt.format(new Date(iso));
-export const formatMonthDay = (iso: string): string =>
-  monthDayFmt.format(new Date(iso));
+export const formatDate = (value: DateInput): string =>
+  dateFmt.format(asDate(value));
+export const formatDateLong = (value: DateInput): string =>
+  dateFmtLong.format(asDate(value));
+export const formatTime = (value: DateInput): string =>
+  timeFmt.format(asDate(value));
+export const formatMonthDay = (value: DateInput): string =>
+  monthDayFmt.format(asDate(value));
 
 /** Returns "DD.MM" e.g. "12.05" — compact date for narrow contexts. */
-export const formatShortDate = (iso: string): string =>
-  shortDateFmt.format(new Date(iso)).replace('/', '.');
+export const formatShortDate = (value: DateInput): string =>
+  shortDateFmt.format(asDate(value)).replace('/', '.');
 
-export function formatDateRange(startIso: string, endIso: string): string {
-  const start = new Date(startIso);
-  const end = new Date(endIso);
+export function formatDateRange(start: DateInput, end: DateInput): string {
+  const startDate = asDate(start);
+  const endDate = asDate(end);
   const sameMonth =
-    start.getMonth() === end.getMonth() &&
-    start.getFullYear() === end.getFullYear();
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getFullYear() === endDate.getFullYear();
   if (sameMonth) {
-    return `${start.getDate()}–${end.getDate()} ${dateFmt
-      .format(end)
+    return `${startDate.getDate()}–${endDate.getDate()} ${dateFmt
+      .format(endDate)
       .split(' ')
       .slice(1)
       .join(' ')}`;
   }
-  return `${formatMonthDay(startIso)} → ${formatMonthDay(endIso)}`;
+  return `${formatMonthDay(start)} → ${formatMonthDay(end)}`;
 }
 
-export function dayKey(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-    d.getDate(),
+export function dayKey(value: DateInput): string {
+  if (typeof value === 'string') return stripOffset(value).slice(0, 10);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(
+    value.getDate(),
   ).padStart(2, '0')}`;
 }
 
@@ -64,9 +75,9 @@ function startOfLocalDay(d: Date): number {
   return x.getTime();
 }
 
-export function isSameDay(a: string | Date, b: string | Date): boolean {
-  const da = a instanceof Date ? a : new Date(a);
-  const db = b instanceof Date ? b : new Date(b);
+export function isSameDay(a: DateInput, b: DateInput): boolean {
+  const da = asDate(a);
+  const db = asDate(b);
   return (
     da.getFullYear() === db.getFullYear() &&
     da.getMonth() === db.getMonth() &&
@@ -74,41 +85,33 @@ export function isSameDay(a: string | Date, b: string | Date): boolean {
   );
 }
 
-export function dayOffsetFrom(
-  reference: string | Date,
-  target: string | Date,
-): number {
-  const ref = reference instanceof Date ? reference : new Date(reference);
-  const tgt = target instanceof Date ? target : new Date(target);
-  const diffMs = startOfLocalDay(tgt) - startOfLocalDay(ref);
+export function dayOffsetFrom(reference: DateInput, target: DateInput): number {
+  const diffMs =
+    startOfLocalDay(asDate(target)) - startOfLocalDay(asDate(reference));
   return Math.round(diffMs / 86_400_000);
 }
 
-export function tripDayCount(startIso: string, endIso: string): number {
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  start.setHours(0, 0, 0, 0);
-  end.setHours(0, 0, 0, 0);
-  return Math.max(
-    1,
-    Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1,
-  );
+export function tripDayCount(start: DateInput, end: DateInput): number {
+  const diffMs = startOfLocalDay(asDate(end)) - startOfLocalDay(asDate(start));
+  return Math.max(1, Math.round(diffMs / 86_400_000) + 1);
 }
 
 export function isOngoing(
-  startIso: string,
-  endIso: string,
+  start: DateInput,
+  end: DateInput,
   now = new Date(),
 ): boolean {
-  return new Date(startIso) <= now && now <= new Date(endIso);
+  // The end date is inclusive: a trip is still ongoing through its last day.
+  const endOfLastDay = startOfLocalDay(asDate(end)) + 86_400_000;
+  return asDate(start) <= now && now.getTime() < endOfLastDay;
 }
 
-export function isUpcoming(startIso: string, now = new Date()): boolean {
-  return new Date(startIso) > now;
+export function isUpcoming(start: DateInput, now = new Date()): boolean {
+  return asDate(start) > now;
 }
 
-export function relativeFromNow(iso: string, now = new Date()): string {
-  const diff = new Date(iso).getTime() - now.getTime();
+export function relativeFromNow(value: DateInput, now = new Date()): string {
+  const diff = asDate(value).getTime() - now.getTime();
   const abs = Math.abs(diff);
   const minutes = Math.round(abs / 60_000);
   const hours = Math.round(abs / 3_600_000);

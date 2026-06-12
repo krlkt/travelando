@@ -1,17 +1,18 @@
 import type { Trip } from './types';
+import { dayKey } from '@/lib/time/formatDate';
+import { toNaiveString } from '@/lib/time/naive';
 
 const today = new Date();
 const iso = (offsetDays: number, hours = 0, minutes = 0): string => {
   const d = new Date(today);
   d.setDate(d.getDate() + offsetDays);
   d.setHours(hours, minutes, 0, 0);
-  return d.toISOString();
+  return toNaiveString(d);
 };
 const dateOnly = (offsetDays: number): string => {
   const d = new Date(today);
   d.setDate(d.getDate() + offsetDays);
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString();
+  return dayKey(d);
 };
 
 export const mockTrips: Trip[] = [

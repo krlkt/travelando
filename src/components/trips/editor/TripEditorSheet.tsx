@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useTrips } from '@/lib/trips/context';
+import { stripOffset } from '@/lib/time/naive';
 import type { Trip } from '@/lib/trips/types';
 
 interface TripEditorSheetProps {
@@ -34,15 +35,13 @@ const defaultGradients = [
 
 function toLocalInputDate(iso?: string): string {
   if (!iso) return '';
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  // Trip dates are floating `YYYY-MM-DD` strings (see lib/time/naive.ts);
+  // tolerate legacy datetime values by keeping only the date part.
+  return stripOffset(iso).slice(0, 10);
 }
 
 function fromLocalInputDate(value: string): string {
-  const [y, m, d] = value.split('-').map(Number);
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
-  dt.setHours(0, 0, 0, 0);
-  return dt.toISOString();
+  return value;
 }
 
 export function TripEditorSheet({
@@ -103,7 +102,7 @@ function TripEditorBody({
       setError('Pick a start and end date.');
       return;
     }
-    if (new Date(endDate) < new Date(startDate)) {
+    if (endDate < startDate) {
       setError("End date can't be before the start.");
       return;
     }

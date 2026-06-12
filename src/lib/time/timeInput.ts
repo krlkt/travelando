@@ -1,17 +1,19 @@
 // Helpers for `<input type="date">` + free-text time fields. All values are
-// local-time strings (`YYYY-MM-DDTHH:MM`) so what the user types matches what
-// they see — conversion to ISO only happens at the boundary via `fromLocalInput`.
+// floating wall-time strings (`YYYY-MM-DDTHH:MM`, see `naive.ts`): what the
+// user types is what gets stored and shown, on every device, in every
+// timezone. No conversion to UTC ever happens.
+
+import { stripOffset } from './naive';
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 
-export function toLocalInput(iso?: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+export function toLocalInput(value?: string): string {
+  if (!value) return '';
+  return stripOffset(value).slice(0, 16);
 }
 
 export function fromLocalInput(value: string): string {
-  return new Date(value).toISOString();
+  return stripOffset(value).slice(0, 16);
 }
 
 export function getDatePart(value: string): string {

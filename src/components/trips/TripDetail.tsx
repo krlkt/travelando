@@ -4,23 +4,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
-import {
-  ArrowLeft,
-  Bed,
-  CalendarDays,
-  Check,
-  CircleCheck,
-  Map as MapIcon,
-  MapPin,
-  Plus,
-  Radio,
-  Share2,
-  Wallet,
-} from 'lucide-react';
+import { ArrowLeft, Bed, Plus, Radio, Share2, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TimelineItem } from './TimelineItem';
+import { DayHeader } from './DayHeader';
+import { timelineGridClass, timelineIndentClass } from './timelineGrid';
 import { useAuth } from '@/lib/auth/context';
 import { findMemberIdForUser } from '@/lib/trips/balances';
 import {
@@ -46,7 +35,11 @@ import {
   findOverlappingItemIds,
   isBackgroundItem,
 } from '@/lib/trips/grouping';
-import { computeDayFillRatio, getDayFillLevel } from '@/lib/trips/dayFill';
+import {
+  computeDayFillRatio,
+  getDayFillLevel,
+  type DayFillLevel,
+} from '@/lib/trips/dayFill';
 import {
   deriveCitiesByDay,
   lodgingForDay,
@@ -77,6 +70,14 @@ import type {
 interface TripDetailProps {
   tripId: string;
 }
+
+/** Hover explanation for the day-tab status dot, which is otherwise mute. */
+const fillTitle: Record<DayFillLevel, string> = {
+  empty: 'Nothing planned yet',
+  light: 'Lightly planned',
+  moderate: 'Partly planned',
+  full: 'Packed day',
+};
 
 export function TripDetail({ tripId }: TripDetailProps) {
   const {
@@ -295,18 +296,21 @@ export function TripDetail({ tripId }: TripDetailProps) {
                   <TabsList className="w-max min-w-full justify-start">
                     {dayCityBuckets.map((bucket) => {
                       const allItems = bucket.segments.flatMap((s) => s.items);
-                      const itemCount = allItems.length;
                       const fillLevel = getDayFillLevel(
                         computeDayFillRatio(allItems, bucket.date),
                       );
                       const isDone = doneDayKeys.has(bucket.key);
                       const isToday = isSameDay(bucket.date, new Date());
+                      const status = isDone
+                        ? 'Marked planned'
+                        : fillTitle[fillLevel];
                       return (
                         <TabsTrigger
                           key={bucket.key}
                           value={bucket.key}
                           data-done={isDone || undefined}
                           data-today={isToday || undefined}
+                          title={`${formatDate(bucket.date)}${isToday ? ' · Today' : ''} · ${status}`}
                           className="data-[today]:ring-primary/45 shrink-0 px-2.5 data-[done]:text-emerald-600 data-[today]:ring-1 data-[today]:ring-inset sm:px-4 dark:data-[done]:text-emerald-400"
                         >
                           {isToday && (
@@ -316,28 +320,15 @@ export function TripDetail({ tripId }: TripDetailProps) {
                             />
                           )}
                           <span className="sm:hidden">
-                            {formatShortDate(bucket.date.toISOString())}
+                            {formatShortDate(bucket.date)}
                           </span>
                           <span className="hidden sm:inline">
-                            {formatDate(bucket.date.toISOString())}
+                            {formatDate(bucket.date)}
                           </span>
-                          {isToday && (
-                            <span className="text-primary ml-1 hidden text-[11px] font-semibold tracking-wide sm:inline">
-                              Today
-                            </span>
-                          )}
                           {isDone ? (
                             <DayFinishedMark />
                           ) : (
                             <DayFillDot level={fillLevel} />
-                          )}
-                          {itemCount > 0 && (
-                            <Badge
-                              variant="muted"
-                              className="ml-2 hidden sm:inline-flex"
-                            >
-                              {itemCount}
-                            </Badge>
                           )}
                         </TabsTrigger>
                       );
@@ -346,125 +337,26 @@ export function TripDetail({ tripId }: TripDetailProps) {
                 </div>
               </div>
 
-              {/* Day label + city + lodging indicator for active day */}
+              {/* Day anchor: number + date + meta + day-level controls */}
               {activeBucket && (
-                <>
-                  <div className="mt-1 mb-1 flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <span className="text-muted-foreground/70 text-xs font-medium">
-                        Day {activeBucketIdx + 1}
-                      </span>
-                      <span className="text-muted-foreground/40 mx-1.5 text-xs">
-                        ·
-                      </span>
-                      <span className="text-muted-foreground/70 text-xs">
-                        {formatDate(activeBucket.date.toISOString())}
-                      </span>
-                      {isSameDay(activeBucket.date, new Date()) && (
-                        <span className="bg-primary/12 text-primary ml-1.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tracking-wide">
-                          <span
-                            className="bg-primary size-1.5 animate-pulse rounded-full"
-                            aria-hidden
-                          />
-                          Today
-                        </span>
-                      )}
-                    </div>
-                    {(() => {
-                      const isDone = doneDayKeys.has(activeBucket.key);
-                      return (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            toggleDayPlan(tripId, activeBucket.key)
-                          }
-                          aria-pressed={isDone}
-                          title={
-                            isDone
-                              ? 'Marked as planned — click to undo'
-                              : 'Mark this day as planned enough'
-                          }
-                          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition ${
-                            isDone
-                              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-400'
-                              : 'border-border/60 text-muted-foreground hover:text-foreground hover:border-border'
-                          }`}
-                        >
-                          {isDone ? (
-                            <CircleCheck className="size-3.5" />
-                          ) : (
-                            <Check className="size-3.5" />
-                          )}
-                          {isDone ? 'Planned' : 'Mark planned'}
-                        </button>
-                      );
-                    })()}
-                  </div>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <MapPin className="text-muted-foreground/60 size-3 shrink-0" />
-                      <span className="text-muted-foreground truncate text-xs">
-                        {activeCityLabel}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setCityOverrideOpen(true)}
-                        className="text-muted-foreground/50 hover:text-muted-foreground shrink-0 text-[10px] underline-offset-2 hover:underline"
-                      >
-                        change
-                      </button>
-                    </div>
-                    {activeLodging ? (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedItem(activeLodging)}
-                        className="text-muted-foreground hover:text-foreground flex min-w-0 items-center gap-1.5 text-xs underline-offset-4 hover:underline"
-                        title="Where you're staying tonight"
-                      >
-                        <Bed className="size-3 shrink-0 opacity-60" />
-                        <span className="truncate">
-                          {activeLodging.to?.label ?? activeLodging.title}
-                        </span>
-                      </button>
-                    ) : (
-                      <span className="text-muted-foreground/50 flex shrink-0 items-center gap-1.5 text-xs">
-                        <Bed className="size-3 opacity-60" />
-                        No lodging
-                      </span>
-                    )}
-                  </div>
-                </>
+                <DayHeader
+                  dayNumber={activeBucketIdx + 1}
+                  date={activeBucket.date}
+                  isToday={isSameDay(activeBucket.date, new Date())}
+                  itemCount={activeBucket.segments.reduce(
+                    (n, s) => n + s.items.length,
+                    0,
+                  )}
+                  cityLabel={activeCityLabel}
+                  onChangeCity={() => setCityOverrideOpen(true)}
+                  lodging={activeLodging}
+                  onSelectLodging={(item) => setSelectedItem(item)}
+                  isDone={doneDayKeys.has(activeBucket.key)}
+                  onToggleDone={() => toggleDayPlan(tripId, activeBucket.key)}
+                  view={view}
+                  onViewChange={setView}
+                />
               )}
-
-              {/* Timeline ⇄ Map view toggle */}
-              <div className="border-border/60 bg-secondary/40 mt-1 inline-flex rounded-full border p-0.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setView('timeline')}
-                  aria-pressed={view === 'timeline'}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition ${
-                    view === 'timeline'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <CalendarDays className="size-3.5" />
-                  Timeline
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setView('map')}
-                  aria-pressed={view === 'map'}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 transition ${
-                    view === 'map'
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <MapIcon className="size-3.5" />
-                  Map
-                </button>
-              </div>
 
               {view === 'map' ? (
                 <DayMap
@@ -504,19 +396,17 @@ export function TripDetail({ tripId }: TripDetailProps) {
           <aside className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
             <FoodWishlist trip={trip} dayKey={activeDay} />
             <ActivityWishlist trip={trip} dayKey={activeDay} />
-            <Button asChild variant="outline" className="w-full">
-              <Link href={`/trips/${trip.id}/expenses`}>
-                <Wallet className="size-4" />
-                Expenses
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setTripEditorOpen(true)}
-            >
-              Edit trip details
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button asChild variant="outline">
+                <Link href={`/trips/${trip.id}/expenses`}>
+                  <Wallet className="size-4" />
+                  Expenses
+                </Link>
+              </Button>
+              <Button variant="outline" onClick={() => setTripEditorOpen(true)}>
+                Edit trip
+              </Button>
+            </div>
           </aside>
         </div>
       </div>
@@ -567,7 +457,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
         <CityOverrideSheet
           tripId={tripId}
           dayKey={activeDay}
-          dayLabel={`Day ${activeBucketIdx + 1} · ${formatDate(activeBucket.date.toISOString())}`}
+          dayLabel={`Day ${activeBucketIdx + 1} · ${formatDate(activeBucket.date)}`}
           currentCity={activeCityLabel}
           existing={existingOverride}
           open={cityOverrideOpen}
@@ -613,6 +503,8 @@ function DayContent({
     (s) => s.background.length > 0 || s.events.length > 0,
   );
   const multiCity = bucket.segments.length > 1;
+  const emptyCityLabel =
+    bucket.segments[bucket.segments.length - 1]?.cityLabel ?? null;
 
   // Hotel "legs": the morning trip from where you woke up to the first stop, and
   // the night trip from the last stop back to where you sleep. Each only shows
@@ -644,8 +536,10 @@ function DayContent({
         {!hasItems ? (
           <div className="border-border/70 bg-secondary/20 grid place-items-center rounded-[var(--radius-lg)] border border-dashed px-6 py-16 text-center">
             <p className="text-muted-foreground max-w-sm text-sm">
-              Nothing planned for this day. Add a flight, a meal, a museum —
-              whatever anchors it.
+              {emptyCityLabel
+                ? `Nothing planned in ${emptyCityLabel} yet.`
+                : 'Nothing planned for this day yet.'}{' '}
+              Add a flight, a meal, a museum — whatever anchors the day.
             </p>
             <Button
               size="sm"
@@ -721,7 +615,7 @@ function DayContent({
                 onAddTransport={onAddTransport}
               />
             )}
-            <div className="ml-[3.25rem] sm:ml-[4rem]">
+            <div className={timelineIndentClass}>
               <Button
                 variant="outline"
                 size="sm"
@@ -741,9 +635,9 @@ function DayContent({
 
 /**
  * A slim row bridging the day's lodging and its first/last stop. Mirrors the
- * timeline's time-column grid so the dashed hotel marker lands on the rail, then
- * offers the same directions + quick-add transport cluster as a between-stops
- * leg.
+ * timeline grid so the dashed hotel marker lands on the rail, then offers the
+ * same directions + quick-add transport cluster as a between-stops leg. The
+ * cluster is hover/focus-revealed on pointer devices, always visible on touch.
  */
 function HotelLegRow({
   leg,
@@ -759,27 +653,33 @@ function HotelLegRow({
   onAddTransport: (prefill: TransportPrefill, dayDate: Date) => void;
 }) {
   return (
-    <div className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-3 sm:grid-cols-[4rem_minmax(0,1fr)] sm:gap-4">
+    <div
+      className={`group/hotel relative z-0 focus-within:z-30 hover:z-30 ${timelineGridClass}`}
+    >
       <div aria-hidden />
-      <div className="flex min-w-0 items-center gap-2.5 py-1.5 pl-[5px]">
-        <span className="border-border/70 text-muted-foreground/70 grid size-5 shrink-0 place-items-center rounded-full border border-dashed">
+      <div className="flex justify-center pt-1">
+        <span className="border-border/70 text-muted-foreground/70 bg-background grid size-5 shrink-0 place-items-center rounded-full border border-dashed">
           <Bed className="size-3" />
         </span>
-        <LegActions
-          originLabel={leg.origin.label}
-          destinationLabel={leg.destination.label}
-          directionsUrl={leg.directionsUrl}
-          onAddTransport={
-            leg.prefill
-              ? () => onAddTransport(leg.prefill!, dayDate)
-              : undefined
-          }
-        />
+      </div>
+      <div className="flex min-w-0 items-center gap-2 py-1">
         <span className="text-muted-foreground/70 min-w-0 truncate text-xs">
           {direction === 'depart'
             ? `Leave ${hotelLabel}`
             : `Back to ${hotelLabel}`}
         </span>
+        <div className="transition-opacity duration-200 pointer-fine:opacity-0 pointer-fine:group-focus-within/hotel:opacity-100 pointer-fine:group-hover/hotel:opacity-100">
+          <LegActions
+            originLabel={leg.origin.label}
+            destinationLabel={leg.destination.label}
+            directionsUrl={leg.directionsUrl}
+            onAddTransport={
+              leg.prefill
+                ? () => onAddTransport(leg.prefill!, dayDate)
+                : undefined
+            }
+          />
+        </div>
       </div>
     </div>
   );

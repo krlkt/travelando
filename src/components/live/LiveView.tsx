@@ -18,6 +18,7 @@ import { routeHeadline, routeStations } from '@/lib/trips/transportRoute';
 import { directionsForItem } from '@/lib/trips/itemDirections';
 import { openMapsLink } from '@/lib/places/maps-link';
 import { formatTime, dayKey, relativeFromNow } from '@/lib/time/formatDate';
+import { parseNaive } from '@/lib/time/naive';
 import { useNow } from '@/lib/time/useNow';
 import { spring } from '@/lib/motion/presets';
 import { cn } from '@/lib/utils';
@@ -37,24 +38,24 @@ export function LiveView({ tripId }: LiveViewProps) {
   const next = findNextItem(trip.items, now);
 
   const todayItems = useMemo(() => {
-    const today = dayKey(now.toISOString());
+    const today = dayKey(now);
     return trip.items
       .filter((i) => dayKey(i.startsAt) === today)
       .sort(
         (a, b) =>
-          new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+          parseNaive(a.startsAt).getTime() - parseNaive(b.startsAt).getTime(),
       );
   }, [trip.items, now]);
 
   const tomorrowItems = useMemo(() => {
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const key = dayKey(tomorrow.toISOString());
+    const key = dayKey(tomorrow);
     return trip.items
       .filter((i) => dayKey(i.startsAt) === key)
       .sort(
         (a, b) =>
-          new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+          parseNaive(a.startsAt).getTime() - parseNaive(b.startsAt).getTime(),
       );
   }, [trip.items, now]);
 
@@ -83,7 +84,7 @@ export function LiveView({ tripId }: LiveViewProps) {
             Right now
           </div>
           <div className="font-display mt-2 text-5xl leading-none tracking-tight tabular-nums sm:text-6xl">
-            {formatTime(now.toISOString())}
+            {formatTime(now)}
           </div>
         </div>
 
@@ -153,7 +154,7 @@ function DayList({
             const isCurrent = current?.id === item.id;
             const isNext = next?.id === item.id;
             const isPast =
-              new Date(item.endsAt ?? item.startsAt) < now && !isCurrent;
+              parseNaive(item.endsAt ?? item.startsAt) < now && !isCurrent;
             const meta = kindMeta[item.kind];
             return (
               <li
@@ -262,12 +263,12 @@ function NowCard({ item, now }: { item: TripItem; now: Date }) {
       ? transportIcons[item.transportMode]
       : meta.icon;
 
-  const endsAt = item.endsAt ? new Date(item.endsAt) : null;
+  const endsAt = item.endsAt ? parseNaive(item.endsAt) : null;
   const total = endsAt
-    ? endsAt.getTime() - new Date(item.startsAt).getTime()
+    ? endsAt.getTime() - parseNaive(item.startsAt).getTime()
     : 0;
   const elapsed = endsAt
-    ? now.getTime() - new Date(item.startsAt).getTime()
+    ? now.getTime() - parseNaive(item.startsAt).getTime()
     : 0;
   const progress = total
     ? Math.min(100, Math.max(0, (elapsed / total) * 100))

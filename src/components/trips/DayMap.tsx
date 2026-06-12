@@ -47,6 +47,7 @@ import {
   getTimePart,
   toLocalInput,
 } from '@/lib/time/timeInput';
+import { parseNaive, toNaiveString } from '@/lib/time/naive';
 import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
 import type { ItemDraft, Trip, TripItem } from '@/lib/trips/types';
 
@@ -97,15 +98,15 @@ function nextSlotIso(dayKey: string, scheduled: DayMapPoint[]): string {
     .filter((p): p is Extract<DayMapPoint, { kind: 'scheduled' }> => {
       return p.kind === 'scheduled';
     })
-    .map((p) => new Date(p.startsAt).getTime())
+    .map((p) => parseNaive(p.startsAt).getTime())
     .filter((t) => Number.isFinite(t));
 
   if (times.length === 0) {
-    const d = new Date(`${dayKey}T00:00:00`);
+    const d = parseNaive(dayKey);
     d.setHours(DEFAULT_START_HOUR, 0, 0, 0);
-    return d.toISOString();
+    return toNaiveString(d);
   }
-  return new Date(Math.max(...times) + SLOT_GAP_MS).toISOString();
+  return toNaiveString(new Date(Math.max(...times) + SLOT_GAP_MS));
 }
 
 /** Local `HH:MM` to prefill the add-to-day time field from the next free slot. */

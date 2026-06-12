@@ -1,4 +1,5 @@
 import type { TripItem } from './types';
+import { parseNaive } from '@/lib/time/naive';
 
 const DAY_START_HOUR = 9;
 const DAY_END_HOUR = 22;
@@ -22,9 +23,9 @@ export function computeDayFillRatio(items: TripItem[], date: Date): number {
   for (const item of items) {
     if (item.kind === 'note') continue;
 
-    const itemStart = new Date(item.startsAt).getTime();
+    const itemStart = parseNaive(item.startsAt).getTime();
     const itemEnd = item.endsAt
-      ? new Date(item.endsAt).getTime()
+      ? parseNaive(item.endsAt).getTime()
       : itemStart + 60 * 60_000;
 
     const clippedStart = Math.max(itemStart, windowStart);

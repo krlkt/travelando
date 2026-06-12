@@ -42,6 +42,7 @@ import {
   getTimePart,
   todayLocalDate,
 } from '@/lib/time/timeInput';
+import { parseNaive, toNaiveString } from '@/lib/time/naive';
 import type {
   ActivityPlace,
   FoodPlace,
@@ -75,7 +76,7 @@ function initialStartsAt(
   if (defaultDate) {
     const start = new Date(defaultDate);
     start.setHours(9, 0, 0, 0);
-    return toLocalInput(start.toISOString());
+    return toNaiveString(start);
   }
   return '';
 }
@@ -90,7 +91,7 @@ function initialEndsAt(
   if (defaultDate) {
     const end = new Date(defaultDate);
     end.setHours(10, 0, 0, 0);
-    return toLocalInput(end.toISOString());
+    return toNaiveString(end);
   }
   return '';
 }
@@ -147,7 +148,7 @@ function ItemEditorBody({
     !item && prefill?.kind === 'transport'
       ? (() => {
           const isoTs =
-            prefill.startsAt ?? prefill.endsAt ?? new Date().toISOString();
+            prefill.startsAt ?? prefill.endsAt ?? toNaiveString(new Date());
           const city = latestCityBefore(
             trip,
             cityOverrides[tripId] ?? [],
@@ -211,20 +212,20 @@ function ItemEditorBody({
     if (newKind === 'transport' && !isEdit) {
       const isoTs = startsAt
         ? fromLocalInput(startsAt)
-        : new Date().toISOString();
+        : toNaiveString(new Date());
       const city = latestCityBefore(trip, cityOverrides[tripId] ?? [], isoTs);
       setFromCityValue(city.cityLabel);
       setFromCityPlace({ label: city.cityLabel, placeId: city.cityPlaceId });
     }
     if (newKind === 'lodging' && !isEdit) {
-      const base = startsAt ? new Date(fromLocalInput(startsAt)) : new Date();
+      const base = startsAt ? parseNaive(startsAt) : new Date();
       const checkIn = new Date(base);
       checkIn.setHours(15, 0, 0, 0);
       const checkOut = new Date(checkIn);
       checkOut.setDate(checkOut.getDate() + 1);
       checkOut.setHours(11, 0, 0, 0);
-      setStartsAt(toLocalInput(checkIn.toISOString()));
-      setEndsAt(toLocalInput(checkOut.toISOString()));
+      setStartsAt(toNaiveString(checkIn));
+      setEndsAt(toNaiveString(checkOut));
       setFromValue('');
       setFromPlace(undefined);
     }

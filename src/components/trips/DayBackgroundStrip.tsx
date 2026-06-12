@@ -69,16 +69,16 @@ export function DayBackgroundStrip({
             type="button"
             onClick={() => onSelect(item)}
             className={cn(
-              'border-border/60 bg-secondary/30 hover:border-foreground/15 focus-visible:ring-ring/60 group relative block rounded-[var(--radius)] border px-3 py-2 text-left transition-[transform,box-shadow,border-color] hover:-translate-y-[1px] hover:shadow-[0_10px_24px_-18px_oklch(20%_0.02_250_/_0.25)] focus-visible:ring-2 focus-visible:outline-none',
+              'border-border/50 bg-secondary/30 hover:border-foreground/15 focus-visible:ring-ring/60 group relative block rounded-[var(--radius)] border px-2.5 py-1.5 text-left transition-[transform,box-shadow,border-color] hover:-translate-y-[1px] hover:shadow-[0_10px_24px_-18px_oklch(20%_0.02_250_/_0.25)] focus-visible:ring-2 focus-visible:outline-none',
               multi ? 'shrink-0 snap-start' : 'w-full',
             )}
           >
             <div className="flex w-full min-w-0 items-center gap-2.5">
               <span
-                className="text-background grid size-7 shrink-0 place-items-center rounded-full"
+                className="text-background grid size-6 shrink-0 place-items-center rounded-full"
                 style={{ background: meta.accent }}
               >
-                <Icon className="size-3.5" strokeWidth={2} />
+                <Icon className="size-3" strokeWidth={2} />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium">

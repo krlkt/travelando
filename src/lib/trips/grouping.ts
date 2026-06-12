@@ -1,5 +1,6 @@
 import type { Trip, TripItem } from './types';
 import { dayKey } from '@/lib/time/formatDate';
+import { parseNaive } from '@/lib/time/naive';
 
 export interface DayBucket {
   key: string;
@@ -9,27 +10,28 @@ export interface DayBucket {
 
 export function groupItemsByDay(trip: Trip): DayBucket[] {
   const buckets = new Map<string, DayBucket>();
-  const start = new Date(trip.startDate);
-  const end = new Date(trip.endDate);
+  const start = parseNaive(trip.startDate);
+  const end = parseNaive(trip.endDate);
   start.setHours(0, 0, 0, 0);
   end.setHours(0, 0, 0, 0);
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const key = dayKey(d.toISOString());
+    const key = dayKey(d);
     buckets.set(key, { key, date: new Date(d), items: [] });
   }
 
   for (const item of trip.items) {
     const key = dayKey(item.startsAt);
     if (!buckets.has(key)) {
-      buckets.set(key, { key, date: new Date(item.startsAt), items: [] });
+      buckets.set(key, { key, date: parseNaive(item.startsAt), items: [] });
     }
     buckets.get(key)!.items.push(item);
   }
 
   for (const bucket of buckets.values()) {
     bucket.items.sort(
-      (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+      (a, b) =>
+        parseNaive(a.startsAt).getTime() - parseNaive(b.startsAt).getTime(),
     );
   }
 
@@ -101,7 +103,7 @@ export function isBackgroundItem(item: TripItem): boolean {
   if (item.kind !== 'transport') return false;
   if (!item.endsAt) return false;
   const durationHours =
-    (new Date(item.endsAt).getTime() - new Date(item.startsAt).getTime()) /
+    (parseNaive(item.endsAt).getTime() - parseNaive(item.startsAt).getTime()) /
     3_600_000;
   return durationHours >= BACKGROUND_MIN_HOURS;
 }
@@ -109,9 +111,9 @@ export function isBackgroundItem(item: TripItem): boolean {
 export function findOverlappingItemIds(items: TripItem[]): Set<string> {
   const overlapping = new Set<string>();
   const ranges = items.map((item) => {
-    const start = new Date(item.startsAt).getTime();
+    const start = parseNaive(item.startsAt).getTime();
     const end = item.endsAt
-      ? new Date(item.endsAt).getTime()
+      ? parseNaive(item.endsAt).getTime()
       : start + 60 * 60 * 1000;
     return { id: item.id, start, end };
   });
@@ -131,9 +133,9 @@ export function findOverlappingItemIds(items: TripItem[]): Set<string> {
 export function findCurrentItem(items: TripItem[], now: Date): TripItem | null {
   return (
     items.find((i) => {
-      const start = new Date(i.startsAt);
+      const start = parseNaive(i.startsAt);
       const end = i.endsAt
-        ? new Date(i.endsAt)
+        ? parseNaive(i.endsAt)
         : new Date(start.getTime() + 60 * 60 * 1000);
       return start <= now && now <= end;
     }) ?? null
@@ -143,10 +145,10 @@ export function findCurrentItem(items: TripItem[], now: Date): TripItem | null {
 export function findNextItem(items: TripItem[], now: Date): TripItem | null {
   return (
     items
-      .filter((i) => new Date(i.startsAt) > now)
+      .filter((i) => parseNaive(i.startsAt) > now)
       .sort(
         (a, b) =>
-          new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+          parseNaive(a.startsAt).getTime() - parseNaive(b.startsAt).getTime(),
       )[0] ?? null
   );
 }

@@ -16,6 +16,7 @@ import {
 } from './cities';
 import { transportEndpoints } from './transportRoute';
 import { dayKey as toDayKey } from '@/lib/time/formatDate';
+import { parseNaive } from '@/lib/time/naive';
 import {
   haversineMeters,
   nearestDistanceMeters,
@@ -164,7 +165,7 @@ export function buildDayMapPoints(
         .slice()
         .sort(
           (a, b) =>
-            new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+            parseNaive(a.startsAt).getTime() - parseNaive(b.startsAt).getTime(),
         )
     : [];
 
@@ -176,7 +177,7 @@ export function buildDayMapPoints(
   // check its depart against the lodging location.
   const prevDate = new Date(`${dayKey}T00:00:00`);
   prevDate.setDate(prevDate.getDate() - 1);
-  const prevLodging = lodgingForDay(trip, toDayKey(prevDate.toISOString()));
+  const prevLodging = lodgingForDay(trip, toDayKey(prevDate));
   const prevLodgingPlace = prevLodging ? itemPlace(prevLodging) : undefined;
 
   // Tracks the last geographic location added to the route. Seeded from the

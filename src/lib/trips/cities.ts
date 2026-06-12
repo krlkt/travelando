@@ -6,11 +6,12 @@ import type {
   DayCityBucket,
 } from './types';
 import { dayKey } from '@/lib/time/formatDate';
+import { parseNaive } from '@/lib/time/naive';
 
 function arrivalTimestamp(transport: TripItem): number {
   return transport.endsAt
-    ? new Date(transport.endsAt).getTime()
-    : new Date(transport.startsAt).getTime() + 1;
+    ? parseNaive(transport.endsAt).getTime()
+    : parseNaive(transport.startsAt).getTime() + 1;
 }
 
 function itemOverlapsDay(
@@ -18,8 +19,8 @@ function itemOverlapsDay(
   dayStart: number,
   dayEnd: number,
 ): boolean {
-  const startTs = new Date(item.startsAt).getTime();
-  const endTs = item.endsAt ? new Date(item.endsAt).getTime() : startTs;
+  const startTs = parseNaive(item.startsAt).getTime();
+  const endTs = item.endsAt ? parseNaive(item.endsAt).getTime() : startTs;
   return startTs <= dayEnd && endTs >= dayStart;
 }
 
@@ -41,7 +42,7 @@ function buildDaySegments(
   let prevCutoff = dayStart;
 
   const effectiveTs = (item: TripItem): number => {
-    const startTs = new Date(item.startsAt).getTime();
+    const startTs = parseNaive(item.startsAt).getTime();
     return Math.max(startTs, dayStart);
   };
 
@@ -89,13 +90,14 @@ export function deriveCitiesByDay(
   const overrideMap = new Map<string, CityOverride>();
   for (const o of overrides) overrideMap.set(o.dayKey, o);
 
-  const start = new Date(trip.startDate);
-  const end = new Date(trip.endDate);
+  const start = parseNaive(trip.startDate);
+  const end = parseNaive(trip.endDate);
   start.setHours(0, 0, 0, 0);
   end.setHours(0, 0, 0, 0);
 
   const sortedItems = [...trip.items].sort(
-    (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime(),
+    (a, b) =>
+      parseNaive(a.startsAt).getTime() - parseNaive(b.startsAt).getTime(),
   );
 
   const result = new Map<string, DayCityBucket>();
@@ -103,7 +105,7 @@ export function deriveCitiesByDay(
   let currentPlaceId: string | undefined;
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const key = dayKey(d.toISOString());
+    const key = dayKey(d);
     const date = new Date(d);
     const dayStart = date.getTime();
     const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
@@ -159,7 +161,7 @@ export function latestCityBefore(
   overrides: CityOverride[],
   isoTimestamp: string,
 ): { cityLabel: string; cityPlaceId?: string } {
-  const ts = new Date(isoTimestamp).getTime();
+  const ts = parseNaive(isoTimestamp).getTime();
   const buckets = deriveCitiesByDay(trip, overrides);
 
   let result: { cityLabel: string; cityPlaceId?: string } = {
@@ -171,7 +173,7 @@ export function latestCityBefore(
   )) {
     for (const seg of bucket.segments) {
       const segStart = seg.startsAt
-        ? new Date(seg.startsAt).getTime()
+        ? parseNaive(seg.startsAt).getTime()
         : bucket.date.getTime();
       if (segStart <= ts) {
         result = { cityLabel: seg.cityLabel, cityPlaceId: seg.cityPlaceId };
@@ -202,16 +204,16 @@ export function lodgingForDay(trip: Trip, key: string): TripItem | null {
 
   const candidates = trip.items.filter((i) => {
     if (i.kind !== 'lodging') return false;
-    const startTs = new Date(i.startsAt).getTime();
+    const startTs = parseNaive(i.startsAt).getTime();
     if (startTs > dayEnd) return false;
     if (!i.endsAt) return false;
-    const endTs = new Date(i.endsAt).getTime();
+    const endTs = parseNaive(i.endsAt).getTime();
     return endTs > dayEnd;
   });
 
   if (candidates.length === 0) return null;
   return candidates.reduce((latest, item) =>
-    new Date(item.startsAt).getTime() > new Date(latest.startsAt).getTime()
+    parseNaive(item.startsAt).getTime() > parseNaive(latest.startsAt).getTime()
       ? item
       : latest,
   );
@@ -232,15 +234,15 @@ export function lodgingWakeUpForDay(trip: Trip, key: string): TripItem | null {
   const candidates = trip.items.filter((i) => {
     if (i.kind !== 'lodging') return false;
     if (!i.endsAt) return false;
-    const startTs = new Date(i.startsAt).getTime();
+    const startTs = parseNaive(i.startsAt).getTime();
     if (startTs >= dayStart) return false;
-    const endTs = new Date(i.endsAt).getTime();
+    const endTs = parseNaive(i.endsAt).getTime();
     return endTs > dayStart;
   });
 
   if (candidates.length === 0) return null;
   return candidates.reduce((latest, item) =>
-    new Date(item.startsAt).getTime() > new Date(latest.startsAt).getTime()
+    parseNaive(item.startsAt).getTime() > parseNaive(latest.startsAt).getTime()
       ? item
       : latest,
   );
@@ -252,8 +254,8 @@ export function findLodgingConflict(
   checkOutIso: string,
   excludeId?: string,
 ): TripItem | null {
-  const aStart = new Date(checkInIso).getTime();
-  const aEnd = new Date(checkOutIso).getTime();
+  const aStart = parseNaive(checkInIso).getTime();
+  const aEnd = parseNaive(checkOutIso).getTime();
   if (!Number.isFinite(aStart) || !Number.isFinite(aEnd) || aEnd <= aStart) {
     return null;
   }
@@ -262,8 +264,8 @@ export function findLodgingConflict(
     if (item.kind !== 'lodging') continue;
     if (item.id === excludeId) continue;
     if (!item.endsAt) continue;
-    const bStart = new Date(item.startsAt).getTime();
-    const bEnd = new Date(item.endsAt).getTime();
+    const bStart = parseNaive(item.startsAt).getTime();
+    const bEnd = parseNaive(item.endsAt).getTime();
     // Half-open intervals: overlap iff aStart < bEnd && bStart < aEnd
     if (aStart < bEnd && bStart < aEnd) return item;
   }

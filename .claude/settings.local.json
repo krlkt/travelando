@@ -32,7 +32,8 @@
       "Read(//tmp/**)",
       "Bash(grep *)",
       "Bash(node *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(npm test *)"
     ]
   }
 }
