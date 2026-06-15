@@ -51,6 +51,8 @@ interface ExpenseSheetProps {
   defaultCategory?: ExpenseCategory;
   defaultTitle?: string;
   lockTitle?: boolean;
+  /** Called with the newly created expense after a successful add (not edit). */
+  onAdded?: (expense: Expense) => void;
 }
 
 export function ExpenseSheet({
@@ -63,6 +65,7 @@ export function ExpenseSheet({
   defaultCategory,
   defaultTitle,
   lockTitle,
+  onAdded,
 }: ExpenseSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -77,6 +80,7 @@ export function ExpenseSheet({
             defaultCategory={defaultCategory}
             defaultTitle={defaultTitle}
             lockTitle={lockTitle}
+            onAdded={onAdded}
           />
         )}
       </SheetContent>
@@ -160,6 +164,7 @@ interface ExpenseBodyProps {
   defaultCategory?: ExpenseCategory;
   defaultTitle?: string;
   lockTitle?: boolean;
+  onAdded?: (expense: Expense) => void;
 }
 
 function ExpenseBody({
@@ -171,6 +176,7 @@ function ExpenseBody({
   defaultCategory,
   defaultTitle,
   lockTitle,
+  onAdded,
 }: ExpenseBodyProps) {
   const { addExpense, updateExpense, removeExpense } = useTrips();
   const isEdit = !!expense;
@@ -396,7 +402,8 @@ function ExpenseBody({
         await updateExpense(trip.id, expense.id, patch);
         toast.success('Expense updated');
       } else {
-        await addExpense(draft);
+        const created = await addExpense(draft);
+        onAdded?.(created);
         toast.success('Expense added');
       }
       onClose();

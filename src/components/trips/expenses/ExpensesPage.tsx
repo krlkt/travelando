@@ -316,6 +316,21 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
           setSheetOpen(o);
           if (!o) setEditingExpense(null);
         }}
+        onAdded={(created) => {
+          // Pull the server's authoritative list so the new expense shows
+          // without a manual page refresh.
+          loadTripExtras(tripId);
+          // Clear any active filters so the just-added expense is never hidden
+          // behind a category/city chip or the "my share" view.
+          setSelectedCategory(null);
+          setSelectedCity(null);
+          if (
+            viewMode === 'mine' &&
+            shareForMember(created, currentMemberId) <= SHARE_EPSILON
+          ) {
+            setViewMode('trip');
+          }
+        }}
       />
     </div>
   );
