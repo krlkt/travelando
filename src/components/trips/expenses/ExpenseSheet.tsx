@@ -26,6 +26,12 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useTrips } from '@/lib/trips/context';
 import { formatAmountInput, parseAmountInput } from '@/lib/trips/grouping';
 import {
+  readExpenseDefaults,
+  resolvePayerDefault,
+  resolveSelectionDefault,
+  writeExpenseDefaults,
+} from '@/lib/trips/expenseDefaults';
+import {
   EXPENSE_CATEGORIES,
   categoryLabels,
 } from '@/lib/trips/expenseCategory';
@@ -100,8 +106,11 @@ interface SelectionState {
   amounts: Record<string, { value: number | null; locked: boolean }>;
 }
 
-function defaultSelectionState(members: TripMember[]): SelectionState {
-  const selected = new Set(members.map((m) => m.id));
+function defaultSelectionState(
+  members: TripMember[],
+  selectedIds?: readonly string[],
+): SelectionState {
+  const selected = new Set(selectedIds ?? members.map((m) => m.id));
   const parts: Record<string, number> = {};
   const amounts: Record<string, { value: number | null; locked: boolean }> = {};
   for (const m of members) {
@@ -181,6 +190,15 @@ function ExpenseBody({
   const { addExpense, updateExpense, removeExpense } = useTrips();
   const isEdit = !!expense;
   const members = trip.members;
+  const isPrivate = !!privateToUserIds && privateToUserIds.length > 0;
+  // Last-used payer/split are restored only for a plain new expense — edit
+  // hydrates from the expense, and the private flow forces its own member set.
+  // Read once on mount (the body remounts per open), not on every keystroke.
+  const storedDefaults = useMemo(
+    () => (!isEdit && !isPrivate ? readExpenseDefaults(trip.id) : null),
+    [isEdit, isPrivate, trip.id],
+  );
+  const memberIds = members.map((m) => m.id);
 
   const [title, setTitle] = useState<string>(
     expense?.title ?? defaultTitle ?? '',
@@ -190,7 +208,12 @@ function ExpenseBody({
   );
   const [currency, setCurrency] = useState<string>(expense?.currency ?? 'EUR');
   const [payerId, setPayerId] = useState<string>(
-    expense?.payerMemberId ?? members[0]?.id ?? '',
+    expense?.payerMemberId ??
+      resolvePayerDefault({
+        stored: storedDefaults,
+        memberIds,
+        fallback: members[0]?.id ?? '',
+      }),
   );
   const [spentOn, setSpentOn] = useState<string>(
     expense?.spentOn ?? todayLocalDate(),
@@ -206,7 +229,10 @@ function ExpenseBody({
     if (expense) return hydrateFromExpense(expense, members);
     if (privateToUserIds && privateToUserIds.length > 0)
       return privateSelectionState(members, privateToUserIds);
-    return defaultSelectionState(members);
+    return defaultSelectionState(
+      members,
+      resolveSelectionDefault({ stored: storedDefaults, memberIds }),
+    );
   });
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -403,6 +429,14 @@ function ExpenseBody({
         toast.success('Expense updated');
       } else {
         const created = await addExpense(draft);
+        // Remember who paid and who it was split with for the next new expense.
+        // Skip the private flow so it doesn't pollute the general default.
+        if (!isPrivate) {
+          writeExpenseDefaults(trip.id, {
+            payerMemberId: payerId,
+            selectedMemberIds: [...selection.selected],
+          });
+        }
         onAdded?.(created);
         toast.success('Expense added');
       }
