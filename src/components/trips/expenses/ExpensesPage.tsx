@@ -54,8 +54,9 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
   const [rates, setRates] = useState<EurRates | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
-  const [selectedCategory, setSelectedCategory] =
-    useState<ExpenseCategory | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<
+    ExpenseCategory[]
+  >([]);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ExpenseViewMode>('mine');
   const [sortMode, setSortMode] = useState<ExpenseSortMode>('spent');
@@ -88,11 +89,19 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
   const currentMemberId = findMemberIdForUser(trip.members, user?.id);
   const categoryExpenses = useMemo(
     () =>
-      selectedCategory
-        ? tripExpenses.filter((e) => e.category === selectedCategory)
-        : tripExpenses,
-    [tripExpenses, selectedCategory],
+      selectedCategories.length === 0
+        ? tripExpenses
+        : tripExpenses.filter((e) => selectedCategories.includes(e.category)),
+    [tripExpenses, selectedCategories],
   );
+
+  const handleToggleCategory = (category: ExpenseCategory) => {
+    setSelectedCategories((prev) =>
+      prev.includes(category)
+        ? prev.filter((c) => c !== category)
+        : [...prev, category],
+    );
+  };
   // Resolve each (category-filtered) expense to the city of its spent day, so
   // the chips and the city filter stay in sync with the category selection.
   const cityResolution = useMemo(
@@ -108,6 +117,23 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
           )
         : categoryExpenses,
     [categoryExpenses, selectedCity, cityResolution],
+  );
+  // The category widget shows every category, so it can't reuse the
+  // category-filtered resolution above. Resolve cities across all expenses and
+  // narrow to the selected city only — leaving the category breakdown intact so
+  // the tiles stay togglable while still tracking the active city.
+  const fullCityResolution = useMemo(
+    () => resolveExpenseCities(tripExpenses, trip, cityOverrides[tripId] ?? []),
+    [tripExpenses, trip, cityOverrides, tripId],
+  );
+  const categoryWidgetExpenses = useMemo(
+    () =>
+      selectedCity
+        ? tripExpenses.filter(
+            (e) => fullCityResolution.keyByExpenseId.get(e.id) === selectedCity,
+          )
+        : tripExpenses,
+    [tripExpenses, selectedCity, fullCityResolution],
   );
   // In "my share" mode, only expenses the current member is part of appear.
   const visibleExpenses = useMemo(
@@ -235,12 +261,13 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
         </section>
 
         <CategoryWidget
-          expenses={tripExpenses}
+          expenses={categoryWidgetExpenses}
           rates={rates}
           mode={viewMode}
           currentMemberId={currentMemberId}
-          selected={selectedCategory}
-          onSelect={setSelectedCategory}
+          selected={selectedCategories}
+          onToggle={handleToggleCategory}
+          onClear={() => setSelectedCategories([])}
         />
 
         <CityFilter
@@ -322,7 +349,7 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
           loadTripExtras(tripId);
           // Clear any active filters so the just-added expense is never hidden
           // behind a category/city chip or the "my share" view.
-          setSelectedCategory(null);
+          setSelectedCategories([]);
           setSelectedCity(null);
           if (
             viewMode === 'mine' &&

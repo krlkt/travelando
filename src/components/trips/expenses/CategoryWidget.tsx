@@ -25,8 +25,10 @@ interface CategoryWidgetProps {
   rates: EurRates | null;
   mode: ExpenseViewMode;
   currentMemberId: string | null;
-  selected: ExpenseCategory | null;
-  onSelect: (category: ExpenseCategory | null) => void;
+  /** Active categories. Empty means no category filter. */
+  selected: ExpenseCategory[];
+  onToggle: (category: ExpenseCategory) => void;
+  onClear: () => void;
 }
 
 export function CategoryWidget({
@@ -35,7 +37,8 @@ export function CategoryWidget({
   mode,
   currentMemberId,
   selected,
-  onSelect,
+  onToggle,
+  onClear,
 }: CategoryWidgetProps) {
   const categoryTotals = useMemo(
     () => aggregateByCategory(expenses, rates, currentMemberId),
@@ -81,14 +84,19 @@ export function CategoryWidget({
           {mode === 'mine'
             ? 'Your spend by category'
             : 'Trip spend by category'}
+          {selected.length > 0 && (
+            <span className="ml-1.5 normal-case opacity-70">
+              · {selected.length} selected
+            </span>
+          )}
           {hasForeign && (
             <span className="ml-1.5 normal-case opacity-70">≈ EUR</span>
           )}
         </span>
-        {selected && (
+        {selected.length > 0 && (
           <button
             type="button"
-            onClick={() => onSelect(null)}
+            onClick={onClear}
             className="text-muted-foreground hover:text-foreground text-[11px] underline-offset-2 hover:underline"
           >
             Clear filter
@@ -100,12 +108,12 @@ export function CategoryWidget({
           const amount = buckets[c];
           const pct =
             grandTotal > 0 ? Math.round((amount / grandTotal) * 100) : 0;
-          const isActive = selected === c;
+          const isActive = selected.includes(c);
           return (
             <button
               key={c}
               type="button"
-              onClick={() => onSelect(isActive ? null : c)}
+              onClick={() => onToggle(c)}
               aria-pressed={isActive}
               className={cn(
                 'border-border/60 group flex flex-col gap-1 rounded-[var(--radius)] border p-2.5 text-left transition',
