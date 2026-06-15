@@ -1,23 +1,14 @@
-import type { ReactNode } from 'react';
-import { createClient } from '@/lib/supabase/server';
-import { createSupabaseRepository } from '@/lib/trips/supabaseRepository';
-import { TripsBootstrap } from '@/components/shell/TripsBootstrap';
-import type { Trip } from '@/lib/trips/types';
+import { Suspense, type ReactNode } from 'react';
+import { TripsDataProvider } from '@/components/shell/TripsDataProvider';
+import { TripsDashboardSkeleton } from '@/components/trips/TripsDashboardSkeleton';
 
-export default async function TripsLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  const supabase = await createClient();
-  const repo = createSupabaseRepository(supabase);
-
-  let trips: Trip[] = [];
-  try {
-    trips = await repo.findAll();
-  } catch (err) {
-    console.error('[travelando] trips findAll failed', err);
-  }
-
-  return <TripsBootstrap trips={trips}>{children}</TripsBootstrap>;
+export default function TripsLayout({ children }: { children: ReactNode }) {
+  // The layout itself stays synchronous; the trip-list fetch lives in
+  // TripsDataProvider behind a Suspense boundary, so navigating into /trips
+  // shows a skeleton immediately instead of blocking on the fetch.
+  return (
+    <Suspense fallback={<TripsDashboardSkeleton />}>
+      <TripsDataProvider>{children}</TripsDataProvider>
+    </Suspense>
+  );
 }

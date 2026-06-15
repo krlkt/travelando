@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { CalendarCheck, MapPinned, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
   TooltipContent,
@@ -23,7 +24,8 @@ interface ActivityWishlistProps {
 }
 
 export function ActivityWishlist({ trip, dayKey }: ActivityWishlistProps) {
-  const { activityPlaces, cityOverrides, removeActivityPlace } = useTrips();
+  const { activityPlaces, cityOverrides, removeActivityPlace, extrasStatus } =
+    useTrips();
   const tripId = trip.id;
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -39,6 +41,10 @@ export function ActivityWishlist({ trip, dayKey }: ActivityWishlistProps) {
   );
 
   const placesForTrip = activityPlaces[tripId];
+  // Only the first load (no cached data yet) shows skeletons; revisits keep the
+  // activities already on screen.
+  const isLoading =
+    placesForTrip === undefined && extrasStatus[tripId] === 'loading';
 
   const places = useMemo(() => placesForTrip ?? [], [placesForTrip]);
 
@@ -182,7 +188,12 @@ export function ActivityWishlist({ trip, dayKey }: ActivityWishlistProps) {
                 </Button>
               </div>
 
-              {visiblePlaces.length === 0 ? (
+              {isLoading ? (
+                <ul className="space-y-2">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-4 w-1/2" />
+                </ul>
+              ) : visiblePlaces.length === 0 ? (
                 <p className="text-muted-foreground/60 text-xs">
                   No activities yet.
                 </p>

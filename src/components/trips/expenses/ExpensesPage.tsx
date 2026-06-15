@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { motion } from 'motion/react';
 import { ArrowLeft, Plus, Wallet } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTrips } from '@/lib/trips/context';
@@ -30,6 +31,10 @@ import { CategoryWidget } from './CategoryWidget';
 import { CityFilter } from './CityFilter';
 import { ShareToggle, type ExpenseViewMode } from './ShareToggle';
 import {
+  ExpensesBodySkeleton,
+  ExpensesTotalsSkeleton,
+} from './ExpensesSkeleton';
+import {
   ExpenseSortToggle,
   type AmountSortDir,
   type ExpenseSortMode,
@@ -51,6 +56,7 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
     cityOverrides,
     removeSettlement,
     loadTripExtras,
+    extrasStatus,
   } = useTrips();
   const { user } = useAuth();
   const trip = getTrip(tripId);
@@ -66,8 +72,12 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
   const [amountDir, setAmountDir] = useState<AmountSortDir>('desc');
 
   useEffect(() => {
-    loadTripExtras(tripId);
+    loadTripExtras(tripId).catch(() => {
+      toast.error("Couldn't load expenses. Pull to refresh or try again.");
+    });
   }, [tripId, loadTripExtras]);
+
+  const isLoadingExtras = extrasStatus[tripId] === 'loading';
 
   useEffect(() => {
     let active = true;
@@ -253,7 +263,9 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
             <ShareToggle value={viewMode} onChange={setViewMode} />
           </div>
           <div className="mt-3">
-            {totals.byCurrency.length === 0 ? (
+            {isLoadingExtras ? (
+              <ExpensesTotalsSkeleton />
+            ) : totals.byCurrency.length === 0 ? (
               <span className="font-display text-3xl tabular-nums sm:text-4xl">
                 —
               </span>
@@ -280,79 +292,85 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
           </div>
         </section>
 
-        <CategoryWidget
-          expenses={categoryWidgetExpenses}
-          rates={rates}
-          mode={viewMode}
-          currentMemberId={currentMemberId}
-          selected={selectedCategories}
-          onToggle={handleToggleCategory}
-          onClear={() => setSelectedCategories([])}
-        />
-
-        <CityFilter
-          groups={cityGroups}
-          selected={selectedCity}
-          onSelect={setSelectedCity}
-        />
-
-        <Tabs defaultValue="expenses" className="mt-6">
-          <div className="flex items-center justify-between gap-3">
-            <TabsList>
-              <TabsTrigger value="expenses">Expenses</TabsTrigger>
-              <TabsTrigger value="balances">Balances</TabsTrigger>
-            </TabsList>
-            <Button size="sm" onClick={handleAdd}>
-              <Plus className="size-4" />
-              Add expense
-            </Button>
-          </div>
-
-          <TabsContent value="expenses" className="mt-4">
-            {visibleExpenses.length === 0 ? (
-              <EmptyState
-                onAdd={handleAdd}
-                mode={viewMode}
-                hasAny={categoryExpenses.length > 0}
-              />
-            ) : (
-              <>
-                {visibleExpenses.length > 1 && (
-                  <div className="mb-4 flex items-center justify-end">
-                    <ExpenseSortToggle
-                      value={sortMode}
-                      amountDir={amountDir}
-                      onChange={setSortMode}
-                      onAmountDirChange={setAmountDir}
-                    />
-                  </div>
-                )}
-                <ExpensesList
-                  expenses={visibleExpenses}
-                  members={trip.members}
-                  mode={viewMode}
-                  sort={sortMode}
-                  amountDir={amountDir}
-                  rates={rates}
-                  currentMemberId={currentMemberId}
-                  onSelect={handleEdit}
-                />
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="balances" className="mt-4">
-            <BalancesTab
-              trip={trip}
-              result={balanceResult}
-              summary={summary}
-              members={trip.members}
+        {isLoadingExtras ? (
+          <ExpensesBodySkeleton />
+        ) : (
+          <>
+            <CategoryWidget
+              expenses={categoryWidgetExpenses}
+              rates={rates}
+              mode={viewMode}
               currentMemberId={currentMemberId}
-              settlements={tripSettlements}
-              onRemoveSettlement={(id) => removeSettlement(trip.id, id)}
+              selected={selectedCategories}
+              onToggle={handleToggleCategory}
+              onClear={() => setSelectedCategories([])}
             />
-          </TabsContent>
-        </Tabs>
+
+            <CityFilter
+              groups={cityGroups}
+              selected={selectedCity}
+              onSelect={setSelectedCity}
+            />
+
+            <Tabs defaultValue="expenses" className="mt-6">
+              <div className="flex items-center justify-between gap-3">
+                <TabsList>
+                  <TabsTrigger value="expenses">Expenses</TabsTrigger>
+                  <TabsTrigger value="balances">Balances</TabsTrigger>
+                </TabsList>
+                <Button size="sm" onClick={handleAdd}>
+                  <Plus className="size-4" />
+                  Add expense
+                </Button>
+              </div>
+
+              <TabsContent value="expenses" className="mt-4">
+                {visibleExpenses.length === 0 ? (
+                  <EmptyState
+                    onAdd={handleAdd}
+                    mode={viewMode}
+                    hasAny={categoryExpenses.length > 0}
+                  />
+                ) : (
+                  <>
+                    {visibleExpenses.length > 1 && (
+                      <div className="mb-4 flex items-center justify-end">
+                        <ExpenseSortToggle
+                          value={sortMode}
+                          amountDir={amountDir}
+                          onChange={setSortMode}
+                          onAmountDirChange={setAmountDir}
+                        />
+                      </div>
+                    )}
+                    <ExpensesList
+                      expenses={visibleExpenses}
+                      members={trip.members}
+                      mode={viewMode}
+                      sort={sortMode}
+                      amountDir={amountDir}
+                      rates={rates}
+                      currentMemberId={currentMemberId}
+                      onSelect={handleEdit}
+                    />
+                  </>
+                )}
+              </TabsContent>
+
+              <TabsContent value="balances" className="mt-4">
+                <BalancesTab
+                  trip={trip}
+                  result={balanceResult}
+                  summary={summary}
+                  members={trip.members}
+                  currentMemberId={currentMemberId}
+                  settlements={tripSettlements}
+                  onRemoveSettlement={(id) => removeSettlement(trip.id, id)}
+                />
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
       </div>
 
       <ExpenseSheet

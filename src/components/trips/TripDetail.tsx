@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
 import { ArrowLeft, Bed, Plus, Radio, Share2, Wallet } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { TimelineItem } from './TimelineItem';
@@ -93,7 +94,9 @@ export function TripDetail({ tripId }: TripDetailProps) {
   const trip = getTrip(tripId);
 
   useEffect(() => {
-    loadTripExtras(tripId);
+    loadTripExtras(tripId).catch(() => {
+      toast.error("Couldn't load all trip details. Some info may be missing.");
+    });
   }, [tripId, loadTripExtras]);
 
   if (!trip) notFound();

@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -56,6 +57,14 @@ interface TripsState {
   dayPlans: Record<string, DayPlan[]>;
   expenses: Record<string, Expense[]>;
   settlements: Record<string, Settlement[]>;
+  /**
+   * Per-trip load state for the secondary data fetched by `loadTripExtras`
+   * (food/activity places, city overrides, day plans, expenses, settlements).
+   * Drives skeletons: `'loading'` only the first time, so revisits with cached
+   * data never flash a skeleton. Stays at the last value during background
+   * refreshes.
+   */
+  extrasStatus: Record<string, ExtrasStatus>;
   loadTripExtras: (tripId: string) => Promise<void>;
   addFoodPlace: (draft: FoodPlaceDraft) => Promise<FoodPlace>;
   updateFoodPlace: (
@@ -104,6 +113,8 @@ interface TripsState {
   acceptInvitation: (memberId: string) => Promise<void>;
   declineInvitation: (memberId: string) => Promise<void>;
 }
+
+export type ExtrasStatus = 'idle' | 'loading' | 'loaded' | 'error';
 
 const TripsContext = createContext<TripsState | null>(null);
 
@@ -175,6 +186,13 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
     {},
   );
   const [invitations, setInvitations] = useState<TripInvitation[]>([]);
+  const [extrasStatus, setExtrasStatus] = useState<
+    Record<string, ExtrasStatus>
+  >({});
+  // De-dupes concurrent loads for the same trip (e.g. dashboard + detail both
+  // mounting). Callers awaiting an in-flight load share its promise instead of
+  // firing a second round of six fetches.
+  const extrasInFlight = useRef<Map<string, Promise<void>>>(new Map());
 
   const getTrip = useCallback(
     (id: string) => trips.find((t) => t.id === id),
@@ -359,20 +377,46 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
   );
 
   const loadTripExtras = useCallback(async (tripId: string): Promise<void> => {
-    const [fp, ap, co, dp, ex, st] = await Promise.all([
-      callApi<FoodPlace[]>(`/api/trips/${tripId}/food-places`),
-      callApi<ActivityPlace[]>(`/api/trips/${tripId}/activity-places`),
-      callApi<CityOverride[]>(`/api/trips/${tripId}/city-overrides`),
-      callApi<DayPlan[]>(`/api/trips/${tripId}/day-plans`),
-      callApi<Expense[]>(`/api/trips/${tripId}/expenses`),
-      callApi<Settlement[]>(`/api/trips/${tripId}/settlements`),
-    ]);
-    setFoodPlaces((prev) => ({ ...prev, [tripId]: fp ?? [] }));
-    setActivityPlaces((prev) => ({ ...prev, [tripId]: ap ?? [] }));
-    setCityOverrides((prev) => ({ ...prev, [tripId]: co ?? [] }));
-    setDayPlans((prev) => ({ ...prev, [tripId]: dp ?? [] }));
-    setExpenses((prev) => ({ ...prev, [tripId]: ex ?? [] }));
-    setSettlements((prev) => ({ ...prev, [tripId]: st ?? [] }));
+    const inFlight = extrasInFlight.current.get(tripId);
+    if (inFlight) return inFlight;
+
+    // First load shows a skeleton; later refreshes keep the cached data on
+    // screen ('loaded' stays put) so the UI never flashes back to a skeleton.
+    setExtrasStatus((prev) =>
+      prev[tripId] === 'loaded' ? prev : { ...prev, [tripId]: 'loading' },
+    );
+
+    const run = (async () => {
+      try {
+        const [fp, ap, co, dp, ex, st] = await Promise.all([
+          callApi<FoodPlace[]>(`/api/trips/${tripId}/food-places`),
+          callApi<ActivityPlace[]>(`/api/trips/${tripId}/activity-places`),
+          callApi<CityOverride[]>(`/api/trips/${tripId}/city-overrides`),
+          callApi<DayPlan[]>(`/api/trips/${tripId}/day-plans`),
+          callApi<Expense[]>(`/api/trips/${tripId}/expenses`),
+          callApi<Settlement[]>(`/api/trips/${tripId}/settlements`),
+        ]);
+        setFoodPlaces((prev) => ({ ...prev, [tripId]: fp ?? [] }));
+        setActivityPlaces((prev) => ({ ...prev, [tripId]: ap ?? [] }));
+        setCityOverrides((prev) => ({ ...prev, [tripId]: co ?? [] }));
+        setDayPlans((prev) => ({ ...prev, [tripId]: dp ?? [] }));
+        setExpenses((prev) => ({ ...prev, [tripId]: ex ?? [] }));
+        setSettlements((prev) => ({ ...prev, [tripId]: st ?? [] }));
+        setExtrasStatus((prev) => ({ ...prev, [tripId]: 'loaded' }));
+      } catch (err) {
+        // Keep any already-cached data visible on a failed refresh; only the
+        // initial load surfaces an error state.
+        setExtrasStatus((prev) =>
+          prev[tripId] === 'loaded' ? prev : { ...prev, [tripId]: 'error' },
+        );
+        throw err;
+      } finally {
+        extrasInFlight.current.delete(tripId);
+      }
+    })();
+
+    extrasInFlight.current.set(tripId, run);
+    return run;
   }, []);
 
   const addFoodPlace = useCallback(
@@ -951,6 +995,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       dayPlans,
       expenses,
       settlements,
+      extrasStatus,
       loadTripExtras,
       addFoodPlace,
       updateFoodPlace,
@@ -990,6 +1035,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       dayPlans,
       expenses,
       settlements,
+      extrasStatus,
       loadTripExtras,
       addFoodPlace,
       updateFoodPlace,

@@ -9,6 +9,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Tooltip,
   TooltipContent,
@@ -29,7 +30,8 @@ interface FoodWishlistProps {
 }
 
 export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
-  const { foodPlaces, cityOverrides, removeFoodPlace } = useTrips();
+  const { foodPlaces, cityOverrides, removeFoodPlace, extrasStatus } =
+    useTrips();
   const tripId = trip.id;
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -45,6 +47,10 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
   );
 
   const placesForTrip = foodPlaces[tripId];
+  // Only the first load (no cached data yet) shows skeletons; revisits keep the
+  // places already on screen.
+  const isLoading =
+    placesForTrip === undefined && extrasStatus[tripId] === 'loading';
 
   const places = useMemo(() => placesForTrip ?? [], [placesForTrip]);
 
@@ -185,7 +191,13 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
                 </Button>
               </div>
 
-              {cityPlaces.filter((p) => !deletingIds.has(p.id)).length === 0 ? (
+              {isLoading ? (
+                <ul className="space-y-2">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-4 w-1/2" />
+                </ul>
+              ) : cityPlaces.filter((p) => !deletingIds.has(p.id)).length ===
+                0 ? (
                 <p className="text-muted-foreground/60 text-xs">
                   No places yet.
                 </p>
