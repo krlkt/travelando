@@ -441,6 +441,7 @@ export interface ExpenseRow {
   currency: string;
   payer_member_id: string;
   spent_on: string;
+  created_at: string;
   mode: ExpenseSplitMode;
   category: ExpenseCategory;
   expense_shares?: ExpenseShareRow[] | null;
@@ -481,6 +482,7 @@ export function rowToExpense(row: ExpenseRow): Expense {
     currency: row.currency,
     payerMemberId: row.payer_member_id,
     spentOn: row.spent_on,
+    createdAt: row.created_at,
     mode: row.mode,
     category: row.category,
     shares,
@@ -489,7 +491,7 @@ export function rowToExpense(row: ExpenseRow): Expense {
 
 export function expenseDraftToInsert(
   draft: ExpenseDraft,
-): Omit<ExpenseRow, 'id' | 'expense_shares'> {
+): Omit<ExpenseRow, 'id' | 'created_at' | 'expense_shares'> {
   return {
     trip_id: draft.tripId,
     item_id: draft.itemId ?? null,
@@ -505,9 +507,12 @@ export function expenseDraftToInsert(
 
 export function expensePatchToUpdate(
   patch: ExpensePatch,
-): Partial<Omit<ExpenseRow, 'id' | 'trip_id' | 'expense_shares'>> {
-  const out: Partial<Omit<ExpenseRow, 'id' | 'trip_id' | 'expense_shares'>> =
-    {};
+): Partial<
+  Omit<ExpenseRow, 'id' | 'trip_id' | 'created_at' | 'expense_shares'>
+> {
+  const out: Partial<
+    Omit<ExpenseRow, 'id' | 'trip_id' | 'created_at' | 'expense_shares'>
+  > = {};
   if (patch.itemId !== undefined) out.item_id = patch.itemId ?? null;
   if (patch.title !== undefined) out.title = patch.title;
   if (patch.amount !== undefined) out.amount = patch.amount;

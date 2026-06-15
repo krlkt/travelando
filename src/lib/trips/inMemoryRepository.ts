@@ -374,6 +374,7 @@ export function createInMemoryRepository(
       const expense: Expense = {
         ...draft,
         id: randomId('exp'),
+        createdAt: new Date().toISOString(),
         shares: draft.shares.map((s) => ({ ...s })),
       };
       expenses = [...expenses, expense];

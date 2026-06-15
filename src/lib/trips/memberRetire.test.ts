@@ -13,6 +13,7 @@ function expense(overrides: Partial<Expense>): Expense {
     currency: 'EUR',
     payerMemberId: 'm-a',
     spentOn: '2026-06-01',
+    createdAt: '2026-06-01T00:00:00Z',
     mode: 'equally',
     category: 'restaurants',
     shares: [

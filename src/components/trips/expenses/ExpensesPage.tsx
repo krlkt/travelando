@@ -17,13 +17,20 @@ import {
   summarizeForUser,
 } from '@/lib/trips/balances';
 import { aggregateByCurrency } from '@/lib/trips/expenseTotals';
+import { resolveExpenseCities } from '@/lib/trips/expenseCities';
 import { formatMoney } from '@/lib/trips/grouping';
 import type { Expense } from '@/lib/trips/types';
 import { ExpenseSheet } from './ExpenseSheet';
 import { ExpensesList } from './ExpensesList';
 import { BalancesTab } from './BalancesTab';
 import { CategoryWidget } from './CategoryWidget';
+import { CityFilter } from './CityFilter';
 import { ShareToggle, type ExpenseViewMode } from './ShareToggle';
+import {
+  ExpenseSortToggle,
+  type AmountSortDir,
+  type ExpenseSortMode,
+} from './ExpenseSortToggle';
 import { fadeUp, stagger } from '@/lib/motion/presets';
 import type { ExpenseCategory } from '@/lib/trips/types';
 
@@ -34,8 +41,14 @@ interface ExpensesPageProps {
 }
 
 export function ExpensesPage({ tripId }: ExpensesPageProps) {
-  const { getTrip, expenses, settlements, removeSettlement, loadTripExtras } =
-    useTrips();
+  const {
+    getTrip,
+    expenses,
+    settlements,
+    cityOverrides,
+    removeSettlement,
+    loadTripExtras,
+  } = useTrips();
   const { user } = useAuth();
   const trip = getTrip(tripId);
   const [rates, setRates] = useState<EurRates | null>(null);
@@ -43,7 +56,10 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [selectedCategory, setSelectedCategory] =
     useState<ExpenseCategory | null>(null);
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ExpenseViewMode>('mine');
+  const [sortMode, setSortMode] = useState<ExpenseSortMode>('spent');
+  const [amountDir, setAmountDir] = useState<AmountSortDir>('desc');
 
   useEffect(() => {
     loadTripExtras(tripId);
@@ -77,20 +93,39 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
         : tripExpenses,
     [tripExpenses, selectedCategory],
   );
+  // Resolve each (category-filtered) expense to the city of its spent day, so
+  // the chips and the city filter stay in sync with the category selection.
+  const cityResolution = useMemo(
+    () =>
+      resolveExpenseCities(categoryExpenses, trip, cityOverrides[tripId] ?? []),
+    [categoryExpenses, trip, cityOverrides, tripId],
+  );
+  const cityExpenses = useMemo(
+    () =>
+      selectedCity
+        ? categoryExpenses.filter(
+            (e) => cityResolution.keyByExpenseId.get(e.id) === selectedCity,
+          )
+        : categoryExpenses,
+    [categoryExpenses, selectedCity, cityResolution],
+  );
   // In "my share" mode, only expenses the current member is part of appear.
   const visibleExpenses = useMemo(
     () =>
       viewMode === 'mine'
-        ? categoryExpenses.filter(
+        ? cityExpenses.filter(
             (e) => shareForMember(e, currentMemberId) > SHARE_EPSILON,
           )
-        : categoryExpenses,
-    [categoryExpenses, viewMode, currentMemberId],
+        : cityExpenses,
+    [cityExpenses, viewMode, currentMemberId],
   );
 
+  // The headline total reflects the active filters (category + city), so it
+  // tracks what's actually listed. View mode only decides which figure —
+  // "my share" or "trip total" — reads as primary; both come from this set.
   const totals = useMemo(
-    () => aggregateByCurrency(tripExpenses, currentMemberId),
-    [tripExpenses, currentMemberId],
+    () => aggregateByCurrency(cityExpenses, currentMemberId),
+    [cityExpenses, currentMemberId],
   );
 
   const balanceResult = useMemo(
@@ -208,6 +243,12 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
           onSelect={setSelectedCategory}
         />
 
+        <CityFilter
+          groups={cityResolution.groups}
+          selected={selectedCity}
+          onSelect={setSelectedCity}
+        />
+
         <Tabs defaultValue="expenses" className="mt-6">
           <div className="flex items-center justify-between gap-3">
             <TabsList>
@@ -228,13 +269,28 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
                 hasAny={categoryExpenses.length > 0}
               />
             ) : (
-              <ExpensesList
-                expenses={visibleExpenses}
-                members={trip.members}
-                mode={viewMode}
-                currentMemberId={currentMemberId}
-                onSelect={handleEdit}
-              />
+              <>
+                {visibleExpenses.length > 1 && (
+                  <div className="mb-4 flex items-center justify-end">
+                    <ExpenseSortToggle
+                      value={sortMode}
+                      amountDir={amountDir}
+                      onChange={setSortMode}
+                      onAmountDirChange={setAmountDir}
+                    />
+                  </div>
+                )}
+                <ExpensesList
+                  expenses={visibleExpenses}
+                  members={trip.members}
+                  mode={viewMode}
+                  sort={sortMode}
+                  amountDir={amountDir}
+                  rates={rates}
+                  currentMemberId={currentMemberId}
+                  onSelect={handleEdit}
+                />
+              </>
             )}
           </TabsContent>
 

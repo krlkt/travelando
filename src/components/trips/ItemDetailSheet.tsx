@@ -52,7 +52,7 @@ export function ItemDetailSheet({
   onOpenChange,
   onEdit,
 }: ItemDetailSheetProps) {
-  const { removeItem, updateItem, expenses } = useTrips();
+  const { removeItem, expenses } = useTrips();
   const { user } = useAuth();
   const [expenseSheetOpen, setExpenseSheetOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);

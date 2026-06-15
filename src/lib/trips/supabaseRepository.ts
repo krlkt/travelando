@@ -80,7 +80,7 @@ const MEMBER_COLUMNS =
 
 const EXPENSE_SHARE_COLUMNS = 'id, expense_id, member_id, value, locked';
 
-const EXPENSE_COLUMNS = `id, trip_id, item_id, title, amount, currency, payer_member_id, spent_on, mode, category, expense_shares(${EXPENSE_SHARE_COLUMNS})`;
+const EXPENSE_COLUMNS = `id, trip_id, item_id, title, amount, currency, payer_member_id, spent_on, created_at, mode, category, expense_shares(${EXPENSE_SHARE_COLUMNS})`;
 
 const SETTLEMENT_COLUMNS =
   'id, trip_id, from_member_id, to_member_id, amount, currency, settled_on, note';

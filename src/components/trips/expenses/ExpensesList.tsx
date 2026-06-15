@@ -7,26 +7,32 @@ import { formatMoney } from '@/lib/trips/grouping';
 import { formatDateLong } from '@/lib/time/formatDate';
 import { fadeUp, stagger } from '@/lib/motion/presets';
 import { shareForMember } from '@/lib/trips/balances';
+import { convertToEur, type EurRates } from '@/lib/trips/fx';
 import { categoryAccents, categoryLabels } from '@/lib/trips/expenseCategory';
 import type { Expense, TripMember } from '@/lib/trips/types';
 import type { ExpenseViewMode } from './ShareToggle';
+import type { AmountSortDir, ExpenseSortMode } from './ExpenseSortToggle';
 
 interface ExpensesListProps {
   expenses: Expense[];
   members: TripMember[];
   mode: ExpenseViewMode;
+  sort: ExpenseSortMode;
+  amountDir: AmountSortDir;
+  rates: EurRates | null;
   currentMemberId: string | null;
   onSelect: (expense: Expense) => void;
 }
 
-interface DayBucket {
+interface ListSection {
   key: string;
-  iso: string;
+  /** Day header label; null renders an unheaded card (date-added ordering). */
+  iso: string | null;
   rows: Expense[];
 }
 
-function groupByDay(expenses: Expense[]): DayBucket[] {
-  const map = new Map<string, DayBucket>();
+function groupByDay(expenses: Expense[]): ListSection[] {
+  const map = new Map<string, ListSection>();
   for (const e of expenses) {
     if (!map.has(e.spentOn)) {
       map.set(e.spentOn, {
@@ -40,10 +46,57 @@ function groupByDay(expenses: Expense[]): DayBucket[] {
   return [...map.values()].sort((a, b) => (a.key < b.key ? 1 : -1));
 }
 
+function byDateAdded(expenses: Expense[]): ListSection[] {
+  const rows = [...expenses].sort((a, b) =>
+    a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0,
+  );
+  if (rows.length === 0) return [];
+  return [{ key: 'date-added', iso: null, rows }];
+}
+
+/**
+ * The amount used for ordering, matching what each row displays: the member's
+ * share in "mine" mode, the full amount otherwise. Normalized to EUR so mixed
+ * currencies compare fairly; rows in non-convertible currencies (or when rates
+ * are unavailable) fall back to their native amount.
+ */
+function sortAmount(
+  expense: Expense,
+  mode: ExpenseViewMode,
+  currentMemberId: string | null,
+  rates: EurRates | null,
+): number {
+  const native =
+    mode === 'mine' ? shareForMember(expense, currentMemberId) : expense.amount;
+  if (!rates) return native;
+  return convertToEur(native, expense.currency, rates) ?? native;
+}
+
+function byAmount(
+  expenses: Expense[],
+  mode: ExpenseViewMode,
+  currentMemberId: string | null,
+  rates: EurRates | null,
+  dir: AmountSortDir,
+): ListSection[] {
+  if (expenses.length === 0) return [];
+  const valueById = new Map(
+    expenses.map((e) => [e.id, sortAmount(e, mode, currentMemberId, rates)]),
+  );
+  const rows = [...expenses].sort((a, b) => {
+    const diff = (valueById.get(a.id) ?? 0) - (valueById.get(b.id) ?? 0);
+    return dir === 'desc' ? -diff : diff;
+  });
+  return [{ key: 'amount', iso: null, rows }];
+}
+
 export function ExpensesList({
   expenses,
   members,
   mode,
+  sort,
+  amountDir,
+  rates,
   currentMemberId,
   onSelect,
 }: ExpensesListProps) {
@@ -51,7 +104,12 @@ export function ExpensesList({
     () => new Map(members.map((m) => [m.id, m])),
     [members],
   );
-  const buckets = useMemo(() => groupByDay(expenses), [expenses]);
+  const buckets = useMemo(() => {
+    if (sort === 'added') return byDateAdded(expenses);
+    if (sort === 'amount')
+      return byAmount(expenses, mode, currentMemberId, rates, amountDir);
+    return groupByDay(expenses);
+  }, [expenses, sort, mode, currentMemberId, rates, amountDir]);
 
   return (
     <motion.div
@@ -62,9 +120,11 @@ export function ExpensesList({
     >
       {buckets.map((bucket) => (
         <motion.section key={bucket.key} variants={fadeUp}>
-          <h3 className="text-muted-foreground mb-2 px-1 text-[10px] tracking-[0.18em] uppercase">
-            {formatDateLong(bucket.iso)}
-          </h3>
+          {bucket.iso && (
+            <h3 className="text-muted-foreground mb-2 px-1 text-[10px] tracking-[0.18em] uppercase">
+              {formatDateLong(bucket.iso)}
+            </h3>
+          )}
           <div className="border-border/70 bg-card overflow-hidden rounded-[var(--radius-lg)] border">
             {bucket.rows.map((expense, idx) => {
               const payer = memberById.get(expense.payerMemberId);

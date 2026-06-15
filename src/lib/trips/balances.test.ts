@@ -42,6 +42,7 @@ const baseExpense = {
   currency: 'EUR',
   payerMemberId: 'm-a',
   spentOn: '2026-05-28',
+  createdAt: '2026-05-28T00:00:00Z',
   category: 'other' as const,
 };
 

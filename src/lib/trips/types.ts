@@ -228,12 +228,14 @@ export interface Expense {
   currency: string;
   payerMemberId: string;
   spentOn: string;
+  /** Server-generated insertion timestamp (ISO). Used for "date added" sort. */
+  createdAt: string;
   mode: ExpenseSplitMode;
   category: ExpenseCategory;
   shares: ExpenseShare[];
 }
 
-export type ExpenseDraft = Omit<Expense, 'id'>;
+export type ExpenseDraft = Omit<Expense, 'id' | 'createdAt'>;
 
 export interface ExpensePatch {
   itemId?: string | null;
