@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { ArrowRight, Users } from 'lucide-react';
+import { ArrowRight, Check, Users } from 'lucide-react';
 import { formatMoney } from '@/lib/trips/grouping';
 import { formatDateLong } from '@/lib/time/formatDate';
 import { fadeUp, stagger } from '@/lib/motion/presets';
@@ -163,6 +163,12 @@ export function ExpensesList({
                       </span>
                       <span className="opacity-50">·</span>
                       <span className="capitalize">{expense.mode}</span>
+                      {expense.resolved && (
+                        <span className="text-primary inline-flex items-center gap-0.5 font-medium">
+                          <Check className="size-3 shrink-0" />
+                          Settled
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">

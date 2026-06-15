@@ -373,6 +373,7 @@ export function createInMemoryRepository(
     async addExpense(draft: ExpenseDraft) {
       const expense: Expense = {
         ...draft,
+        resolved: draft.resolved ?? false,
         id: randomId('exp'),
         createdAt: new Date().toISOString(),
         shares: draft.shares.map((s) => ({ ...s })),
@@ -394,6 +395,7 @@ export function createInMemoryRepository(
         if (patch.spentOn !== undefined) next.spentOn = patch.spentOn;
         if (patch.mode !== undefined) next.mode = patch.mode;
         if (patch.category !== undefined) next.category = patch.category;
+        if (patch.resolved !== undefined) next.resolved = patch.resolved;
         if (patch.shares !== undefined)
           next.shares = patch.shares.map((s) => ({ ...s }));
         updated = next;

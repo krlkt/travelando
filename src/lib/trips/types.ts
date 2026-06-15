@@ -232,6 +232,12 @@ export interface Expense {
   createdAt: string;
   mode: ExpenseSplitMode;
   category: ExpenseCategory;
+  /**
+   * When true, members already paid their own share at the time, so this
+   * expense is excluded from balance settlement. It still counts toward
+   * spending totals and the category breakdown.
+   */
+  resolved: boolean;
   shares: ExpenseShare[];
 }
 
@@ -246,6 +252,7 @@ export interface ExpensePatch {
   spentOn?: string;
   mode?: ExpenseSplitMode;
   category?: ExpenseCategory;
+  resolved?: boolean;
   shares?: ExpenseShare[];
 }
 

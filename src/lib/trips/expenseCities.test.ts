@@ -27,6 +27,7 @@ function expense(overrides: Partial<Expense>): Expense {
     createdAt: '2026-06-01T08:00:00Z',
     mode: 'equally',
     category: 'other',
+    resolved: false,
     shares: [{ memberId: 'm-a', value: null, locked: false }],
     ...overrides,
   };

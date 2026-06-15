@@ -444,6 +444,7 @@ export interface ExpenseRow {
   created_at: string;
   mode: ExpenseSplitMode;
   category: ExpenseCategory;
+  resolved: boolean;
   expense_shares?: ExpenseShareRow[] | null;
 }
 
@@ -485,6 +486,7 @@ export function rowToExpense(row: ExpenseRow): Expense {
     createdAt: row.created_at,
     mode: row.mode,
     category: row.category,
+    resolved: row.resolved ?? false,
     shares,
   };
 }
@@ -502,6 +504,7 @@ export function expenseDraftToInsert(
     spent_on: draft.spentOn,
     mode: draft.mode,
     category: draft.category,
+    resolved: draft.resolved,
   };
 }
 
@@ -522,6 +525,7 @@ export function expensePatchToUpdate(
   if (patch.spentOn !== undefined) out.spent_on = patch.spentOn;
   if (patch.mode !== undefined) out.mode = patch.mode;
   if (patch.category !== undefined) out.category = patch.category;
+  if (patch.resolved !== undefined) out.resolved = patch.resolved;
   return out;
 }
 

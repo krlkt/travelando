@@ -195,6 +195,7 @@ function ExpenseBody({
   const [category, setCategory] = useState<ExpenseCategory>(
     expense?.category ?? defaultCategory ?? 'other',
   );
+  const [resolved, setResolved] = useState<boolean>(expense?.resolved ?? false);
   const [selection, setSelection] = useState<SelectionState>(() => {
     if (expense) return hydrateFromExpense(expense, members);
     if (privateToUserIds && privateToUserIds.length > 0)
@@ -374,6 +375,7 @@ function ExpenseBody({
       spentOn,
       mode,
       category,
+      resolved,
       shares,
     };
 
@@ -388,6 +390,7 @@ function ExpenseBody({
           spentOn: draft.spentOn,
           mode: draft.mode,
           category: draft.category,
+          resolved: draft.resolved,
           shares: draft.shares,
         };
         await updateExpense(trip.id, expense.id, patch);
@@ -566,6 +569,36 @@ function ExpenseBody({
             );
           })}
         </div>
+
+        <button
+          type="button"
+          onClick={() => setResolved((v) => !v)}
+          aria-pressed={resolved}
+          className="border-border/60 hover:bg-secondary/40 flex items-start gap-2.5 rounded-[var(--radius)] border p-2.5 text-left transition"
+        >
+          <span
+            className={cn(
+              'border-border mt-0.5 grid size-5 shrink-0 place-items-center rounded border',
+              resolved
+                ? 'bg-primary border-primary text-primary-foreground'
+                : '',
+            )}
+            aria-hidden
+          >
+            {resolved && (
+              <svg viewBox="0 0 16 16" className="size-3" fill="currentColor">
+                <path d="M6.2 10.6 3.4 7.8l-.9.9 3.7 3.7 8-8-.9-.9z" />
+              </svg>
+            )}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">Already settled</span>
+            <span className="text-muted-foreground block text-xs">
+              Each member already paid their share. Keep it in totals, but skip
+              it in the balance.
+            </span>
+          </span>
+        </button>
 
         {mode === 'amounts' && parsedAmount !== null && (
           <div className="text-muted-foreground flex justify-between text-xs tabular-nums">

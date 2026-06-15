@@ -178,6 +178,7 @@ export const expenseDraftSchema = z.object({
   spentOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   mode: expenseSplitModeSchema,
   category: expenseCategorySchema,
+  resolved: z.boolean(),
   shares: z.array(expenseShareSchema).min(1),
 });
 

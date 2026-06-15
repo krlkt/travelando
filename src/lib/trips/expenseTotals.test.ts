@@ -21,6 +21,7 @@ function makeExpense(overrides: Partial<Expense>): Expense {
     createdAt: '2026-05-28T00:00:00Z',
     category: 'other',
     mode: 'equally',
+    resolved: false,
     shares: [
       { memberId: 'm-a', value: null, locked: false },
       { memberId: 'm-b', value: null, locked: false },

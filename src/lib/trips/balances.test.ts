@@ -44,6 +44,7 @@ const baseExpense = {
   spentOn: '2026-05-28',
   createdAt: '2026-05-28T00:00:00Z',
   category: 'other' as const,
+  resolved: false,
 };
 
 describe('expandShares', () => {
@@ -196,6 +197,57 @@ describe('computeBalances', () => {
     const { balances } = computeBalances([expense], members);
     const alice = balances.find((b) => b.memberId === 'm-a')!;
     expect(alice.byCurrency[0].currency).toBe('EUR');
+  });
+
+  it('excludes resolved expenses from balances entirely', () => {
+    const expense: Expense = {
+      ...baseExpense,
+      resolved: true,
+      mode: 'equally',
+      shares: [
+        { memberId: 'm-a', value: null, locked: false },
+        { memberId: 'm-b', value: null, locked: false },
+        { memberId: 'm-c', value: null, locked: false },
+      ],
+    };
+    const { balances } = computeBalances([expense], members);
+    for (const b of balances) expect(b.byCurrency).toEqual([]);
+  });
+
+  it('settles only the unresolved expenses in a mixed set', () => {
+    const resolvedExpense: Expense = {
+      ...baseExpense,
+      id: 'e-resolved',
+      amount: 300,
+      resolved: true,
+      mode: 'equally',
+      shares: [
+        { memberId: 'm-a', value: null, locked: false },
+        { memberId: 'm-b', value: null, locked: false },
+        { memberId: 'm-c', value: null, locked: false },
+      ],
+    };
+    const openExpense: Expense = {
+      ...baseExpense,
+      id: 'e-open',
+      amount: 90,
+      payerMemberId: 'm-a',
+      mode: 'equally',
+      shares: [
+        { memberId: 'm-a', value: null, locked: false },
+        { memberId: 'm-b', value: null, locked: false },
+        { memberId: 'm-c', value: null, locked: false },
+      ],
+    };
+    const { balances } = computeBalances(
+      [resolvedExpense, openExpense],
+      members,
+    );
+    const alice = balances.find((b) => b.memberId === 'm-a')!;
+    // Only the open 90 EUR expense contributes: Alice paid 90, owes 30.
+    expect(alice.byCurrency).toEqual([
+      { currency: 'EUR', paid: 90, owed: 30, net: 60 },
+    ]);
   });
 });
 

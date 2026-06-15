@@ -130,6 +130,10 @@ export function computeBalances(
   }
 
   for (const expense of expenses) {
+    // Resolved expenses were already settled member-by-member at the time, so
+    // they don't affect who owes whom. They still count toward spending totals
+    // elsewhere — only the settlement math skips them.
+    if (expense.resolved) continue;
     const code = expense.currency.toUpperCase();
     const payerAcc = bucketFor(expense.payerMemberId, code);
     payerAcc.paid += expense.amount;
