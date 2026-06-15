@@ -141,3 +141,29 @@ export function resolveExpenseCities(
 
   return { groups: ordered, keyByExpenseId };
 }
+
+/**
+ * Recount the resolved city groups over a subset of expenses (e.g. only those
+ * the current member shares, in "my share" mode), reusing the resolution's
+ * `keyByExpenseId` map. Preserves the original group order and labels, and
+ * drops cities with no countable expenses so the chips match the filtered list.
+ */
+export function countCityGroups(
+  resolution: ExpenseCityResolution,
+  countableExpenses: Expense[],
+): ExpenseCityGroup[] {
+  const counts = new Map<string, number>();
+  for (const expense of countableExpenses) {
+    const key = resolution.keyByExpenseId.get(expense.id);
+    if (key === undefined) continue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  return resolution.groups
+    .map((group) => ({
+      key: group.key,
+      label: group.label,
+      count: counts.get(group.key) ?? 0,
+    }))
+    .filter((group) => group.count > 0);
+}

@@ -17,7 +17,10 @@ import {
   summarizeForUser,
 } from '@/lib/trips/balances';
 import { aggregateByCurrency } from '@/lib/trips/expenseTotals';
-import { resolveExpenseCities } from '@/lib/trips/expenseCities';
+import {
+  countCityGroups,
+  resolveExpenseCities,
+} from '@/lib/trips/expenseCities';
 import { formatMoney } from '@/lib/trips/grouping';
 import type { Expense } from '@/lib/trips/types';
 import { ExpenseSheet } from './ExpenseSheet';
@@ -135,6 +138,23 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
         : tripExpenses,
     [tripExpenses, selectedCity, fullCityResolution],
   );
+  // Chip counts track the same view-mode filter the list uses, so "my share"
+  // mode counts only expenses the current member is part of. Resolution stays
+  // on the full set so the city filter and headline totals are unaffected.
+  const cityCountExpenses = useMemo(
+    () =>
+      viewMode === 'mine'
+        ? categoryExpenses.filter(
+            (e) => shareForMember(e, currentMemberId) > SHARE_EPSILON,
+          )
+        : categoryExpenses,
+    [categoryExpenses, viewMode, currentMemberId],
+  );
+  const cityGroups = useMemo(
+    () => countCityGroups(cityResolution, cityCountExpenses),
+    [cityResolution, cityCountExpenses],
+  );
+
   // In "my share" mode, only expenses the current member is part of appear.
   const visibleExpenses = useMemo(
     () =>
@@ -271,7 +291,7 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
         />
 
         <CityFilter
-          groups={cityResolution.groups}
+          groups={cityGroups}
           selected={selectedCity}
           onSelect={setSelectedCity}
         />

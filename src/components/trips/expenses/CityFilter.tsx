@@ -28,18 +28,25 @@ export function CityFilter({ groups, selected, onSelect }: CityFilterProps) {
         <MapPin className="size-3 shrink-0 opacity-60" />
         All cities
       </Chip>
-      {groups.map((group) => (
-        <Chip
-          key={group.key}
-          active={selected === group.key}
-          onClick={() => onSelect(selected === group.key ? null : group.key)}
-        >
-          {group.label}
-          <span className="text-muted-foreground/60 tabular-nums">
-            {group.count}
-          </span>
-        </Chip>
-      ))}
+      {groups.map((group) => {
+        const active = selected === group.key;
+        return (
+          <Chip
+            key={group.key}
+            active={active}
+            onClick={() => onSelect(active ? null : group.key)}
+          >
+            {group.label}
+            <span
+              className={`tabular-nums ${
+                active ? 'text-background/70' : 'text-muted-foreground/60'
+              }`}
+            >
+              {group.count}
+            </span>
+          </Chip>
+        );
+      })}
     </div>
   );
 }

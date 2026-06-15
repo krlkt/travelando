@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { resolveExpenseCities, UNDETECTED_CITY_KEY } from './expenseCities';
+import {
+  countCityGroups,
+  resolveExpenseCities,
+  UNDETECTED_CITY_KEY,
+} from './expenseCities';
 import type { CityOverride, Expense, Trip, TripItem } from './types';
 
 function makeTrip(items: TripItem[] = []): Trip {
@@ -211,5 +215,66 @@ describe('resolveExpenseCities', () => {
       label: 'Paris',
       count: 1,
     });
+  });
+});
+
+describe('countCityGroups', () => {
+  it('recounts groups over a subset, preserving order and labels', () => {
+    const trip = makeTrip([
+      transport({
+        fromCity: { label: 'Amsterdam' },
+        toCity: { label: 'Paris' },
+      }),
+    ]);
+    const expenses = [
+      expense({ id: 'p-1', spentOn: '2026-06-02' }),
+      expense({ id: 'p-2', spentOn: '2026-06-03' }),
+      expense({ id: 'u-1', spentOn: '2026-06-01' }),
+    ];
+    const resolution = resolveExpenseCities(expenses, trip);
+
+    // Counting the full set matches the resolution's own counts.
+    expect(countCityGroups(resolution, expenses)).toEqual([
+      { key: 'Paris', label: 'Paris', count: 2 },
+      { key: UNDETECTED_CITY_KEY, label: 'Undetectable', count: 1 },
+    ]);
+
+    // Counting only one Paris expense drops its count, keeps ordering.
+    const subset = expenses.filter((e) => e.id !== 'p-2');
+    expect(countCityGroups(resolution, subset)).toEqual([
+      { key: 'Paris', label: 'Paris', count: 1 },
+      { key: UNDETECTED_CITY_KEY, label: 'Undetectable', count: 1 },
+    ]);
+  });
+
+  it('drops cities with no countable expenses', () => {
+    const trip = makeTrip([
+      transport({
+        fromCity: { label: 'Amsterdam' },
+        toCity: { label: 'Paris' },
+      }),
+    ]);
+    const expenses = [
+      expense({ id: 'paris', spentOn: '2026-06-03' }),
+      expense({ id: 'undetected', spentOn: '2026-06-01' }),
+    ];
+    const resolution = resolveExpenseCities(expenses, trip);
+
+    // Subset has only the Paris expense, so Undetectable disappears.
+    expect(countCityGroups(resolution, [expenses[0]])).toEqual([
+      { key: 'Paris', label: 'Paris', count: 1 },
+    ]);
+  });
+
+  it('ignores expenses absent from the resolution map', () => {
+    const trip = makeTrip();
+    const resolution = resolveExpenseCities(
+      [expense({ id: 'known', spentOn: '2026-06-01' })],
+      trip,
+    );
+
+    expect(countCityGroups(resolution, [expense({ id: 'stranger' })])).toEqual(
+      [],
+    );
   });
 });
