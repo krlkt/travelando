@@ -130,16 +130,39 @@ export function findOverlappingItemIds(items: TripItem[]): Set<string> {
   return overlapping;
 }
 
+// An item with no explicit end stays current until the next item begins. For
+// the final open-ended item (nothing after it) we fall back to a 1-hour window
+// so it doesn't read as "now" indefinitely.
+const OPEN_ENDED_FALLBACK_MS = 60 * 60 * 1000;
+
 export function findCurrentItem(items: TripItem[], now: Date): TripItem | null {
-  return (
-    items.find((i) => {
-      const start = parseNaive(i.startsAt);
-      const end = i.endsAt
-        ? parseNaive(i.endsAt)
-        : new Date(start.getTime() + 60 * 60 * 1000);
-      return start <= now && now <= end;
-    }) ?? null
+  const sorted = [...items].sort(
+    (a, b) =>
+      parseNaive(a.startsAt).getTime() - parseNaive(b.startsAt).getTime(),
   );
+
+  let current: TripItem | null = null;
+  for (let i = 0; i < sorted.length; i++) {
+    const item = sorted[i];
+    const start = parseNaive(item.startsAt);
+    if (start > now) break;
+
+    let end: Date;
+    if (item.endsAt) {
+      end = parseNaive(item.endsAt);
+    } else {
+      const nextStart = sorted[i + 1]
+        ? parseNaive(sorted[i + 1].startsAt)
+        : null;
+      end = nextStart ?? new Date(start.getTime() + OPEN_ENDED_FALLBACK_MS);
+    }
+
+    // Keep scanning so that among overlapping matches the latest-starting one
+    // wins (a short event nested inside a longer one reads as the current one).
+    if (now <= end) current = item;
+  }
+
+  return current;
 }
 
 export function findNextItem(items: TripItem[], now: Date): TripItem | null {

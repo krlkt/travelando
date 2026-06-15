@@ -10,6 +10,7 @@ import { TripEditorSheet } from './editor/TripEditorSheet';
 import { useTrips } from '@/lib/trips/context';
 import { isDemoTrip } from '@/lib/trips/demoTrips';
 import { isOngoing, isUpcoming } from '@/lib/time/formatDate';
+import { useNow } from '@/lib/time/useNow';
 import { fadeUp, stagger } from '@/lib/motion/presets';
 import type { Trip } from '@/lib/trips/types';
 
@@ -23,8 +24,8 @@ export function TripsDashboard() {
     [trips],
   );
 
+  const now = useNow();
   const { ongoing, upcoming, past } = useMemo(() => {
-    const now = new Date();
     const o: Trip[] = [];
     const u: Trip[] = [];
     const p: Trip[] = [];
@@ -38,7 +39,7 @@ export function TripsDashboard() {
       else p.push(t);
     }
     return { ongoing: o, upcoming: u, past: p.reverse() };
-  }, [visibleTrips]);
+  }, [visibleTrips, now]);
 
   useEffect(() => {
     for (const trip of visibleTrips) {

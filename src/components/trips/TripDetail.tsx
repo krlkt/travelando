@@ -59,6 +59,7 @@ import {
   isOngoing,
   isSameDay,
 } from '@/lib/time/formatDate';
+import { useNow } from '@/lib/time/useNow';
 import { fadeUp, stagger } from '@/lib/motion/presets';
 import type {
   CityOverride,
@@ -97,7 +98,10 @@ export function TripDetail({ tripId }: TripDetailProps) {
 
   if (!trip) notFound();
 
-  const now = new Date();
+  // Reactive, client-local clock. A plain `new Date()` here is sampled once at
+  // render — on the server that's the UTC clock, which makes floating wall-time
+  // comparisons (parseNaive) off by the viewer's tz offset and never refreshes.
+  const now = useNow();
   const ongoing = isOngoing(trip.startDate, trip.endDate, now);
   const current = ongoing ? findCurrentItem(trip.items, now) : null;
 
@@ -300,7 +304,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
                         computeDayFillRatio(allItems, bucket.date),
                       );
                       const isDone = doneDayKeys.has(bucket.key);
-                      const isToday = isSameDay(bucket.date, new Date());
+                      const isToday = isSameDay(bucket.date, now);
                       const status = isDone
                         ? 'Marked planned'
                         : fillTitle[fillLevel];
@@ -342,7 +346,7 @@ export function TripDetail({ tripId }: TripDetailProps) {
                 <DayHeader
                   dayNumber={activeBucketIdx + 1}
                   date={activeBucket.date}
-                  isToday={isSameDay(activeBucket.date, new Date())}
+                  isToday={isSameDay(activeBucket.date, now)}
                   itemCount={activeBucket.segments.reduce(
                     (n, s) => n + s.items.length,
                     0,

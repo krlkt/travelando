@@ -30,6 +30,7 @@ import {
 import { aggregateByCurrency } from '@/lib/trips/expenseTotals';
 import { useTrips } from '@/lib/trips/context';
 import { useAuth } from '@/lib/auth/context';
+import { useNow } from '@/lib/time/useNow';
 import type { Trip } from '@/lib/trips/types';
 
 interface TripCardProps {
@@ -42,7 +43,9 @@ export function TripCard({ trip, highlight }: TripCardProps) {
   const { user, loading: authLoading } = useAuth();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
-  const now = new Date();
+  // Reactive, client-local clock so ongoing/upcoming and the current item stay
+  // correct in the viewer's timezone and refresh as time passes.
+  const now = useNow();
 
   const isOwner = Boolean(user && trip.ownerId && trip.ownerId === user.id);
   const myMembership = user
