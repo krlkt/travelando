@@ -185,7 +185,7 @@ function DayList({
                     )}
                   </div>
                   {item.notes && (
-                    <p className="text-muted-foreground mt-1 line-clamp-2 text-xs leading-snug whitespace-pre-wrap">
+                    <p className="text-muted-foreground mt-1 line-clamp-2 text-xs leading-snug break-words whitespace-pre-wrap">
                       {item.notes}
                     </p>
                   )}
@@ -296,7 +296,7 @@ function NowCard({ item, now }: { item: TripItem; now: Date }) {
         </span>
         <div className="min-w-0 flex-1">
           <Badge variant={meta.badge}>{meta.label}</Badge>
-          <h2 className="font-display mt-2 text-3xl leading-tight tracking-tight">
+          <h2 className="font-display mt-2 text-3xl leading-tight tracking-tight break-words">
             {item.title}
           </h2>
           {(() => {
@@ -305,25 +305,31 @@ function NowCard({ item, now }: { item: TripItem; now: Date }) {
             if (!route.from && !route.to) return null;
             return (
               <>
-                <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-1.5 text-sm">
-                  {route.from && <span>{route.from.label}</span>}
+                <div className="text-muted-foreground mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-sm">
+                  {route.from && (
+                    <span className="break-words">{route.from.label}</span>
+                  )}
                   {route.from && route.to && (
-                    <ArrowRight className="size-3.5" />
+                    <ArrowRight className="size-3.5 shrink-0" />
                   )}
                   {route.to && (
-                    <span className="flex items-center gap-1">
-                      <MapPin className="size-3.5" />
-                      {route.to.label}
+                    <span className="flex min-w-0 items-center gap-1">
+                      <MapPin className="size-3.5 shrink-0" />
+                      <span className="break-words">{route.to.label}</span>
                     </span>
                   )}
                 </div>
                 {stations && (
-                  <div className="text-muted-foreground/70 mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                    {stations.from && <span>{stations.from.label}</span>}
-                    {stations.from && stations.to && (
-                      <ArrowRight className="size-3" />
+                  <div className="text-muted-foreground/70 mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
+                    {stations.from && (
+                      <span className="break-words">{stations.from.label}</span>
                     )}
-                    {stations.to && <span>{stations.to.label}</span>}
+                    {stations.from && stations.to && (
+                      <ArrowRight className="size-3 shrink-0" />
+                    )}
+                    {stations.to && (
+                      <span className="break-words">{stations.to.label}</span>
+                    )}
                   </div>
                 )}
               </>
@@ -357,7 +363,7 @@ function NowCard({ item, now }: { item: TripItem; now: Date }) {
       )}
 
       {item.notes && (
-        <p className="text-foreground/80 relative mt-4 text-sm leading-relaxed whitespace-pre-wrap">
+        <p className="text-foreground/80 relative mt-4 text-sm leading-relaxed break-words whitespace-pre-wrap">
           {item.notes}
         </p>
       )}
@@ -390,7 +396,9 @@ function NextCard({ item, now }: { item: TripItem; now: Date }) {
           <Icon className="size-4" strokeWidth={2} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="leading-tight font-medium">{item.title}</div>
+          <div className="leading-tight font-medium break-words">
+            {item.title}
+          </div>
           {(() => {
             const dest = routeHeadline(item).to;
             if (!dest) return null;
