@@ -255,7 +255,11 @@ export function DayMapCanvas({
         el = createClusterElement(spec.count);
         lngLat = [spec.lng, spec.lat];
         const { clusterId, lng, lat } = spec;
-        el.addEventListener('click', () => {
+        el.addEventListener('click', (e) => {
+          // MapLibre appends markers into the canvas container, so a marker
+          // click otherwise bubbles to the map's route-line handler and opens
+          // Google Maps directions when a marker sits over the route.
+          e.stopPropagation();
           const idx = clusterIndexRef.current;
           if (!idx) return;
           const expansionZoom = idx.getClusterExpansionZoom(clusterId);
@@ -269,7 +273,12 @@ export function DayMapCanvas({
         const point = spec.point;
         el = createMarkerElement(point);
         lngLat = [point.lng, point.lat];
-        el.addEventListener('click', () => onSelectRef.current(point));
+        el.addEventListener('click', (e) => {
+          // Prevent the click bubbling to the route-line handler (see cluster
+          // handler above) — clicking a marker should never open directions.
+          e.stopPropagation();
+          onSelectRef.current(point);
+        });
       }
 
       const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
