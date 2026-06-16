@@ -88,7 +88,7 @@ export function LiveView({ tripId }: LiveViewProps) {
           </div>
         </div>
 
-        <div className="mt-10 grid gap-4">
+        <div className="mt-10 grid grid-cols-[minmax(0,1fr)] gap-4">
           <AnimatePresence mode="wait">
             {current ? (
               <NowCard key={current.id} item={current} now={now} />
@@ -144,7 +144,7 @@ function DayList({
       <div className="text-muted-foreground text-[10px] tracking-[0.18em] uppercase">
         {label}
       </div>
-      <ol className="mt-3 grid gap-1.5">
+      <ol className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-1.5">
         {items.length === 0 ? (
           <li className="border-border/70 bg-secondary/20 text-muted-foreground rounded-[var(--radius)] border border-dashed px-4 py-6 text-center text-sm">
             {emptyCopy}
@@ -403,14 +403,14 @@ function NextCard({ item, now }: { item: TripItem; now: Date }) {
             const dest = routeHeadline(item).to;
             if (!dest) return null;
             return (
-              <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
-                <MapPin className="size-3" />
+              <div className="text-muted-foreground mt-0.5 flex min-w-0 items-center gap-1 text-xs">
+                <MapPin className="size-3 shrink-0" />
                 <span className="truncate">{dest.label}</span>
               </div>
             );
           })()}
         </div>
-        <span className="text-muted-foreground text-sm tabular-nums">
+        <span className="text-muted-foreground shrink-0 text-sm tabular-nums">
           {formatTime(item.startsAt)}
         </span>
       </div>
