@@ -17,6 +17,7 @@ import { kindMeta, transportIcons } from '@/lib/trips/kindMeta';
 import { routeHeadline, routeStations } from '@/lib/trips/transportRoute';
 import { directionsForItem } from '@/lib/trips/itemDirections';
 import { openMapsLink } from '@/lib/places/maps-link';
+import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
 import { formatTime, dayKey, relativeFromNow } from '@/lib/time/formatDate';
 import { parseNaive } from '@/lib/time/naive';
 import { useNow } from '@/lib/time/useNow';
@@ -307,7 +308,12 @@ function NowCard({ item, now }: { item: TripItem; now: Date }) {
               <>
                 <div className="text-muted-foreground mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-sm">
                   {route.from && (
-                    <span className="break-words">{route.from.label}</span>
+                    <PlaceAddressLink
+                      place={route.from}
+                      className="break-words"
+                    >
+                      {route.from.label}
+                    </PlaceAddressLink>
                   )}
                   {route.from && route.to && (
                     <ArrowRight className="size-3.5 shrink-0" />
@@ -315,20 +321,35 @@ function NowCard({ item, now }: { item: TripItem; now: Date }) {
                   {route.to && (
                     <span className="flex min-w-0 items-center gap-1">
                       <MapPin className="size-3.5 shrink-0" />
-                      <span className="break-words">{route.to.label}</span>
+                      <PlaceAddressLink
+                        place={route.to}
+                        className="break-words"
+                      >
+                        {route.to.label}
+                      </PlaceAddressLink>
                     </span>
                   )}
                 </div>
                 {stations && (
                   <div className="text-muted-foreground/70 mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
                     {stations.from && (
-                      <span className="break-words">{stations.from.label}</span>
+                      <PlaceAddressLink
+                        place={stations.from}
+                        className="break-words"
+                      >
+                        {stations.from.label}
+                      </PlaceAddressLink>
                     )}
                     {stations.from && stations.to && (
                       <ArrowRight className="size-3 shrink-0" />
                     )}
                     {stations.to && (
-                      <span className="break-words">{stations.to.label}</span>
+                      <PlaceAddressLink
+                        place={stations.to}
+                        className="break-words"
+                      >
+                        {stations.to.label}
+                      </PlaceAddressLink>
                     )}
                   </div>
                 )}
@@ -405,7 +426,9 @@ function NextCard({ item, now }: { item: TripItem; now: Date }) {
             return (
               <div className="text-muted-foreground mt-0.5 flex min-w-0 items-center gap-1 text-xs">
                 <MapPin className="size-3 shrink-0" />
-                <span className="truncate">{dest.label}</span>
+                <PlaceAddressLink place={dest} className="truncate">
+                  {dest.label}
+                </PlaceAddressLink>
               </div>
             );
           })()}
