@@ -707,6 +707,50 @@ function ExpenseBody({
   );
 }
 
+interface MemberAmountInputProps {
+  value: number | null;
+  locked: boolean;
+  onChange: (value: number | null) => void;
+  placeholder: string;
+}
+
+/**
+ * Per-member amount field for the "amounts" split. Holds its own raw text so
+ * the user can type, edit mid-string, and backspace freely; the parsed number
+ * still flows up on every keystroke to keep unlocked members' auto-split live.
+ * Formatting happens only on blur — mirroring the main total Amount field.
+ */
+function MemberAmountInput({
+  value,
+  locked,
+  onChange,
+  placeholder,
+}: MemberAmountInputProps) {
+  const [text, setText] = useState<string>(() =>
+    locked && value !== null ? formatAmountInput(value) : '',
+  );
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setText(raw);
+        onChange(parseAmountInput(raw));
+      }}
+      onBlur={() => {
+        const parsed = parseAmountInput(text);
+        if (parsed !== null) setText(formatAmountInput(parsed));
+      }}
+      placeholder={placeholder}
+      disabled={!locked}
+      className="h-7 w-20 px-2 text-right text-xs tabular-nums"
+    />
+  );
+}
+
 interface MemberRowProps {
   member: TripMember;
   isSelected: boolean;
@@ -783,23 +827,16 @@ function MemberRow({
       )}
       {isSelected && mode === 'amounts' && (
         <>
-          <Input
-            type="text"
-            inputMode="decimal"
-            value={
-              amountEntry.locked
-                ? formatAmountInput(amountEntry.value ?? 0)
-                : ''
-            }
-            onChange={(e) => {
-              const parsed = parseAmountInput(e.target.value);
-              onAmountChange(parsed);
-            }}
+          <MemberAmountInput
+            // Remount on lock toggle so the field reseeds from the stored
+            // value (or clears) without an effect re-formatting mid-typing.
+            key={amountEntry.locked ? 'locked' : 'unlocked'}
+            value={amountEntry.value}
+            locked={amountEntry.locked}
+            onChange={onAmountChange}
             placeholder={
               previewAmount !== undefined ? previewAmount.toFixed(2) : 'auto'
             }
-            disabled={!amountEntry.locked}
-            className="h-7 w-20 px-2 text-right text-xs tabular-nums"
           />
           <button
             type="button"

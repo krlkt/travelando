@@ -34,7 +34,8 @@
       "Bash(node *)",
       "Bash(git stash *)",
       "Bash(npm test *)",
-      "Bash(git -c core.pager=cat diff --stat -- src/lib/email/sendTripInvite.test.ts)"
+      "Bash(git -c core.pager=cat diff --stat -- src/lib/email/sendTripInvite.test.ts)",
+      "WebFetch(domain:ui-ux-pro-max-skill.nextlevelbuilder.io)"
     ]
   }
 }
