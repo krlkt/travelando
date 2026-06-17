@@ -17,6 +17,7 @@ import {
   Maximize2,
   Minimize2,
   MapPin,
+  TriangleAlert,
   UtensilsCrossed,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,16 @@ import {
 } from '@/components/ui/sheet';
 import { WantLevel } from './WantLevel';
 import { WishlistFilterControls } from './WishlistFilterControls';
+import {
+  OpenStatePill,
+  PlacePhoto,
+  PriceLevel,
+  RatingBadge,
+} from '@/components/places/PlaceDetailBits';
 import { useTrips } from '@/lib/trips/context';
+import { usePlaceDetails } from '@/hooks/usePlaceDetails';
+import { useMapTheme } from '@/hooks/useMapTheme';
+import { openStateAtWallTime, openStateNow } from '@/lib/places/openingHours';
 import { buildDayMapPoints, type DayMapPoint } from '@/lib/trips/dayMapPoints';
 import {
   availableWishCategories,
@@ -40,7 +50,7 @@ import {
   filterDayMapPoints,
   type WishlistFilter,
 } from '@/lib/trips/wishlistFilter';
-import { isMapConfigured, type MapTheme } from '@/lib/map/style';
+import { isMapConfigured } from '@/lib/map/style';
 import { formatDistance, walkMinutes } from '@/lib/map/distance';
 import {
   fromLocalInput,
@@ -69,27 +79,6 @@ interface DayMapProps {
   dayKey: string;
   /** Opens the existing item detail sheet for scheduled/lodging pins. */
   onSelectItem: (item: TripItem) => void;
-}
-
-function resolveTheme(): MapTheme {
-  if (typeof document === 'undefined') return 'light';
-  if (document.documentElement.classList.contains('dark')) return 'dark';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-    ? 'dark'
-    : 'light';
-}
-
-function useMapTheme(): MapTheme {
-  // Lazy initializer resolves the theme up front (no setState-in-effect); the
-  // effect only subscribes to later system-theme changes.
-  const [theme, setTheme] = useState<MapTheme>(resolveTheme);
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => setTheme(resolveTheme());
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return theme;
 }
 
 /** Next free start time on the day: after the last scheduled stop, else 10:00. */
@@ -383,6 +372,7 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
 
       <AddToDaySheet
         wish={selectedWish}
+        dayKey={dayKey}
         time={time}
         onTimeChange={setTime}
         endTime={endTime}
@@ -408,6 +398,8 @@ function LegendDot({ className, label }: { className: string; label: string }) {
 
 interface AddToDaySheetProps {
   wish: DayMapPoint | null;
+  /** The day being scheduled — used for the opening-hours conflict check. */
+  dayKey: string;
   time: string;
   onTimeChange: (time: string) => void;
   endTime: string;
@@ -419,6 +411,7 @@ interface AddToDaySheetProps {
 
 function AddToDaySheet({
   wish,
+  dayKey,
   time,
   onTimeChange,
   endTime,
@@ -428,23 +421,66 @@ function AddToDaySheet({
   onAdd,
 }: AddToDaySheetProps) {
   const isWish = wish?.kind === 'foodWish' || wish?.kind === 'activityWish';
-  const Icon = wish?.kind === 'foodWish' ? UtensilsCrossed : Camera;
+  const isFood = wish?.kind === 'foodWish';
+  const Icon = isFood ? UtensilsCrossed : Camera;
+
+  // Stream in Google details (rating, price, hours, photo) for this place — the
+  // same enrichment the wishlist surfaces. Skips cleanly for manual places.
+  const { detail } = usePlaceDetails(isWish ? wish?.placeId : null);
+
+  const openState = detail?.openingHours
+    ? openStateNow(detail.openingHours, detail.utcOffsetMinutes)
+    : 'unknown';
+
+  // Warn (non-blocking) when the place looks closed at the chosen wall time.
+  const conflict = useMemo(() => {
+    if (!detail?.openingHours || !time) return false;
+    const slot = parseNaive(fromLocalInput(`${dayKey}T${time}`));
+    return openStateAtWallTime(detail.openingHours, slot) === 'closed';
+  }, [detail, dayKey, time]);
+
+  const wantLevel = wish && 'wantLevel' in wish ? wish.wantLevel : undefined;
 
   return (
     <Sheet open={isWish} onOpenChange={onOpenChange}>
       <SheetContent side="bottom">
         {isWish && wish && (
           <>
-            <div>
-              <SheetTitle className="flex items-center gap-2">
-                <Icon className="text-muted-foreground size-4" />
-                {wish.label}
-              </SheetTitle>
-              <SheetDescription>
-                {wish.kind === 'foodWish'
-                  ? 'Food wishlist'
-                  : 'Activity wishlist'}
-              </SheetDescription>
+            <div className="flex items-start gap-3">
+              <PlacePhoto
+                photoName={detail?.photoName}
+                sizeClass="size-14"
+                dimPx={56}
+              />
+              <div className="min-w-0 flex-1">
+                <SheetTitle className="flex items-center gap-2">
+                  <Icon className="text-muted-foreground size-4 shrink-0" />
+                  <span className="truncate">{wish.label}</span>
+                </SheetTitle>
+                <SheetDescription>
+                  {isFood ? 'Food wishlist' : 'Activity wishlist'}
+                </SheetDescription>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <RatingBadge
+                    rating={detail?.rating}
+                    userRatingCount={detail?.userRatingCount}
+                  />
+                  <PriceLevel level={detail?.priceLevel} />
+                  <OpenStatePill
+                    openState={openState}
+                    weekdayDescriptions={
+                      detail?.openingHours?.weekdayDescriptions
+                    }
+                  />
+                  {wantLevel ? (
+                    <WantLevel
+                      mode="indicator"
+                      variant={isFood ? 'chili' : 'star'}
+                      value={wantLevel}
+                    />
+                  ) : null}
+                </div>
+              </div>
             </div>
 
             <div className="grid gap-3 py-1">
@@ -469,13 +505,6 @@ function AddToDaySheet({
                   {wish.address}
                 </PlaceAddressLink>
               )}
-              {'wantLevel' in wish && wish.wantLevel ? (
-                <WantLevel
-                  mode="indicator"
-                  variant="star"
-                  value={wish.wantLevel}
-                />
-              ) : null}
 
               <div className="flex gap-3">
                 <div className="grid max-w-[8rem] gap-1.5">
@@ -495,6 +524,16 @@ function AddToDaySheet({
                   />
                 </div>
               </div>
+
+              {conflict && (
+                <div className="flex items-start gap-2 rounded-[var(--radius-md)] bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+                  <TriangleAlert className="mt-0.5 size-4 shrink-0" />
+                  <span>
+                    {wish.label} looks closed at this time. You can still add it
+                    — double-check its opening hours.
+                  </span>
+                </div>
+              )}
             </div>
 
             <SheetFooter>
@@ -505,10 +544,9 @@ function AddToDaySheet({
                 onClick={onAdd}
                 disabled={adding}
                 style={{
-                  background:
-                    wish.kind === 'foodWish'
-                      ? 'var(--kind-meal)'
-                      : 'var(--kind-activity)',
+                  background: isFood
+                    ? 'var(--kind-meal)'
+                    : 'var(--kind-activity)',
                 }}
               >
                 {adding ? 'Adding…' : 'Add to this day'}

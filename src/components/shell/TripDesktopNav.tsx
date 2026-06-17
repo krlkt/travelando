@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { motion } from 'motion/react';
-import { Map, Radio, Wallet } from 'lucide-react';
+import { Heart, Map, Radio, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { spring } from '@/lib/motion/presets';
 
@@ -21,6 +21,7 @@ export function TripDesktopNav() {
   if (!tripId) return null;
 
   const overviewHref = `/trips/${tripId}`;
+  const wishlistsHref = `/trips/${tripId}/wishlists`;
   const expensesHref = `/trips/${tripId}/expenses`;
   const liveHref = `/trips/${tripId}/now`;
 
@@ -35,6 +36,12 @@ export function TripDesktopNav() {
           label="Trip"
           icon={<Map className="size-[18px]" strokeWidth={1.8} />}
           active={pathname === overviewHref}
+        />
+        <RailTab
+          href={wishlistsHref}
+          label="Wishlist"
+          icon={<Heart className="size-[18px]" strokeWidth={1.8} />}
+          active={pathname === wishlistsHref}
         />
         <RailTab
           href={expensesHref}

@@ -9,10 +9,17 @@ import { activityCategoryGlyph, foodCategoryGlyph } from './categoryGlyphs';
 // glyph used by the lodging anchor.
 const GLYPH = {
   bed: '<path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/>',
+  // lucide: check
+  check: '<path d="M20 6 9 17l-5-5"/>',
 } as const;
 
 function svg(paths: string): string {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+}
+
+/** Small "in plan" badge overlaid on a wishlist marker already on the route. */
+function inPlanBadge(): string {
+  return `<span class="dm-marker__check">${svg(GLYPH.check)}</span>`;
 }
 
 function accentVar(kind: ItemKind): string {
@@ -77,11 +84,13 @@ export function createMarkerElement(point: DayMapPoint): HTMLButtonElement {
       break;
     case 'foodWish':
       el.style.setProperty('--dm-accent', 'var(--kind-meal)');
-      inner = `<span class="dm-marker__pin dm-marker__pin--ghost">${svg(foodCategoryGlyph(point.category))}</span>${wantDots(point.wantLevel)}`;
+      if (point.inPlan) el.classList.add('dm-marker--in-plan');
+      inner = `<span class="dm-marker__pin dm-marker__pin--ghost">${svg(foodCategoryGlyph(point.category))}</span>${point.inPlan ? inPlanBadge() : ''}${wantDots(point.wantLevel)}`;
       break;
     case 'activityWish':
       el.style.setProperty('--dm-accent', 'var(--kind-activity)');
-      inner = `<span class="dm-marker__pin dm-marker__pin--ghost">${svg(activityCategoryGlyph(point.category))}</span>${wantDots(point.wantLevel)}`;
+      if (point.inPlan) el.classList.add('dm-marker--in-plan');
+      inner = `<span class="dm-marker__pin dm-marker__pin--ghost">${svg(activityCategoryGlyph(point.category))}</span>${point.inPlan ? inPlanBadge() : ''}${wantDots(point.wantLevel)}`;
       break;
   }
 
@@ -100,8 +109,8 @@ function markerLabel(point: DayMapPoint): string {
         return `Stop ${point.order}: arrive at ${point.label}`;
       return `Stop ${point.order}: ${point.label}`;
     case 'foodWish':
-      return `Food wishlist: ${point.label}`;
+      return `Food wishlist: ${point.label}${point.inPlan ? ' — already in your plan' : ''}`;
     case 'activityWish':
-      return `Activity wishlist: ${point.label}`;
+      return `Activity wishlist: ${point.label}${point.inPlan ? ' — already in your plan' : ''}`;
   }
 }

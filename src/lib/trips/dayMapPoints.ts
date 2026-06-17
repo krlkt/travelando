@@ -69,6 +69,8 @@ export interface FoodWishMapPoint extends BaseDayMapPoint {
   category?: FoodPlaceCategory;
   /** Straight-line metres to the nearest scheduled/lodging anchor (proximity hint). */
   nearestPlanMeters?: number;
+  /** True when a timeline item already visits this place (trip-wide map). */
+  inPlan?: boolean;
 }
 
 export interface ActivityWishMapPoint extends BaseDayMapPoint {
@@ -78,6 +80,8 @@ export interface ActivityWishMapPoint extends BaseDayMapPoint {
   category?: ActivityPlaceCategory;
   /** Straight-line metres to the nearest scheduled/lodging anchor (proximity hint). */
   nearestPlanMeters?: number;
+  /** True when a timeline item already visits this place (trip-wide map). */
+  inPlan?: boolean;
 }
 
 export type DayMapPoint =

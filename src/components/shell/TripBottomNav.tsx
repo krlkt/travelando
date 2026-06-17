@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Map, Menu, Radio, Wallet } from 'lucide-react';
+import { Heart, Map, Menu, Radio, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { spring } from '@/lib/motion/presets';
 import { MobileMenu } from './MobileMenu';
@@ -19,9 +19,11 @@ export function TripBottomNav() {
   if (!tripId) return null;
 
   const overviewHref = `/trips/${tripId}`;
+  const wishlistsHref = `/trips/${tripId}/wishlists`;
   const expensesHref = `/trips/${tripId}/expenses`;
   const liveHref = `/trips/${tripId}/now`;
   const overviewActive = pathname === overviewHref;
+  const wishlistsActive = pathname === wishlistsHref;
   const expensesActive = pathname === expensesHref;
   const liveActive = pathname === liveHref;
 
@@ -52,6 +54,12 @@ export function TripBottomNav() {
             label="Trip"
             icon={<Map className="size-[18px]" />}
             active={overviewActive}
+          />
+          <Tab
+            href={wishlistsHref}
+            label="Wishlist"
+            icon={<Heart className="size-[18px]" />}
+            active={wishlistsActive}
           />
           <Tab
             href={expensesHref}

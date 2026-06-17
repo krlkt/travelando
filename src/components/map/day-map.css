@@ -116,6 +116,31 @@
   box-shadow: 0 1px 4px oklch(20% 0.02 250 / 0.18);
 }
 
+/* Wishlist places already on the itinerary: solid (not ghost) + a check badge,
+   so the trip-wide map separates "planned" from "still to schedule". */
+.dm-marker--in-plan .dm-marker__pin--ghost {
+  background: var(--dm-accent);
+  color: var(--background);
+  border-style: solid;
+}
+.dm-marker__check {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.3rem;
+  display: grid;
+  place-items: center;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: var(--dm-accent);
+  color: var(--background);
+  box-shadow: 0 0 0 2px var(--background);
+}
+.dm-marker__check svg {
+  width: 0.6rem;
+  height: 0.6rem;
+}
+
 /* Wishlist places far from today's plan fade back; hover/focus restores them. */
 .dm-marker--far .dm-marker__inner {
   opacity: 0.45;
