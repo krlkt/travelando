@@ -9,14 +9,10 @@ import type {
   Trip,
   TripItem,
 } from './types';
-import {
-  deriveCitiesByDay,
-  foodPlaceCitiesForDay,
-  lodgingForDay,
-} from './cities';
+import { foodPlaceCitiesForDay, lodgingForDay } from './cities';
+import { dayScheduledItems } from './dayScheduledItems';
 import { transportEndpoints } from './transportRoute';
 import { dayKey as toDayKey } from '@/lib/time/formatDate';
-import { parseNaive } from '@/lib/time/naive';
 import {
   haversineMeters,
   nearestDistanceMeters,
@@ -154,8 +150,6 @@ export function buildDayMapPoints(
   activityPlaces: ActivityPlace[],
   overrides: CityOverride[] = [],
 ): DayMapData {
-  const buckets = deriveCitiesByDay(trip, overrides);
-  const bucket = buckets.get(dayKey);
   const cities = foodPlaceCitiesForDay(trip, overrides, dayKey);
   const cityKeys = new Set(cities.map(cityKey));
 
@@ -163,15 +157,7 @@ export function buildDayMapPoints(
   let unlocatedCount = 0;
 
   // --- Scheduled items (the route), time-ordered ----------------------------
-  const dayItems = bucket
-    ? bucket.segments
-        .flatMap((seg) => seg.items)
-        .slice()
-        .sort(
-          (a, b) =>
-            parseNaive(a.startsAt).getTime() - parseNaive(b.startsAt).getTime(),
-        )
-    : [];
+  const dayItems = dayScheduledItems(trip, dayKey, overrides);
 
   const scheduledPlaceIds = new Set<string>();
   let order = 0;

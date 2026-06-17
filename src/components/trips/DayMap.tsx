@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/sheet';
 import { WantLevel } from './WantLevel';
 import { WishlistFilterControls } from './WishlistFilterControls';
+import { AddToDayTimeline } from './AddToDayTimeline';
 import {
   OpenStatePill,
   PlacePhoto,
@@ -44,6 +45,7 @@ import { usePlaceDetails } from '@/hooks/usePlaceDetails';
 import { useMapTheme } from '@/hooks/useMapTheme';
 import { openStateAtWallTime, openStateNow } from '@/lib/places/openingHours';
 import { buildDayMapPoints, type DayMapPoint } from '@/lib/trips/dayMapPoints';
+import { dayScheduledItems } from '@/lib/trips/dayScheduledItems';
 import {
   availableWishCategories,
   DEFAULT_WISHLIST_FILTER,
@@ -200,6 +202,13 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
   const wishCategories = useMemo(
     () => availableWishCategories(points),
     [points],
+  );
+
+  // The day's existing stops, in time order — shown compactly in the add sheet
+  // so the user can see occupied windows before choosing a slot.
+  const dayItems = useMemo(
+    () => dayScheduledItems(trip, dayKey, cityOverrides[tripId] ?? []),
+    [trip, dayKey, cityOverrides, tripId],
   );
 
   const handleSelectPoint = useCallback(
@@ -373,6 +382,7 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
       <AddToDaySheet
         wish={selectedWish}
         dayKey={dayKey}
+        dayItems={dayItems}
         time={time}
         onTimeChange={setTime}
         endTime={endTime}
@@ -400,6 +410,8 @@ interface AddToDaySheetProps {
   wish: DayMapPoint | null;
   /** The day being scheduled — used for the opening-hours conflict check. */
   dayKey: string;
+  /** The day's existing stops, in time order, for the compact timeline. */
+  dayItems: TripItem[];
   time: string;
   onTimeChange: (time: string) => void;
   endTime: string;
@@ -412,6 +424,7 @@ interface AddToDaySheetProps {
 function AddToDaySheet({
   wish,
   dayKey,
+  dayItems,
   time,
   onTimeChange,
   endTime,
@@ -505,6 +518,20 @@ function AddToDaySheet({
                   {wish.address}
                 </PlaceAddressLink>
               )}
+
+              <AddToDayTimeline
+                items={dayItems}
+                proposed={{
+                  label: wish.label,
+                  kind: isFood ? 'meal' : 'activity',
+                  startsAt: time
+                    ? fromLocalInput(`${dayKey}T${time}`)
+                    : undefined,
+                  endsAt: endTime
+                    ? fromLocalInput(`${dayKey}T${endTime}`)
+                    : undefined,
+                }}
+              />
 
               <div className="flex gap-3">
                 <div className="grid max-w-[8rem] gap-1.5">
