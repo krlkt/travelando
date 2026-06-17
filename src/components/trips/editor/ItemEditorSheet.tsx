@@ -349,10 +349,10 @@ function ItemEditorBody({
         : undefined;
 
     const resolvedFrom: Place | undefined =
-      kind === 'meal' || kind === 'lodging'
-        ? undefined
-        : (fromPlace ??
-          (fromValue.trim() ? { label: fromValue.trim() } : undefined));
+      kind === 'transport'
+        ? (fromPlace ??
+          (fromValue.trim() ? { label: fromValue.trim() } : undefined))
+        : undefined;
     const resolvedTo: Place | undefined =
       toPlace ?? (toValue.trim() ? { label: toValue.trim() } : undefined);
 
@@ -730,30 +730,7 @@ function ItemEditorBody({
             </p>
           </div>
         ) : (
-          <div
-            className={
-              kind === 'meal' || kind === 'lodging'
-                ? 'grid gap-3'
-                : 'grid grid-cols-2 gap-3'
-            }
-          >
-            {kind !== 'meal' && kind !== 'lodging' && (
-              <div className="grid gap-1.5">
-                <Label>From</Label>
-                <PlaceAutocomplete
-                  value={fromValue}
-                  onChange={(v) => {
-                    setFromValue(v);
-                    setFromPlace(undefined);
-                  }}
-                  onSelect={(place) => {
-                    setFromValue(place.label);
-                    setFromPlace(place);
-                  }}
-                  placeholder="(optional)"
-                />
-              </div>
-            )}
+          <div className="grid gap-3">
             <div className="grid gap-1.5">
               <Label>{kind === 'lodging' ? 'Where' : 'Place'}</Label>
               <PlaceAutocomplete
