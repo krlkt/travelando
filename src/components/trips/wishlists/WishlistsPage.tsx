@@ -29,6 +29,7 @@ import { ActivityPlaceSheet } from '@/components/trips/ActivityPlaceSheet';
 import { FoodPlaceSheet } from '@/components/trips/FoodPlaceSheet';
 import { WishlistCard } from './WishlistCard';
 import { WishlistFilters } from './WishlistFilters';
+import { AddWishToTimelineSheet } from './AddWishToTimelineSheet';
 
 interface WishlistsPageProps {
   tripId: string;
@@ -120,6 +121,11 @@ export function WishlistsPage({ tripId }: WishlistsPageProps) {
   const [sheetCity, setSheetCity] = useState<CityRef | null>(null);
   const [editingFood, setEditingFood] = useState<FoodPlace | null>(null);
   const [editingActivity, setEditingActivity] = useState<ActivityPlace | null>(
+    null,
+  );
+
+  // The wishlist place being scheduled onto a day (drives the day-picker sheet).
+  const [schedulingEntry, setSchedulingEntry] = useState<WishlistEntry | null>(
     null,
   );
 
@@ -358,6 +364,7 @@ export function WishlistsPage({ tripId }: WishlistsPageProps) {
                       inPlan={plannedIds.has(entry.id)}
                       onEdit={openEdit}
                       onDelete={handleDelete}
+                      onAddToTimeline={setSchedulingEntry}
                       onRating={handleRating}
                     />
                   ))}
@@ -393,6 +400,14 @@ export function WishlistsPage({ tripId }: WishlistsPageProps) {
           onOpenChange={closeSheet}
         />
       )}
+
+      <AddWishToTimelineSheet
+        tripId={tripId}
+        entry={schedulingEntry}
+        onOpenChange={(open) => {
+          if (!open) setSchedulingEntry(null);
+        }}
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { CalendarCheck, Pencil, Trash2 } from 'lucide-react';
+import { CalendarCheck, CalendarPlus, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -29,6 +29,8 @@ interface WishlistCardProps {
   inPlan: boolean;
   onEdit: (entry: WishlistEntry) => void;
   onDelete: (entry: WishlistEntry) => void;
+  /** Opens the day picker to schedule this place onto the timeline. */
+  onAddToTimeline: (entry: WishlistEntry) => void;
   /** Reports the loaded Google rating upward so the page can sort by it. */
   onRating?: (id: string, rating: number) => void;
   /** Briefly ringed when its map pin was tapped (selection sync). */
@@ -46,6 +48,7 @@ export function WishlistCard({
   inPlan,
   onEdit,
   onDelete,
+  onAddToTimeline,
   onRating,
   highlighted,
 }: WishlistCardProps) {
@@ -140,6 +143,15 @@ export function WishlistCard({
 
         <div className="mt-2 flex items-center gap-1">
           <div className="ml-auto flex items-center gap-1 sm:opacity-0 sm:transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:text-primary size-7"
+              onClick={() => onAddToTimeline(entry)}
+              aria-label={`Add ${entry.name} to a day`}
+            >
+              <CalendarPlus className="size-3.5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon-sm"
