@@ -68,7 +68,7 @@ export function WishlistCard({
     <article
       id={`wish-${entry.id}`}
       className={cn(
-        'group border-border/60 bg-card relative flex scroll-mt-24 gap-3 rounded-[var(--radius-lg)] border p-3 transition-all',
+        'group border-border/60 bg-card relative flex min-w-0 scroll-mt-24 gap-3 overflow-hidden rounded-[var(--radius-lg)] border p-3 transition-all',
         'hover:border-border focus-within:border-border',
         inPlan && 'border-primary/30 bg-primary/[0.03]',
         highlighted && 'ring-primary/60 border-primary/50 ring-2',
