@@ -1,11 +1,11 @@
 'use client';
 
-import { Star } from 'lucide-react';
+import { ChevronDown, Star } from 'lucide-react';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import type { OpenState } from '@/lib/places/openingHours';
 import { cn } from '@/lib/utils';
 
@@ -114,34 +114,50 @@ interface OpenStatePillProps {
   weekdayDescriptions?: string[];
 }
 
-/** Open/Closed pill with an optional weekday-hours tooltip. Null when unknown. */
+/**
+ * Open/Closed pill. When weekday hours are known it becomes a tappable
+ * disclosure (popover) so the full schedule is reachable on touch devices,
+ * not just on hover. Null when the open state is unknown.
+ */
 export function OpenStatePill({
   openState,
   weekdayDescriptions,
 }: OpenStatePillProps) {
   if (openState === 'unknown') return null;
+
+  const label = openState === 'open' ? 'Open now' : 'Closed';
+  const pillClass = cn(
+    'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+    OPEN_PILL[openState],
+  );
+  const hasHours = Boolean(weekdayDescriptions && weekdayDescriptions.length);
+
+  if (!hasHours) {
+    return <span className={pillClass}>{label}</span>;
+  }
+
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          tabIndex={0}
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`${label} — show opening hours`}
           className={cn(
-            'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
-            OPEN_PILL[openState],
+            pillClass,
+            'focus-visible:ring-ring inline-flex items-center gap-0.5 focus:outline-none focus-visible:ring-2',
           )}
         >
-          {openState === 'open' ? 'Open now' : 'Closed'}
-        </span>
-      </TooltipTrigger>
-      {weekdayDescriptions && weekdayDescriptions.length > 0 && (
-        <TooltipContent className="max-w-56">
-          <ul className="space-y-0.5 text-xs">
-            {weekdayDescriptions.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </TooltipContent>
-      )}
-    </Tooltip>
+          {label}
+          <ChevronDown className="size-2.5 opacity-70" aria-hidden />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="max-w-56">
+        <ul className="space-y-0.5 text-xs">
+          {weekdayDescriptions!.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
   );
 }
