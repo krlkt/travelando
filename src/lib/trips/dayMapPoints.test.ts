@@ -173,6 +173,58 @@ describe('buildDayMapPoints', () => {
     expect(points.filter((p) => p.kind === 'foodWish')).toHaveLength(0);
   });
 
+  it('marks a wish as inPlan when scheduled on another day (pin kept)', () => {
+    const food: FoodPlace[] = [
+      {
+        id: 'f-1',
+        tripId,
+        cityLabel: 'Tokyo',
+        name: 'TeamLab Cafe',
+        lat: 35.62,
+        lng: 139.78,
+        placeId: 'p-teamlab',
+      },
+    ];
+    const trip = makeTrip([
+      activity({}), // day-1 anchor (Tokyo, placeId p-senso)
+      activity({
+        id: 'a-day2',
+        title: 'Day 2 TeamLab',
+        startsAt: '2026-06-02T10:00:00',
+        to: { label: 'TeamLab', lat: 35.62, lng: 139.78, placeId: 'p-teamlab' },
+      }),
+    ]);
+
+    const { points } = buildDayMapPoints(trip, day1, food, []);
+    const wish = points.filter((p) => p.kind === 'foodWish');
+
+    expect(wish).toHaveLength(1);
+    expect(wish[0].kind === 'foodWish' && wish[0].inPlan).toBe(true);
+  });
+
+  it('leaves inPlan falsy for an unplanned wish', () => {
+    const food: FoodPlace[] = [
+      {
+        id: 'f-1',
+        tripId,
+        cityLabel: 'Tokyo',
+        name: 'Ramen Bar',
+        lat: 35.69,
+        lng: 139.7,
+      },
+    ];
+
+    const { points } = buildDayMapPoints(
+      makeTrip([activity({})]),
+      day1,
+      food,
+      [],
+    );
+    const wish = points.find((p) => p.kind === 'foodWish');
+
+    expect(wish && wish.kind === 'foodWish' && wish.inPlan).toBeFalsy();
+  });
+
   it('pins a transport leg at both depart and arrive (stations preferred)', () => {
     const { points } = buildDayMapPoints(
       makeTrip([transport({})]),

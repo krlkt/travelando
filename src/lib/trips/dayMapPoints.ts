@@ -11,6 +11,7 @@ import type {
 } from './types';
 import { foodPlaceCitiesForDay, lodgingForDay } from './cities';
 import { dayScheduledItems } from './dayScheduledItems';
+import { isPlaceInTimeline } from './wishlistStatus';
 import { transportEndpoints } from './transportRoute';
 import { dayKey as toDayKey } from '@/lib/time/formatDate';
 import {
@@ -65,7 +66,7 @@ export interface FoodWishMapPoint extends BaseDayMapPoint {
   category?: FoodPlaceCategory;
   /** Straight-line metres to the nearest scheduled/lodging anchor (proximity hint). */
   nearestPlanMeters?: number;
-  /** True when a timeline item already visits this place (trip-wide map). */
+  /** True when any timeline item already visits this place (any day of the trip). */
   inPlan?: boolean;
 }
 
@@ -76,7 +77,7 @@ export interface ActivityWishMapPoint extends BaseDayMapPoint {
   category?: ActivityPlaceCategory;
   /** Straight-line metres to the nearest scheduled/lodging anchor (proximity hint). */
   nearestPlanMeters?: number;
-  /** True when a timeline item already visits this place (trip-wide map). */
+  /** True when any timeline item already visits this place (any day of the trip). */
   inPlan?: boolean;
 }
 
@@ -322,6 +323,7 @@ export function buildDayMapPoints(
       wantLevel: fp.wantLevel,
       category: fp.category,
       nearestPlanMeters: planDistance({ lat: fp.lat, lng: fp.lng }),
+      inPlan: isPlaceInTimeline(fp, trip.items),
     });
   }
 
@@ -344,6 +346,7 @@ export function buildDayMapPoints(
       wantLevel: ap.wantLevel,
       category: ap.category,
       nearestPlanMeters: planDistance({ lat: ap.lat, lng: ap.lng }),
+      inPlan: isPlaceInTimeline(ap, trip.items),
     });
   }
 
