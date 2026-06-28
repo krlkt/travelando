@@ -11,41 +11,12 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
-import { toast } from 'sonner';
-import {
-  Camera,
-  Maximize2,
-  Minimize2,
-  MapPin,
-  TriangleAlert,
-  UtensilsCrossed,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { TimeField } from '@/components/ui/TimeField';
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-  SheetClose,
-} from '@/components/ui/sheet';
-import { WantLevel } from './WantLevel';
+import { Maximize2, Minimize2, MapPin } from 'lucide-react';
 import { WishlistFilterControls } from './WishlistFilterControls';
-import { AddToDayTimeline } from './AddToDayTimeline';
-import {
-  OpenStatePill,
-  PlacePhoto,
-  PriceLevel,
-  RatingBadge,
-} from '@/components/places/PlaceDetailBits';
+import { AddToDaySheet, type AddToDayWish } from './AddToDaySheet';
 import { useTrips } from '@/lib/trips/context';
-import { usePlaceDetails } from '@/hooks/usePlaceDetails';
 import { useMapTheme } from '@/hooks/useMapTheme';
-import { openStateAtWallTime, openStateNow } from '@/lib/places/openingHours';
 import { buildDayMapPoints, type DayMapPoint } from '@/lib/trips/dayMapPoints';
-import { dayScheduledItems } from '@/lib/trips/dayScheduledItems';
 import {
   availableWishCategories,
   DEFAULT_WISHLIST_FILTER,
@@ -53,15 +24,7 @@ import {
   type WishlistFilter,
 } from '@/lib/trips/wishlistFilter';
 import { isMapConfigured } from '@/lib/map/style';
-import { formatDistance, walkMinutes } from '@/lib/map/distance';
-import {
-  fromLocalInput,
-  getTimePart,
-  toLocalInput,
-} from '@/lib/time/timeInput';
-import { parseNaive, toNaiveString } from '@/lib/time/naive';
-import { PlaceAddressLink } from '@/components/places/PlaceAddressLink';
-import type { ItemDraft, Trip, TripItem } from '@/lib/trips/types';
+import type { Trip, TripItem } from '@/lib/trips/types';
 
 const DayMapCanvas = dynamic(
   () => import('@/components/map/DayMapCanvas').then((m) => m.DayMapCanvas),
@@ -73,9 +36,6 @@ const DayMapCanvas = dynamic(
   },
 );
 
-const SLOT_GAP_MS = 60 * 60 * 1000;
-const DEFAULT_START_HOUR = 10;
-
 interface DayMapProps {
   trip: Trip;
   dayKey: string;
@@ -83,40 +43,15 @@ interface DayMapProps {
   onSelectItem: (item: TripItem) => void;
 }
 
-/** Next free start time on the day: after the last scheduled stop, else 10:00. */
-function nextSlotIso(dayKey: string, scheduled: DayMapPoint[]): string {
-  const times = scheduled
-    .filter((p): p is Extract<DayMapPoint, { kind: 'scheduled' }> => {
-      return p.kind === 'scheduled';
-    })
-    .map((p) => parseNaive(p.startsAt).getTime())
-    .filter((t) => Number.isFinite(t));
-
-  if (times.length === 0) {
-    const d = parseNaive(dayKey);
-    d.setHours(DEFAULT_START_HOUR, 0, 0, 0);
-    return toNaiveString(d);
-  }
-  return toNaiveString(new Date(Math.max(...times) + SLOT_GAP_MS));
-}
-
-/** Local `HH:MM` to prefill the add-to-day time field from the next free slot. */
-function nextSlotTime(dayKey: string, scheduled: DayMapPoint[]): string {
-  return getTimePart(toLocalInput(nextSlotIso(dayKey, scheduled)));
-}
-
 export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
-  const { foodPlaces, activityPlaces, cityOverrides, addItem } = useTrips();
+  const { foodPlaces, activityPlaces, cityOverrides } = useTrips();
   const theme = useMapTheme();
   const tripId = trip.id;
 
   const [wishFilter, setWishFilter] = useState<WishlistFilter>(
     DEFAULT_WISHLIST_FILTER,
   );
-  const [selectedWish, setSelectedWish] = useState<DayMapPoint | null>(null);
-  const [time, setTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [adding, setAdding] = useState(false);
+  const [selectedWish, setSelectedWish] = useState<AddToDayWish | null>(null);
   const [expanded, setExpanded] = useState(false);
 
   // The live map is portaled to <body> and stays mounted across expand/collapse
@@ -204,13 +139,6 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
     [points],
   );
 
-  // The day's existing stops, in time order — shown compactly in the add sheet
-  // so the user can see occupied windows before choosing a slot.
-  const dayItems = useMemo(
-    () => dayScheduledItems(trip, dayKey, cityOverrides[tripId] ?? []),
-    [trip, dayKey, cityOverrides, tripId],
-  );
-
   const handleSelectPoint = useCallback(
     (point: DayMapPoint) => {
       if (point.kind === 'scheduled' || point.kind === 'lodging') {
@@ -218,61 +146,19 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
         if (item) onSelectItem(item);
         return;
       }
-      // Prefill the time field with the next free slot, but let the user edit it
-      // before adding instead of silently committing to that slot.
-      setTime(nextSlotTime(dayKey, points));
-      setEndTime('');
-      setSelectedWish(point);
+      setSelectedWish({
+        kind: point.kind,
+        label: point.label,
+        address: point.address,
+        lat: point.lat,
+        lng: point.lng,
+        placeId: point.placeId,
+        wantLevel: point.wantLevel,
+        nearestPlanMeters: point.nearestPlanMeters,
+      });
     },
-    [trip.items, onSelectItem, dayKey, points],
+    [trip.items, onSelectItem],
   );
-
-  const handleAddToDay = useCallback(async () => {
-    if (!selectedWish) return;
-    if (
-      selectedWish.kind !== 'foodWish' &&
-      selectedWish.kind !== 'activityWish'
-    )
-      return;
-
-    // Honor the chosen time; fall back to the next free slot if it was cleared.
-    const startsAt = time
-      ? fromLocalInput(`${dayKey}T${time}`)
-      : nextSlotIso(dayKey, points);
-
-    // End time is optional, but when set it must not precede the start.
-    const endsAt = endTime ? fromLocalInput(`${dayKey}T${endTime}`) : undefined;
-    if (endsAt && new Date(endsAt) < new Date(startsAt)) {
-      toast.error("End time can't be before the start.");
-      return;
-    }
-
-    const draft: ItemDraft = {
-      kind: selectedWish.kind === 'foodWish' ? 'meal' : 'activity',
-      title: selectedWish.label,
-      startsAt,
-      endsAt,
-      to: {
-        label: selectedWish.label,
-        address: selectedWish.address,
-        lat: selectedWish.lat,
-        lng: selectedWish.lng,
-        placeId: selectedWish.placeId,
-      },
-    };
-
-    setAdding(true);
-    try {
-      await addItem(tripId, draft);
-      toast.success(`Added ${selectedWish.label} to this day`);
-      setSelectedWish(null);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Add failed';
-      toast.error(`Couldn't add to day: ${message}`);
-    } finally {
-      setAdding(false);
-    }
-  }, [selectedWish, dayKey, points, time, endTime, addItem, tripId]);
 
   if (!isMapConfigured()) {
     return (
@@ -381,17 +267,11 @@ export function DayMap({ trip, dayKey, onSelectItem }: DayMapProps) {
 
       <AddToDaySheet
         wish={selectedWish}
+        trip={trip}
         dayKey={dayKey}
-        dayItems={dayItems}
-        time={time}
-        onTimeChange={setTime}
-        endTime={endTime}
-        onEndTimeChange={setEndTime}
-        adding={adding}
         onOpenChange={(open) => {
           if (!open) setSelectedWish(null);
         }}
-        onAdd={handleAddToDay}
       />
     </div>
   );
@@ -403,185 +283,5 @@ function LegendDot({ className, label }: { className: string; label: string }) {
       <span className={`size-2.5 rounded-full ${className}`} />
       {label}
     </span>
-  );
-}
-
-interface AddToDaySheetProps {
-  wish: DayMapPoint | null;
-  /** The day being scheduled — used for the opening-hours conflict check. */
-  dayKey: string;
-  /** The day's existing stops, in time order, for the compact timeline. */
-  dayItems: TripItem[];
-  time: string;
-  onTimeChange: (time: string) => void;
-  endTime: string;
-  onEndTimeChange: (time: string) => void;
-  adding: boolean;
-  onOpenChange: (open: boolean) => void;
-  onAdd: () => void;
-}
-
-function AddToDaySheet({
-  wish,
-  dayKey,
-  dayItems,
-  time,
-  onTimeChange,
-  endTime,
-  onEndTimeChange,
-  adding,
-  onOpenChange,
-  onAdd,
-}: AddToDaySheetProps) {
-  const isWish = wish?.kind === 'foodWish' || wish?.kind === 'activityWish';
-  const isFood = wish?.kind === 'foodWish';
-  const Icon = isFood ? UtensilsCrossed : Camera;
-
-  // Stream in Google details (rating, price, hours, photo) for this place — the
-  // same enrichment the wishlist surfaces. Skips cleanly for manual places.
-  const { detail } = usePlaceDetails(isWish ? wish?.placeId : null);
-
-  const openState = detail?.openingHours
-    ? openStateNow(detail.openingHours, detail.utcOffsetMinutes)
-    : 'unknown';
-
-  // Warn (non-blocking) when the place looks closed at the chosen wall time.
-  const conflict = useMemo(() => {
-    if (!detail?.openingHours || !time) return false;
-    const slot = parseNaive(fromLocalInput(`${dayKey}T${time}`));
-    return openStateAtWallTime(detail.openingHours, slot) === 'closed';
-  }, [detail, dayKey, time]);
-
-  const wantLevel = wish && 'wantLevel' in wish ? wish.wantLevel : undefined;
-
-  return (
-    <Sheet open={isWish} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom">
-        {isWish && wish && (
-          <>
-            <div className="flex items-start gap-3">
-              <PlacePhoto
-                photoName={detail?.photoName}
-                sizeClass="size-14"
-                dimPx={56}
-              />
-              <div className="min-w-0 flex-1">
-                <SheetTitle className="flex items-center gap-2">
-                  <Icon className="text-muted-foreground size-4 shrink-0" />
-                  <span className="truncate">{wish.label}</span>
-                </SheetTitle>
-                <SheetDescription>
-                  {isFood ? 'Food wishlist' : 'Activity wishlist'}
-                </SheetDescription>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <RatingBadge
-                    rating={detail?.rating}
-                    userRatingCount={detail?.userRatingCount}
-                  />
-                  <PriceLevel level={detail?.priceLevel} />
-                  <OpenStatePill
-                    openState={openState}
-                    weekdayDescriptions={
-                      detail?.openingHours?.weekdayDescriptions
-                    }
-                  />
-                  {wantLevel ? (
-                    <WantLevel
-                      mode="indicator"
-                      variant={isFood ? 'chili' : 'star'}
-                      value={wantLevel}
-                    />
-                  ) : null}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-3 py-1">
-              {'nearestPlanMeters' in wish &&
-                wish.nearestPlanMeters != null && (
-                  <p className="text-muted-foreground text-sm">
-                    {formatDistance(wish.nearestPlanMeters)} from your plan · ~
-                    {walkMinutes(wish.nearestPlanMeters)} min walk
-                  </p>
-                )}
-              {wish.address && (
-                <PlaceAddressLink
-                  place={{
-                    label: wish.label,
-                    address: wish.address,
-                    lat: wish.lat,
-                    lng: wish.lng,
-                    placeId: wish.placeId,
-                  }}
-                  className="text-muted-foreground text-sm"
-                >
-                  {wish.address}
-                </PlaceAddressLink>
-              )}
-
-              <AddToDayTimeline
-                items={dayItems}
-                proposed={{
-                  label: wish.label,
-                  kind: isFood ? 'meal' : 'activity',
-                  startsAt: time
-                    ? fromLocalInput(`${dayKey}T${time}`)
-                    : undefined,
-                  endsAt: endTime
-                    ? fromLocalInput(`${dayKey}T${endTime}`)
-                    : undefined,
-                }}
-              />
-
-              <div className="flex gap-3">
-                <div className="grid max-w-[8rem] gap-1.5">
-                  <Label>Start time</Label>
-                  <TimeField
-                    value={time}
-                    ariaLabel="Start time"
-                    onCommit={onTimeChange}
-                  />
-                </div>
-                <div className="grid max-w-[8rem] gap-1.5">
-                  <Label>End time</Label>
-                  <TimeField
-                    value={endTime}
-                    ariaLabel="End time"
-                    onCommit={onEndTimeChange}
-                  />
-                </div>
-              </div>
-
-              {conflict && (
-                <div className="flex items-start gap-2 rounded-[var(--radius-md)] bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-                  <TriangleAlert className="mt-0.5 size-4 shrink-0" />
-                  <span>
-                    {wish.label} looks closed at this time. You can still add it
-                    — double-check its opening hours.
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <SheetFooter>
-              <SheetClose asChild>
-                <Button variant="ghost">Cancel</Button>
-              </SheetClose>
-              <Button
-                onClick={onAdd}
-                disabled={adding}
-                style={{
-                  background: isFood
-                    ? 'var(--kind-meal)'
-                    : 'var(--kind-activity)',
-                }}
-              >
-                {adding ? 'Adding…' : 'Add to this day'}
-              </Button>
-            </SheetFooter>
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
   );
 }

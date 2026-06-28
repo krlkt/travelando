@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { FoodPlaceSheet } from './FoodPlaceSheet';
+import { AddToDaySheet, type AddToDayWish } from './AddToDaySheet';
 import { WantLevel } from './WantLevel';
 import { useTrips } from '@/lib/trips/context';
 import { deriveCitiesByDay, foodPlaceCitiesForDay } from '@/lib/trips/cities';
@@ -36,6 +37,7 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingPlace, setEditingPlace] = useState<FoodPlace | null>(null);
+  const [selectedWish, setSelectedWish] = useState<AddToDayWish | null>(null);
   const [activeCity, setActiveCity] = useState<{
     cityLabel: string;
     cityPlaceId?: string;
@@ -211,25 +213,42 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
                         className="group flex items-start justify-between gap-2"
                       >
                         <div className="min-w-0">
-                          <PlaceAddressLink
-                            place={{
-                              label: place.name,
-                              address: place.address,
-                              lat: place.lat,
-                              lng: place.lng,
-                              placeId: place.placeId,
-                            }}
-                            className="block max-w-full min-w-0"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedWish({
+                                kind: 'foodWish',
+                                label: place.name,
+                                address: place.address,
+                                lat: place.lat,
+                                lng: place.lng,
+                                placeId: place.placeId,
+                                wantLevel: place.wantLevel,
+                              })
+                            }
+                            className="block max-w-full min-w-0 cursor-pointer text-left"
+                            aria-label={`Open ${place.name}`}
                           >
-                            <span className="block truncate text-sm font-medium">
+                            <span className="block truncate text-sm font-medium underline-offset-2 hover:underline focus-visible:underline">
                               {place.name}
                             </span>
-                            {place.address && (
+                          </button>
+                          {place.address && (
+                            <PlaceAddressLink
+                              place={{
+                                label: place.name,
+                                address: place.address,
+                                lat: place.lat,
+                                lng: place.lng,
+                                placeId: place.placeId,
+                              }}
+                              className="block max-w-full min-w-0"
+                            >
                               <span className="text-muted-foreground block truncate text-xs">
                                 {place.address}
                               </span>
-                            )}
-                          </PlaceAddressLink>
+                            </PlaceAddressLink>
+                          )}
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           {plannedIds.has(place.id) && (
@@ -287,6 +306,17 @@ export function FoodWishlist({ trip, dayKey }: FoodWishlistProps) {
           item={editingPlace}
           open={sheetOpen}
           onOpenChange={setSheetOpen}
+        />
+      )}
+
+      {dayKey && (
+        <AddToDaySheet
+          wish={selectedWish}
+          trip={trip}
+          dayKey={dayKey}
+          onOpenChange={(open) => {
+            if (!open) setSelectedWish(null);
+          }}
         />
       )}
     </div>
