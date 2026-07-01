@@ -74,7 +74,11 @@ export function WishlistCard({
         highlighted && 'ring-primary/60 border-primary/50 ring-2',
       )}
     >
-      <PlacePhoto photoName={detail?.photoName} />
+      <PlacePhoto
+        photoName={detail?.photoName}
+        photoNames={detail?.photoNames}
+        placeName={entry.name}
+      />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">

@@ -30,6 +30,13 @@ export interface PlaceRichDetail extends PlaceDetail {
   utcOffsetMinutes?: number;
   /** First photo resource name (`places/{id}/photos/{ref}`), if any. */
   photoName?: string;
+  /**
+   * All photo resource names Google returned (up to ~10), in display order.
+   * The refs ride along in the already-cached details blob, so exposing them
+   * costs no extra call; the billed photo-media fetch happens per image only
+   * when something actually renders them (e.g. the on-click gallery).
+   */
+  photoNames?: string[];
   websiteUri?: string;
   phone?: string;
   googleMapsUri?: string;
@@ -68,7 +75,7 @@ const PRICE_LEVELS: Record<string, number> = {
   PRICE_LEVEL_VERY_EXPENSIVE: 4,
 };
 
-function parseGoogleRichDetail(
+export function parseGoogleRichDetail(
   data: Record<string, unknown>,
 ): PlaceRichDetail | null {
   const base = parseGoogleDetail(data);
@@ -76,7 +83,10 @@ function parseGoogleRichDetail(
 
   const priceLevelRaw = data.priceLevel as string | undefined;
   const photos = data.photos as Array<Record<string, unknown>> | undefined;
-  const photoName = photos?.[0]?.name as string | undefined;
+  const photoNames = photos
+    ?.map((p) => p.name as string | undefined)
+    .filter((name): name is string => Boolean(name));
+  const photoName = photoNames?.[0];
 
   return {
     ...base,
@@ -88,6 +98,7 @@ function parseGoogleRichDetail(
       | undefined,
     utcOffsetMinutes: data.utcOffsetMinutes as number | undefined,
     photoName,
+    photoNames: photoNames?.length ? photoNames : undefined,
     websiteUri: data.websiteUri as string | undefined,
     phone: data.internationalPhoneNumber as string | undefined,
     googleMapsUri: data.googleMapsUri as string | undefined,

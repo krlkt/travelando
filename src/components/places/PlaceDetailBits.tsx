@@ -1,11 +1,13 @@
 'use client';
 
-import { ChevronDown, Star } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronDown, Images, Star } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { PlacePhotoGallery } from '@/components/places/PlacePhotoGallery';
 import type { OpenState } from '@/lib/places/openingHours';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +26,14 @@ const OPEN_PILL: Record<Exclude<OpenState, 'unknown'>, string> = {
 
 interface PlacePhotoProps {
   photoName?: string;
+  /**
+   * All photo refs for the place. When more than one is present the thumbnail
+   * becomes a button that opens an on-demand gallery; the extra images are only
+   * fetched once it's opened.
+   */
+  photoNames?: string[];
+  /** Place name, used for the gallery title and image alt text. */
+  placeName?: string;
   /** Tailwind size class for the box (e.g. `size-16`). */
   sizeClass?: string;
   /** Intrinsic px for the `<img>` width/height attributes (avoids CLS). */
@@ -32,39 +42,82 @@ interface PlacePhotoProps {
   fetchW?: number;
 }
 
-/** Square place thumbnail, falling back to a star placeholder when no photo. */
+/**
+ * Square place thumbnail, falling back to a star placeholder when no photo.
+ * When {@link PlacePhotoProps.photoNames} holds more than one photo the
+ * thumbnail turns into a gallery trigger, marked by a hover/focus overlay and a
+ * count chip; the additional images load only when the gallery is opened.
+ */
 export function PlacePhoto({
   photoName,
+  photoNames,
+  placeName = '',
   sizeClass = 'size-16',
   dimPx = 64,
   fetchW = 160,
 }: PlacePhotoProps) {
-  if (photoName) {
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const extraCount = photoNames ? photoNames.length : 0;
+  const hasGallery = extraCount > 1;
+
+  if (!photoName) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={`/api/places/photo?name=${encodeURIComponent(photoName)}&w=${fetchW}`}
-        alt=""
-        width={dimPx}
-        height={dimPx}
-        loading="lazy"
+      <div
+        aria-hidden
         className={cn(
-          'border-border/40 shrink-0 rounded-[var(--radius-md)] border object-cover',
+          'bg-secondary/60 text-muted-foreground/40 grid shrink-0 place-items-center rounded-[var(--radius-md)]',
           sizeClass,
         )}
-      />
+      >
+        <Star className="size-5" />
+      </div>
     );
   }
-  return (
-    <div
-      aria-hidden
+
+  const thumb = (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/api/places/photo?name=${encodeURIComponent(photoName)}&w=${fetchW}`}
+      alt=""
+      width={dimPx}
+      height={dimPx}
+      loading="lazy"
       className={cn(
-        'bg-secondary/60 text-muted-foreground/40 grid shrink-0 place-items-center rounded-[var(--radius-md)]',
-        sizeClass,
+        'border-border/40 size-full rounded-[var(--radius-md)] border object-cover',
       )}
-    >
-      <Star className="size-5" />
-    </div>
+    />
+  );
+
+  if (!hasGallery) {
+    return <div className={cn('shrink-0', sizeClass)}>{thumb}</div>;
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setGalleryOpen(true)}
+        aria-label={`View ${extraCount} photos of ${placeName || 'this place'}`}
+        className={cn(
+          'group/photo focus-visible:ring-ring relative shrink-0 overflow-hidden rounded-[var(--radius-md)] focus:outline-none focus-visible:ring-2',
+          sizeClass,
+        )}
+      >
+        {thumb}
+        <span className="absolute inset-0 bg-black/0 transition-colors group-hover/photo:bg-black/25 group-focus-visible/photo:bg-black/25" />
+        <span className="pointer-events-none absolute right-1 bottom-1 flex items-center gap-0.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-medium text-white">
+          <Images className="size-2.5" aria-hidden />
+          {extraCount}
+        </span>
+      </button>
+
+      <PlacePhotoGallery
+        photoNames={photoNames!}
+        placeName={placeName}
+        open={galleryOpen}
+        onOpenChange={setGalleryOpen}
+      />
+    </>
   );
 }
 

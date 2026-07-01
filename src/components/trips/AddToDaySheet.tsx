@@ -184,6 +184,8 @@ export function AddToDaySheet({
             <div className="flex items-start gap-3">
               <PlacePhoto
                 photoName={detail?.photoName}
+                photoNames={detail?.photoNames}
+                placeName={wish.label}
                 sizeClass="size-14"
                 dimPx={56}
               />
