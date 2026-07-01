@@ -135,6 +135,29 @@ export const activityPlaceDraftSchema = z.object({
 
 export const activityPlacePatchSchema = activityPlaceDraftSchema.partial();
 
+export const travelCompanionSchema = z.enum([
+  'solo',
+  'partner',
+  'friends',
+  'family',
+]);
+
+/**
+ * Body for `POST /api/trips/[id]/recommendations`. The city is required (we
+ * recommend per-city); everything else is optional personalization. Strings are
+ * length-capped so a malformed client can't inflate the LLM prompt.
+ */
+export const recommendationRequestSchema = z.object({
+  cityLabel: z.string().min(1).max(120),
+  cityPlaceId: z.string().max(300).optional(),
+  interests: z.string().max(300).optional(),
+  companions: travelCompanionSchema.optional(),
+  groupSize: z.number().int().min(1).max(50).optional(),
+  ageRange: z.string().max(40).optional(),
+});
+
+export type RecommendationRequest = z.infer<typeof recommendationRequestSchema>;
+
 export const cityOverrideDraftSchema = z.object({
   tripId: z.string().min(1),
   dayKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),

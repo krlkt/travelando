@@ -199,6 +199,42 @@ export interface ActivityPlace {
 export type ActivityPlaceDraft = Omit<ActivityPlace, 'id'>;
 export type CityOverrideDraft = Omit<CityOverride, 'id'>;
 
+/** Who the traveller is going with — biases what gets recommended. */
+export type TravelCompanion = 'solo' | 'partner' | 'friends' | 'family';
+
+/**
+ * Optional user input that personalizes city recommendations. Every field is
+ * optional: with nothing set, the recommender returns the city's plain must-dos.
+ */
+export interface RecommendationContext {
+  /** Free-text of what they feel like doing ("ramen, temples, jazz bars"). */
+  interests?: string;
+  companions?: TravelCompanion;
+  groupSize?: number;
+  /** Loose age band, e.g. "kids", "20s", "60+". */
+  ageRange?: string;
+}
+
+/**
+ * A single AI-curated place suggestion for a city. Shaped to drop straight into
+ * the wishlist: `kind` + `category` map onto the food/activity tables, and the
+ * place fields mirror {@link FoodPlace}/{@link ActivityPlace}. `reason` is the
+ * one-line "why this fits you" written by the LLM (absent on the rule-based
+ * fallback).
+ */
+export interface Recommendation {
+  placeId: string;
+  name: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  rating?: number;
+  userRatingCount?: number;
+  kind: 'food' | 'activity';
+  category: FoodPlaceCategory | ActivityPlaceCategory;
+  reason?: string;
+}
+
 export type ExpenseSplitMode = 'equally' | 'parts' | 'amounts';
 
 export type ExpenseCategory =

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { notFound } from 'next/navigation';
-import { Heart, Plus } from 'lucide-react';
+import { Heart, Plus, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +27,7 @@ import {
 import type { ActivityPlace, FoodPlace } from '@/lib/trips/types';
 import { ActivityPlaceSheet } from '@/components/trips/ActivityPlaceSheet';
 import { FoodPlaceSheet } from '@/components/trips/FoodPlaceSheet';
+import { RecommendationsSheet } from '@/components/trips/recommendations/RecommendationsSheet';
 import { WishlistCard } from './WishlistCard';
 import { WishlistFilters } from './WishlistFilters';
 import { AddWishToTimelineSheet } from './AddWishToTimelineSheet';
@@ -125,6 +126,7 @@ export function WishlistsPage({ tripId }: WishlistsPageProps) {
   );
 
   // The wishlist place being scheduled onto a day (drives the day-picker sheet).
+  const [discoverOpen, setDiscoverOpen] = useState(false);
   const [schedulingEntry, setSchedulingEntry] = useState<WishlistEntry | null>(
     null,
   );
@@ -335,6 +337,14 @@ export function WishlistsPage({ tripId }: WishlistsPageProps) {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="h-7 gap-1 px-2 text-xs text-violet-600 hover:text-violet-700 dark:text-violet-400"
+                    onClick={() => setDiscoverOpen(true)}
+                  >
+                    <Sparkles className="size-3.5" /> Discover
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="text-muted-foreground hover:text-foreground h-7 gap-1 px-2 text-xs"
                     onClick={() => openAdd('food')}
                   >
@@ -379,6 +389,16 @@ export function WishlistsPage({ tripId }: WishlistsPageProps) {
           )}
         </div>
       </div>
+
+      {activeCity && (
+        <RecommendationsSheet
+          tripId={tripId}
+          cityLabel={activeCity.cityLabel}
+          cityPlaceId={activeCity.cityPlaceId}
+          open={discoverOpen}
+          onOpenChange={setDiscoverOpen}
+        />
+      )}
 
       {sheetKind === 'food' && sheetCity && (
         <FoodPlaceSheet
