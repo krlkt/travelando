@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { notFound } from 'next/navigation';
-import { Heart, Plus, Sparkles } from 'lucide-react';
+import { Heart, List, Map as MapIcon, Plus, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,7 +30,10 @@ import { FoodPlaceSheet } from '@/components/trips/FoodPlaceSheet';
 import { RecommendationsSheet } from '@/components/trips/recommendations/RecommendationsSheet';
 import { WishlistCard } from './WishlistCard';
 import { WishlistFilters } from './WishlistFilters';
+import { WishlistMap } from './WishlistMap';
 import { AddWishToTimelineSheet } from './AddWishToTimelineSheet';
+
+type WishlistView = 'list' | 'map';
 
 interface WishlistsPageProps {
   tripId: string;
@@ -114,6 +117,7 @@ export function WishlistsPage({ tripId }: WishlistsPageProps) {
     DEFAULT_WISHLIST_VIEW.planFilter,
   );
   const [sort, setSort] = useState<WishlistSort>(DEFAULT_WISHLIST_VIEW.sort);
+  const [view, setView] = useState<WishlistView>('list');
   const [ratingById, setRatingById] = useState<Map<string, number>>(new Map());
 
   // Edit / add sheet state.
@@ -334,6 +338,34 @@ export function WishlistsPage({ tripId }: WishlistsPageProps) {
                   {activeCity.label}
                 </h2>
                 <div className="flex items-center gap-1">
+                  <div className="border-border/60 mr-1 inline-flex items-center rounded-full border p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setView('list')}
+                      aria-pressed={view === 'list'}
+                      aria-label="List view"
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs transition ${
+                        view === 'list'
+                          ? 'bg-secondary text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <List className="size-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setView('map')}
+                      aria-pressed={view === 'map'}
+                      aria-label="Map view"
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs transition ${
+                        view === 'map'
+                          ? 'bg-secondary text-foreground'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      <MapIcon className="size-3.5" />
+                    </button>
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -361,7 +393,13 @@ export function WishlistsPage({ tripId }: WishlistsPageProps) {
                 </div>
               </div>
 
-              {visible.length === 0 ? (
+              {view === 'map' ? (
+                <WishlistMap
+                  entries={visible}
+                  plannedIds={plannedIds}
+                  onSelect={setSchedulingEntry}
+                />
+              ) : visible.length === 0 ? (
                 <p className="text-muted-foreground/60 text-xs">
                   Nothing here yet.
                 </p>
