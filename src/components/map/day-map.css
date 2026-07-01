@@ -23,11 +23,22 @@
 
 /* Inner wrapper carries all hover/scale/lift motion, keeping the
    MapLibre-controlled root transform-free. */
+/* No `will-change`/compositor promotion here: MapLibre repositions the root
+   marker via `transform` every zoom frame, and a permanently-composited child
+   updates on a separate layer, so the pin visibly swims away from its spot
+   mid-zoom and only settles when the gesture stops. The hover transition below
+   is enough on its own.
+
+   `position: relative` makes this inner wrapper the containing block for the
+   absolutely-positioned want pips and in-plan check badge — it MUST live here,
+   not on the root `.dm-marker`, because MapLibre requires the root to keep its
+   own `position: absolute`; overriding that drops the marker into normal flow
+   and breaks its projected placement. */
 .dm-marker__inner {
+  position: relative;
   display: grid;
   place-items: center;
   transition: transform var(--duration-fast, 150ms) var(--ease-out-expo, ease);
-  will-change: transform;
 }
 
 .dm-marker:hover .dm-marker__inner,
@@ -158,10 +169,6 @@
   transform: translateX(-50%);
   display: flex;
   gap: 1.5px;
-}
-.dm-marker--foodWish,
-.dm-marker--activityWish {
-  position: relative;
 }
 .dm-marker__want i {
   width: 3px;

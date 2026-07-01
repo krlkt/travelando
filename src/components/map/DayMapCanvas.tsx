@@ -48,6 +48,12 @@ function openExternal(url: string): void {
 // Pixel radius within which wishlist pins collapse into a "+N" cluster.
 const CLUSTER_RADIUS = 48;
 const CLUSTER_MAX_ZOOM = 18;
+// Fraction of the viewport span to pad the cluster query bbox by on each side.
+// Supercluster range-queries on each cluster's *centroid*, so an edge cluster
+// whose centroid sits just outside the visible rect drops out — and pops back
+// in on the next nudge. Padding keeps edge clusters mounted so pins don't
+// flicker in/out while panning.
+const BBOX_PADDING_RATIO = 0.5;
 
 type WishPoint = FoodWishMapPoint | ActivityWishMapPoint;
 type WishProps = { point: WishPoint };
@@ -210,13 +216,23 @@ export function DayMapCanvas({
     const index = clusterIndexRef.current;
     if (index) {
       const b = map.getBounds();
+      const west = b.getWest();
+      const south = b.getSouth();
+      const east = b.getEast();
+      const north = b.getNorth();
+      // Grow the query rect so clusters just past the edge stay mounted.
+      const padX = (east - west) * BBOX_PADDING_RATIO;
+      const padY = (north - south) * BBOX_PADDING_RATIO;
       const bbox: [number, number, number, number] = [
-        b.getWest(),
-        b.getSouth(),
-        b.getEast(),
-        b.getNorth(),
+        west - padX,
+        south - padY,
+        east + padX,
+        north + padY,
       ];
-      const zoom = Math.round(map.getZoom());
+      // Floor (not round) to match supercluster's own zoom banding, so clusters
+      // split/merge exactly at integer zoom steps and agree with the integer
+      // getClusterExpansionZoom used on cluster click.
+      const zoom = Math.floor(map.getZoom());
       for (const feature of index.getClusters(bbox, zoom)) {
         const props = feature.properties;
         if ('cluster' in props && props.cluster) {
