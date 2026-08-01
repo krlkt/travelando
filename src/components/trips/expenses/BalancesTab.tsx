@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Scale, ArrowLeftRight } from 'lucide-react';
+import { Scale, ArrowLeftRight, ListTree } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatMoney } from '@/lib/trips/grouping';
 import { fadeUp, stagger } from '@/lib/motion/presets';
@@ -12,9 +12,10 @@ import type {
   UserSummary,
   UserSummaryEntry,
 } from '@/lib/trips/balances';
-import type { Settlement, Trip, TripMember } from '@/lib/trips/types';
+import type { Expense, Settlement, Trip, TripMember } from '@/lib/trips/types';
 import { SettleSheet } from './SettleSheet';
 import { SettlementsLog } from './SettlementsLog';
+import { BalanceBreakdownDialog } from './BalanceBreakdownDialog';
 
 interface BalancesTabProps {
   trip: Trip;
@@ -22,6 +23,7 @@ interface BalancesTabProps {
   summary: UserSummary | null;
   members: TripMember[];
   currentMemberId: string | null;
+  expenses: Expense[];
   settlements: Settlement[];
   onRemoveSettlement: (id: string) => Promise<void>;
 }
@@ -32,11 +34,15 @@ export function BalancesTab({
   summary,
   members,
   currentMemberId,
+  expenses,
   settlements,
   onRemoveSettlement,
 }: BalancesTabProps) {
   const [settleOpen, setSettleOpen] = useState(false);
   const [editing, setEditing] = useState<Settlement | null>(null);
+  const [breakdownMember, setBreakdownMember] = useState<TripMember | null>(
+    null,
+  );
 
   function openEdit(settlement: Settlement) {
     setEditing(settlement);
@@ -141,13 +147,26 @@ export function BalancesTab({
                     idx > 0 ? 'border-border/40 border-t' : ''
                   }`}
                 >
-                  <div className="leading-tight font-medium">
-                    {member.displayName}
-                    {isMe && (
-                      <span className="text-muted-foreground ml-1.5 text-xs">
-                        (you)
-                      </span>
-                    )}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="leading-tight font-medium">
+                      {member.displayName}
+                      {isMe && (
+                        <span className="text-muted-foreground ml-1.5 text-xs">
+                          (you)
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-foreground -mr-1.5 h-7 gap-1 px-2 text-xs"
+                      onClick={() => setBreakdownMember(member)}
+                      aria-label={`See how ${member.displayName}'s balance is calculated`}
+                    >
+                      <ListTree className="size-3.5" />
+                      Details
+                    </Button>
                   </div>
                   {lines.length === 0 ? (
                     <div className="text-muted-foreground text-xs">Settled</div>
@@ -180,6 +199,17 @@ export function BalancesTab({
         currencies={currencies}
         currentMemberId={currentMemberId}
         settlement={editing}
+      />
+
+      <BalanceBreakdownDialog
+        member={breakdownMember}
+        members={members}
+        expenses={expenses}
+        settlements={settlements}
+        open={breakdownMember !== null}
+        onOpenChange={(open) => {
+          if (!open) setBreakdownMember(null);
+        }}
       />
     </>
   );

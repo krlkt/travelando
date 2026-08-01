@@ -364,6 +364,7 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
                   summary={summary}
                   members={trip.members}
                   currentMemberId={currentMemberId}
+                  expenses={tripExpenses}
                   settlements={tripSettlements}
                   onRemoveSettlement={(id) => removeSettlement(trip.id, id)}
                 />
