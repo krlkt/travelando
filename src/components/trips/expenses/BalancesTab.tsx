@@ -36,6 +36,17 @@ export function BalancesTab({
   onRemoveSettlement,
 }: BalancesTabProps) {
   const [settleOpen, setSettleOpen] = useState(false);
+  const [editing, setEditing] = useState<Settlement | null>(null);
+
+  function openEdit(settlement: Settlement) {
+    setEditing(settlement);
+    setSettleOpen(true);
+  }
+
+  function handleSheetOpenChange(open: boolean) {
+    setSettleOpen(open);
+    if (!open) setEditing(null);
+  }
 
   if (!result) {
     return (
@@ -101,7 +112,10 @@ export function BalancesTab({
                 size="sm"
                 variant="outline"
                 className="shrink-0"
-                onClick={() => setSettleOpen(true)}
+                onClick={() => {
+                  setEditing(null);
+                  setSettleOpen(true);
+                }}
               >
                 <ArrowLeftRight className="size-4" />
                 Settle up
@@ -153,7 +167,7 @@ export function BalancesTab({
         <SettlementsLog
           settlements={settlements}
           members={members}
-          currentMemberId={currentMemberId}
+          onEdit={openEdit}
           onRemove={onRemoveSettlement}
         />
       </motion.div>
@@ -161,10 +175,11 @@ export function BalancesTab({
       <SettleSheet
         trip={trip}
         open={settleOpen}
-        onOpenChange={setSettleOpen}
+        onOpenChange={handleSheetOpenChange}
         members={members}
         currencies={currencies}
         currentMemberId={currentMemberId}
+        settlement={editing}
       />
     </>
   );

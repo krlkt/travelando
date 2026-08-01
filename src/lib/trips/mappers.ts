@@ -18,6 +18,7 @@ import type {
   Place,
   Settlement,
   SettlementDraft,
+  SettlementUpdate,
   Trip,
   TripDraft,
   TripInvitation,
@@ -576,5 +577,18 @@ export function settlementDraftToInsert(
     currency: draft.currency,
     settled_on: draft.settledOn,
     note: draft.note ?? null,
+  };
+}
+
+export function settlementUpdateToRow(
+  patch: SettlementUpdate,
+): Omit<SettlementRow, 'id' | 'trip_id'> {
+  return {
+    from_member_id: patch.fromMemberId,
+    to_member_id: patch.toMemberId,
+    amount: patch.amount,
+    currency: patch.currency,
+    settled_on: patch.settledOn,
+    note: patch.note ?? null,
   };
 }

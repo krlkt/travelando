@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { toast } from 'sonner';
-import { ArrowRight, Trash2 } from 'lucide-react';
+import { ArrowRight, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatMoney } from '@/lib/trips/grouping';
 import { fadeUp } from '@/lib/motion/presets';
@@ -12,7 +12,7 @@ import type { Settlement, TripMember } from '@/lib/trips/types';
 interface SettlementsLogProps {
   settlements: Settlement[];
   members: TripMember[];
-  currentMemberId: string | null;
+  onEdit: (settlement: Settlement) => void;
   onRemove: (id: string) => Promise<void>;
 }
 
@@ -25,7 +25,7 @@ function formatDate(value: string): string {
 export function SettlementsLog({
   settlements,
   members,
-  currentMemberId,
+  onEdit,
   onRemove,
 }: SettlementsLogProps) {
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -56,9 +56,6 @@ export function SettlementsLog({
         {sorted.map((s, idx) => {
           const from = memberById.get(s.fromMemberId);
           const to = memberById.get(s.toMemberId);
-          const involvesMe =
-            s.fromMemberId === currentMemberId ||
-            s.toMemberId === currentMemberId;
           return (
             <div
               key={s.id}
@@ -89,7 +86,18 @@ export function SettlementsLog({
               <div className="text-right text-sm font-medium tabular-nums">
                 {formatMoney(s.amount, s.currency)}
               </div>
-              {involvesMe && (
+              <div className="flex shrink-0 items-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-foreground size-7"
+                  disabled={pendingId === s.id}
+                  onClick={() => onEdit(s)}
+                  aria-label="Edit settlement"
+                >
+                  <Pencil className="size-3.5" />
+                </Button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -101,7 +109,7 @@ export function SettlementsLog({
                 >
                   <Trash2 className="size-3.5" />
                 </Button>
-              )}
+              </div>
             </div>
           );
         })}

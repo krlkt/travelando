@@ -418,6 +418,16 @@ export function createInMemoryRepository(
       settlements = [...settlements, settlement];
       return { ...settlement };
     },
+    async updateSettlement(id, patch) {
+      let updated: Settlement | undefined;
+      settlements = settlements.map((s) => {
+        if (s.id !== id) return s;
+        updated = { ...s, ...patch };
+        return updated;
+      });
+      if (!updated) throw new Error(`updateSettlement ${id}: not found`);
+      return { ...updated };
+    },
     async removeSettlement(id) {
       settlements = settlements.filter((s) => s.id !== id);
     },

@@ -22,6 +22,7 @@ import {
   rowToSettlement,
   rowToTrip,
   settlementDraftToInsert,
+  settlementUpdateToRow,
   tripDraftToInsert,
   tripPatchToUpdate,
   type ActivityPlaceRow,
@@ -54,6 +55,7 @@ import type {
   MemberInviteDraft,
   Settlement,
   SettlementDraft,
+  SettlementUpdate,
   Trip,
   TripDraft,
   TripInvitation,
@@ -706,6 +708,24 @@ export function createSupabaseRepository(
         .select(SETTLEMENT_COLUMNS)
         .single();
       const row = unwrap(data as SettlementRow | null, error, 'addSettlement');
+      return rowToSettlement(row);
+    },
+
+    async updateSettlement(
+      id: string,
+      patch: SettlementUpdate,
+    ): Promise<Settlement> {
+      const { data, error } = await client
+        .from('settlements')
+        .update(settlementUpdateToRow(patch))
+        .eq('id', id)
+        .select(SETTLEMENT_COLUMNS)
+        .single();
+      const row = unwrap(
+        data as SettlementRow | null,
+        error,
+        'updateSettlement',
+      );
       return rowToSettlement(row);
     },
 

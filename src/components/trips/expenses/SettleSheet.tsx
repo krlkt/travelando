@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import { useTrips } from '@/lib/trips/context';
 import { parseAmountInput } from '@/lib/trips/grouping';
-import type { Trip, TripMember } from '@/lib/trips/types';
+import type { Settlement, Trip, TripMember } from '@/lib/trips/types';
 
 const FALLBACK_CURRENCY = 'EUR';
 
@@ -36,6 +36,8 @@ interface SettleSheetProps {
   currencies: string[];
   /** Defaults the "from" side to the current user when they have a member row. */
   currentMemberId: string | null;
+  /** When set, the sheet edits this settlement instead of recording a new one. */
+  settlement?: Settlement | null;
 }
 
 function todayLocalDate(): string {
@@ -51,6 +53,7 @@ export function SettleSheet({
   members,
   currencies,
   currentMemberId,
+  settlement,
 }: SettleSheetProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -62,6 +65,7 @@ export function SettleSheet({
             members={members}
             currencies={currencies}
             currentMemberId={currentMemberId}
+            settlement={settlement ?? null}
           />
         )}
       </SheetContent>
@@ -75,6 +79,7 @@ interface SettleBodyProps {
   members: TripMember[];
   currencies: string[];
   currentMemberId: string | null;
+  settlement: Settlement | null;
 }
 
 function SettleBody({
@@ -83,23 +88,32 @@ function SettleBody({
   members,
   currencies,
   currentMemberId,
+  settlement,
 }: SettleBodyProps) {
-  const { addSettlement } = useTrips();
+  const { addSettlement, updateSettlement } = useTrips();
+  const isEditing = settlement !== null;
 
   // Default: from = me (if I have a member row), else the first member.
   const defaultFromId = useMemo(() => {
+    if (settlement) return settlement.fromMemberId;
     if (currentMemberId && members.some((m) => m.id === currentMemberId)) {
       return currentMemberId;
     }
     return members[0]?.id ?? '';
-  }, [currentMemberId, members]);
+  }, [settlement, currentMemberId, members]);
 
   const [fromId, setFromId] = useState(defaultFromId);
-  const [toId, setToId] = useState('');
-  const [amountInput, setAmountInput] = useState('');
-  const [currency, setCurrency] = useState(currencies[0] ?? FALLBACK_CURRENCY);
-  const [settledOn, setSettledOn] = useState(todayLocalDate());
-  const [note, setNote] = useState('');
+  const [toId, setToId] = useState(settlement?.toMemberId ?? '');
+  const [amountInput, setAmountInput] = useState(
+    settlement ? String(settlement.amount) : '',
+  );
+  const [currency, setCurrency] = useState(
+    settlement?.currency ?? currencies[0] ?? FALLBACK_CURRENCY,
+  );
+  const [settledOn, setSettledOn] = useState(
+    settlement?.settledOn ?? todayLocalDate(),
+  );
+  const [note, setNote] = useState(settlement?.note ?? '');
   const [submitting, setSubmitting] = useState(false);
 
   const fromMember = members.find((m) => m.id === fromId) ?? null;
@@ -119,16 +133,28 @@ function SettleBody({
     if (!canSubmit || !fromMember || !toMember || amount === null) return;
     setSubmitting(true);
     try {
-      await addSettlement({
-        tripId: trip.id,
-        fromMemberId: fromMember.id,
-        toMemberId: toMember.id,
-        amount,
-        currency,
-        settledOn,
-        note: note.trim() || undefined,
-      });
-      toast.success('Settlement recorded');
+      if (settlement) {
+        await updateSettlement(trip.id, settlement.id, {
+          fromMemberId: fromMember.id,
+          toMemberId: toMember.id,
+          amount,
+          currency,
+          settledOn,
+          note: note.trim() || undefined,
+        });
+        toast.success('Settlement updated');
+      } else {
+        await addSettlement({
+          tripId: trip.id,
+          fromMemberId: fromMember.id,
+          toMemberId: toMember.id,
+          amount,
+          currency,
+          settledOn,
+          note: note.trim() || undefined,
+        });
+        toast.success('Settlement recorded');
+      }
       onClose();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to settle');
@@ -150,7 +176,9 @@ function SettleBody({
   return (
     <div className="flex h-full flex-col">
       <div className="border-border/60 border-b px-6 py-5">
-        <SheetTitle className="text-lg">Settle up</SheetTitle>
+        <SheetTitle className="text-lg">
+          {isEditing ? 'Edit settlement' : 'Settle up'}
+        </SheetTitle>
         <SheetDescription className="text-muted-foreground mt-1 text-xs">
           Record a real-world money transfer between any two members.
         </SheetDescription>
@@ -263,7 +291,11 @@ function SettleBody({
           </Button>
         </SheetClose>
         <Button type="button" onClick={handleSubmit} disabled={!canSubmit}>
-          {submitting ? 'Saving…' : 'Record settlement'}
+          {submitting
+            ? 'Saving…'
+            : isEditing
+              ? 'Save changes'
+              : 'Record settlement'}
         </Button>
       </SheetFooter>
     </div>

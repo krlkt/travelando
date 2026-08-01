@@ -26,6 +26,7 @@ import type {
   MemberInviteDraft,
   Settlement,
   SettlementDraft,
+  SettlementUpdate,
   Trip,
   TripDraft,
   TripInvitation,
@@ -90,6 +91,11 @@ interface TripsState {
   ) => Promise<void>;
   removeExpense: (tripId: string, id: string) => Promise<void>;
   addSettlement: (draft: SettlementDraft) => Promise<Settlement>;
+  updateSettlement: (
+    tripId: string,
+    id: string,
+    patch: SettlementUpdate,
+  ) => Promise<Settlement>;
   removeSettlement: (tripId: string, id: string) => Promise<void>;
 
   addMember: (tripId: string, draft: TripMemberDraft) => Promise<TripMember>;
@@ -688,6 +694,52 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
     [],
   );
 
+  const updateSettlement = useCallback(
+    async (
+      tripId: string,
+      id: string,
+      patch: SettlementUpdate,
+    ): Promise<Settlement> => {
+      let snapshot: Settlement | undefined;
+      setSettlements((prev) => {
+        const list = prev[tripId] ?? [];
+        snapshot = list.find((s) => s.id === id);
+        return {
+          ...prev,
+          [tripId]: list.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+        };
+      });
+      try {
+        const updated = await callApi<Settlement>(`/api/settlements/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(patch),
+        });
+        if (updated) {
+          setSettlements((prev) => ({
+            ...prev,
+            [tripId]: (prev[tripId] ?? []).map((s) =>
+              s.id === id ? updated : s,
+            ),
+          }));
+          return updated;
+        }
+        return { ...(snapshot as Settlement), ...patch, id, tripId };
+      } catch (err) {
+        if (snapshot) {
+          const restored = snapshot;
+          setSettlements((prev) => ({
+            ...prev,
+            [tripId]: (prev[tripId] ?? []).map((s) =>
+              s.id === id ? restored : s,
+            ),
+          }));
+        }
+        throw err;
+      }
+    },
+    [],
+  );
+
   const removeSettlement = useCallback(
     async (tripId: string, id: string): Promise<void> => {
       let snapshot: Settlement | undefined;
@@ -1010,6 +1062,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       updateExpense,
       removeExpense,
       addSettlement,
+      updateSettlement,
       removeSettlement,
       addMember,
       updateMember,
@@ -1050,6 +1103,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       updateExpense,
       removeExpense,
       addSettlement,
+      updateSettlement,
       removeSettlement,
       addMember,
       updateMember,

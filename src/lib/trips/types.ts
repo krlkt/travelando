@@ -304,3 +304,6 @@ export interface Settlement {
 }
 
 export type SettlementDraft = Omit<Settlement, 'id'>;
+
+/** Editable fields of a settlement. The trip a settlement belongs to is fixed. */
+export type SettlementUpdate = Omit<Settlement, 'id' | 'tripId'>;

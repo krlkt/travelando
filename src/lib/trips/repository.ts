@@ -16,6 +16,7 @@ import type {
   MemberInviteDraft,
   Settlement,
   SettlementDraft,
+  SettlementUpdate,
   Trip,
   TripDraft,
   TripInvitation,
@@ -94,5 +95,6 @@ export interface TripsRepository {
 
   listSettlements(tripId: string): Promise<Settlement[]>;
   addSettlement(draft: SettlementDraft): Promise<Settlement>;
+  updateSettlement(id: string, patch: SettlementUpdate): Promise<Settlement>;
   removeSettlement(id: string): Promise<void>;
 }
