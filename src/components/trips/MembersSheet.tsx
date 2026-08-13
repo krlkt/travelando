@@ -181,6 +181,12 @@ function MembersSheetBody({
     ? trip.members.filter((m) => m.userId !== trip.ownerId)
     : trip.members;
 
+  const ownerMember = trip.ownerId
+    ? trip.members.find((m) => m.userId === trip.ownerId)
+    : undefined;
+  const isOwnerMe = Boolean(user && trip.ownerId === user.id);
+  const ownerName = ownerMember?.displayName || 'Owner';
+
   return (
     <>
       <div>
@@ -278,11 +284,11 @@ function MembersSheetBody({
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium">
-                Owner
-                {user && trip.ownerId === user.id ? ' (you)' : ''}
+                {ownerName}
+                {isOwnerMe ? ' (you)' : ''}
               </div>
               <div className="text-muted-foreground truncate text-xs">
-                Manages members and can delete the trip
+                Owner · Manages members and can delete the trip
               </div>
             </div>
           </div>
