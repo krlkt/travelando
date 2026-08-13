@@ -10,7 +10,6 @@ import {
 import { aggregateByCategory } from '@/lib/trips/expenseTotals';
 import { cn } from '@/lib/utils';
 import type { Expense, ExpenseCategory } from '@/lib/trips/types';
-import type { ExpenseViewMode } from './ShareToggle';
 
 // Compact whole-euro format keeps category tiles tight even with large,
 // multi-currency totals (e.g. "€12,346").
@@ -23,8 +22,10 @@ const eurCompact = new Intl.NumberFormat('en-GB', {
 interface CategoryWidgetProps {
   expenses: Expense[];
   rates: EurRates | null;
-  mode: ExpenseViewMode;
-  currentMemberId: string | null;
+  /** Focused member whose share is shown; `null` = trip total. */
+  focusMemberId: string | null;
+  /** Possessive scope word for the heading, e.g. "Your", "Trip", "Alex's". */
+  scopeName: string;
   /** Active categories. Empty means no category filter. */
   selected: ExpenseCategory[];
   onToggle: (category: ExpenseCategory) => void;
@@ -34,15 +35,15 @@ interface CategoryWidgetProps {
 export function CategoryWidget({
   expenses,
   rates,
-  mode,
-  currentMemberId,
+  focusMemberId,
+  scopeName,
   selected,
   onToggle,
   onClear,
 }: CategoryWidgetProps) {
   const categoryTotals = useMemo(
-    () => aggregateByCategory(expenses, rates, currentMemberId),
-    [expenses, rates, currentMemberId],
+    () => aggregateByCategory(expenses, rates, focusMemberId),
+    [expenses, rates, focusMemberId],
   );
 
   const buckets = useMemo(() => {
@@ -56,11 +57,12 @@ export function CategoryWidget({
       other: 0,
     };
     for (const c of EXPENSE_CATEGORIES) {
-      totals[c] =
-        mode === 'mine' ? categoryTotals[c].mine : categoryTotals[c].total;
+      totals[c] = focusMemberId
+        ? categoryTotals[c].mine
+        : categoryTotals[c].total;
     }
     return totals;
-  }, [categoryTotals, mode]);
+  }, [categoryTotals, focusMemberId]);
 
   const grandTotal = useMemo(
     () => EXPENSE_CATEGORIES.reduce((s, c) => s + buckets[c], 0),
@@ -81,9 +83,7 @@ export function CategoryWidget({
     >
       <div className="mb-2 flex items-center justify-between px-1">
         <span className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">
-          {mode === 'mine'
-            ? 'Your spend by category'
-            : 'Trip spend by category'}
+          {`${scopeName} spend by category`}
           {selected.length > 0 && (
             <span className="ml-1.5 normal-case opacity-70">
               · {selected.length} selected

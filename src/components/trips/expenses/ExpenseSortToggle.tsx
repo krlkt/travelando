@@ -19,7 +19,7 @@ interface ExpenseSortToggleProps {
  * Segmented control choosing how the expenses list is ordered: by the day each
  * expense was spent (grouped), by when it was added (newest first), or by
  * amount. Clicking the active "Amount" option flips between biggest-first and
- * lowest-first. Mirrors {@link ShareToggle} with a sliding `layoutId` thumb.
+ * lowest-first. Uses a sliding `layoutId` thumb between the options.
  */
 export function ExpenseSortToggle({
   value,

@@ -29,7 +29,7 @@ import { ExpensesList } from './ExpensesList';
 import { BalancesTab } from './BalancesTab';
 import { CategoryWidget } from './CategoryWidget';
 import { CityFilter } from './CityFilter';
-import { ShareToggle, type ExpenseViewMode } from './ShareToggle';
+import { ShareScopeSelect, type ShareScope } from './ShareScopeSelect';
 import {
   ExpensesBodySkeleton,
   ExpensesTotalsSkeleton,
@@ -43,6 +43,15 @@ import { fadeUp, stagger } from '@/lib/motion/presets';
 import type { ExpenseCategory } from '@/lib/trips/types';
 
 const SHARE_EPSILON = 0.005;
+
+function firstNameOf(name: string): string {
+  return name.split(/\s+/)[0] || name;
+}
+
+/** Possessive form of a name: "Alex" → "Alex's", "Chris" → "Chris'". */
+function possessive(name: string): string {
+  return /s$/i.test(name) ? `${name}'` : `${name}'s`;
+}
 
 interface ExpensesPageProps {
   tripId: string;
@@ -67,7 +76,11 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
     ExpenseCategory[]
   >([]);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ExpenseViewMode>('mine');
+  // `undefined` means "follow the current member" (the default "My share"
+  // view); once the user picks explicitly it holds a memberId or `null` (trip).
+  const [chosenScope, setChosenScope] = useState<ShareScope | undefined>(
+    undefined,
+  );
   const [sortMode, setSortMode] = useState<ExpenseSortMode>('spent');
   const [amountDir, setAmountDir] = useState<AmountSortDir>('desc');
 
@@ -100,6 +113,47 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
     [settlements, tripId],
   );
   const currentMemberId = findMemberIdForUser(trip.members, user?.id);
+
+  // The member whose share is in focus. `null` = trip total. Defaults to the
+  // current member until they explicitly pick another scope.
+  const focusMemberId: ShareScope =
+    chosenScope === undefined ? currentMemberId : chosenScope;
+  const isTripScope = focusMemberId === null;
+  const isMeScope = focusMemberId !== null && focusMemberId === currentMemberId;
+
+  // Scope labels derived from the focused member. Memoized so the surrounding
+  // memos keep their manual memoization (the React Compiler bails if a plain
+  // `trip.members` lookup sits loose in the render body).
+  const { scopeCaption, categoryScopeName, focusName } = useMemo(() => {
+    const member = focusMemberId
+      ? (trip.members.find((m) => m.id === focusMemberId) ?? null)
+      : null;
+    // Possessive short label, e.g. "Alex's" (or "Alex'").
+    const possessiveName = member
+      ? possessive(firstNameOf(member.displayName))
+      : '';
+    return {
+      // Headline caption for the totals card.
+      scopeCaption: isTripScope
+        ? 'Trip total'
+        : isMeScope
+          ? 'My share'
+          : `${possessiveName} share`,
+      // Scope word for the category widget heading.
+      categoryScopeName: isTripScope
+        ? 'Trip'
+        : isMeScope
+          ? 'Your'
+          : possessiveName,
+      // Short name for the empty state; `null` for the trip scope.
+      focusName: isTripScope
+        ? null
+        : isMeScope
+          ? 'you'
+          : firstNameOf(member?.displayName ?? 'them'),
+    };
+  }, [trip.members, focusMemberId, isTripScope, isMeScope]);
+
   const categoryExpenses = useMemo(
     () =>
       selectedCategories.length === 0
@@ -148,40 +202,42 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
         : tripExpenses,
     [tripExpenses, selectedCity, fullCityResolution],
   );
-  // Chip counts track the same view-mode filter the list uses, so "my share"
-  // mode counts only expenses the current member is part of. Resolution stays
-  // on the full set so the city filter and headline totals are unaffected.
+  // Chip counts track the same scope filter the list uses, so a member scope
+  // counts only expenses that member is part of. Resolution stays on the full
+  // set so the city filter and headline totals are unaffected.
   const cityCountExpenses = useMemo(
     () =>
-      viewMode === 'mine'
+      focusMemberId
         ? categoryExpenses.filter(
-            (e) => shareForMember(e, currentMemberId) > SHARE_EPSILON,
+            (e) => shareForMember(e, focusMemberId) > SHARE_EPSILON,
           )
         : categoryExpenses,
-    [categoryExpenses, viewMode, currentMemberId],
+    [categoryExpenses, focusMemberId],
   );
   const cityGroups = useMemo(
     () => countCityGroups(cityResolution, cityCountExpenses),
     [cityResolution, cityCountExpenses],
   );
 
-  // In "my share" mode, only expenses the current member is part of appear.
+  // In a member scope, only expenses that member is part of appear.
   const visibleExpenses = useMemo(
     () =>
-      viewMode === 'mine'
+      focusMemberId
         ? cityExpenses.filter(
-            (e) => shareForMember(e, currentMemberId) > SHARE_EPSILON,
+            (e) => shareForMember(e, focusMemberId) > SHARE_EPSILON,
           )
         : cityExpenses,
-    [cityExpenses, viewMode, currentMemberId],
+    [cityExpenses, focusMemberId],
   );
 
   // The headline total reflects the active filters (category + city), so it
-  // tracks what's actually listed. View mode only decides which figure —
-  // "my share" or "trip total" — reads as primary; both come from this set.
+  // tracks what's actually listed. Scope only decides which figure reads as
+  // primary; both come from this set. `mine` carries the focused member's
+  // share, falling back to the current member so the trip-scope secondary line
+  // can still show "your share".
   const totals = useMemo(
-    () => aggregateByCurrency(cityExpenses, currentMemberId),
-    [cityExpenses, currentMemberId],
+    () => aggregateByCurrency(cityExpenses, focusMemberId ?? currentMemberId),
+    [cityExpenses, focusMemberId, currentMemberId],
   );
 
   const balanceResult = useMemo(
@@ -258,9 +314,14 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
         <section className="border-border/70 bg-card mt-4 overflow-hidden rounded-[var(--radius-xl)] border p-5 shadow-[0_1px_2px_oklch(20%_0.02_250_/_0.04),0_18px_42px_-24px_oklch(20%_0.02_250_/_0.18)] sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <span className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">
-              {viewMode === 'mine' ? 'My share' : 'Trip total'}
+              {scopeCaption}
             </span>
-            <ShareToggle value={viewMode} onChange={setViewMode} />
+            <ShareScopeSelect
+              members={trip.members}
+              value={focusMemberId}
+              currentMemberId={currentMemberId}
+              onChange={setChosenScope}
+            />
           </div>
           <div className="mt-3">
             {isLoadingExtras ? (
@@ -272,17 +333,17 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
             ) : (
               <div className="flex flex-col gap-2">
                 {totals.byCurrency.map((c) => {
-                  const primary = viewMode === 'mine' ? c.mine : c.total;
-                  const secondary = viewMode === 'mine' ? c.total : c.mine;
+                  const primary = isTripScope ? c.total : c.mine;
+                  const secondary = isTripScope ? c.mine : c.total;
                   return (
                     <div key={c.currency} className="flex flex-col gap-0.5">
                       <span className="font-display text-3xl leading-none tabular-nums sm:text-4xl">
                         {formatMoney(primary, c.currency)}
                       </span>
                       <span className="text-muted-foreground text-xs tabular-nums">
-                        {viewMode === 'mine'
-                          ? `of ${formatMoney(secondary, c.currency)} trip total`
-                          : `your share ${formatMoney(secondary, c.currency)}`}
+                        {isTripScope
+                          ? `your share ${formatMoney(secondary, c.currency)}`
+                          : `of ${formatMoney(secondary, c.currency)} trip total`}
                       </span>
                     </div>
                   );
@@ -299,8 +360,8 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
             <CategoryWidget
               expenses={categoryWidgetExpenses}
               rates={rates}
-              mode={viewMode}
-              currentMemberId={currentMemberId}
+              focusMemberId={focusMemberId}
+              scopeName={categoryScopeName}
               selected={selectedCategories}
               onToggle={handleToggleCategory}
               onClear={() => setSelectedCategories([])}
@@ -328,7 +389,7 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
                 {visibleExpenses.length === 0 ? (
                   <EmptyState
                     onAdd={handleAdd}
-                    mode={viewMode}
+                    focusName={focusName}
                     hasAny={categoryExpenses.length > 0}
                   />
                 ) : (
@@ -346,11 +407,10 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
                     <ExpensesList
                       expenses={visibleExpenses}
                       members={trip.members}
-                      mode={viewMode}
+                      focusMemberId={focusMemberId}
                       sort={sortMode}
                       amountDir={amountDir}
                       rates={rates}
-                      currentMemberId={currentMemberId}
                       onSelect={handleEdit}
                     />
                   </>
@@ -390,11 +450,13 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
           // behind a category/city chip or the "my share" view.
           setSelectedCategories([]);
           setSelectedCity(null);
+          // If the current scope is a member the new expense doesn't involve,
+          // fall back to the trip total so it's never hidden.
           if (
-            viewMode === 'mine' &&
-            shareForMember(created, currentMemberId) <= SHARE_EPSILON
+            focusMemberId &&
+            shareForMember(created, focusMemberId) <= SHARE_EPSILON
           ) {
-            setViewMode('trip');
+            setChosenScope(null);
           }
         }}
       />
@@ -404,24 +466,26 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
 
 interface EmptyStateProps {
   onAdd: () => void;
-  mode: ExpenseViewMode;
+  /** Whose share is in focus; `null` for the trip scope. "you" for self. */
+  focusName: string | null;
   hasAny: boolean;
 }
 
-function EmptyState({ onAdd, mode, hasAny }: EmptyStateProps) {
-  // "mine" mode with expenses present means none of them involve the user.
-  const noneForMe = mode === 'mine' && hasAny;
+function EmptyState({ onAdd, focusName, hasAny }: EmptyStateProps) {
+  // A member scope with expenses present means none of them involve that member.
+  const noneForMember = focusName !== null && hasAny;
+  const splitLabel = focusName === 'you' ? 'you' : focusName;
   return (
     <div className="border-border/70 bg-secondary/20 grid place-items-center rounded-[var(--radius-lg)] border border-dashed px-6 py-16 text-center">
       <span className="bg-primary/15 text-primary mb-3 grid size-10 place-items-center rounded-full">
         <Wallet className="size-5" />
       </span>
       <p className="text-muted-foreground max-w-sm text-sm">
-        {noneForMe
-          ? 'None of these expenses are split with you. Switch to Trip total to see them all.'
+        {noneForMember
+          ? `None of these expenses are split with ${splitLabel}. Switch to Trip total to see them all.`
           : 'No expenses yet. Track what gets spent, who paid, and how to split it.'}
       </p>
-      {!noneForMe && (
+      {!noneForMember && (
         <Button size="sm" variant="outline" className="mt-4" onClick={onAdd}>
           <Plus className="size-4" />
           Add first expense
