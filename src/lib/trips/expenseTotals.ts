@@ -1,6 +1,6 @@
 import { expandShares } from './balances';
 import { EXPENSE_CATEGORIES } from './expenseCategory';
-import { convertToEur, type EurRates } from './fx';
+import { convertCurrency, convertToEur, type EurRates } from './fx';
 import type { Expense, ExpenseCategory } from './types';
 
 export interface CurrencyTotal {
@@ -11,6 +11,48 @@ export interface CurrencyTotal {
 
 export interface ExpenseCurrencyTotals {
   byCurrency: CurrencyTotal[];
+}
+
+export interface CombinedTotal {
+  /** Target currency the figures below are expressed in. */
+  currency: string;
+  total: number;
+  mine: number;
+  /** Currencies that couldn't be converted and were left out of the sum. */
+  unconvertible: string[];
+}
+
+/**
+ * Fold a per-currency breakdown into a single target currency. Currencies that
+ * can't be converted (missing/invalid rate) are excluded from the sum and
+ * reported in `unconvertible` so the UI can flag them rather than under-report
+ * silently. The target currency itself always passes through untouched.
+ */
+export function combineInCurrency(
+  byCurrency: CurrencyTotal[],
+  target: string,
+  rates: EurRates,
+): CombinedTotal {
+  const targetCode = target.toUpperCase();
+  const combined: CombinedTotal = {
+    currency: targetCode,
+    total: 0,
+    mine: 0,
+    unconvertible: [],
+  };
+
+  for (const c of byCurrency) {
+    const total = convertCurrency(c.total, c.currency, targetCode, rates);
+    if (total === null) {
+      combined.unconvertible.push(c.currency);
+      continue;
+    }
+    combined.total += total;
+    const mine = convertCurrency(c.mine, c.currency, targetCode, rates);
+    if (mine !== null) combined.mine += mine;
+  }
+
+  return combined;
 }
 
 interface Bucket {

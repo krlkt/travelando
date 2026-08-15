@@ -75,6 +75,10 @@ export interface TripsRepository {
   // paid, appears in a split, or settled is retired into a name-only member so
   // expense history and balances stay intact.
   removeMember(tripId: string, memberId: string): Promise<RemoveMemberResult>;
+  // Hands the trip to another member, who must have an account and have
+  // accepted their invite. The outgoing owner stays on as a regular member.
+  // Resolves with the new owner's user id.
+  transferOwnership(tripId: string, memberId: string): Promise<string>;
   // Convert an existing (name-only) member into a pending invite, or send a
   // fresh pending invite. Access is granted only once the invitee accepts.
   inviteMember(

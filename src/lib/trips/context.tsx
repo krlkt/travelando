@@ -113,6 +113,8 @@ interface TripsState {
     memberId: string,
     draft: MemberInviteDraft,
   ) => Promise<TripMember>;
+  /** Hand the trip to another member. The caller stays on as a regular member. */
+  transferOwnership: (tripId: string, memberId: string) => Promise<void>;
 
   invitations: TripInvitation[];
   refreshInvitations: () => Promise<void>;
@@ -927,6 +929,24 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
     [],
   );
 
+  // Not optimistic on purpose: ownership drives who may manage members and
+  // delete the trip, so the UI only swaps it once the server has committed.
+  const transferOwnership = useCallback(
+    async (tripId: string, memberId: string): Promise<void> => {
+      const result = await callApi<{ ownerId: string }>(
+        `/api/trips/${tripId}/members/${memberId}/transfer-ownership`,
+        { method: 'POST' },
+      );
+      if (!result?.ownerId) throw new Error('Owner not returned');
+      setTrips((prev) =>
+        prev.map((t) =>
+          t.id === tripId ? { ...t, ownerId: result.ownerId } : t,
+        ),
+      );
+    },
+    [],
+  );
+
   const refreshInvitations = useCallback(async (): Promise<void> => {
     try {
       const data = await callApi<TripInvitation[]>('/api/invitations');
@@ -1068,6 +1088,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       updateMember,
       removeMember,
       inviteMember,
+      transferOwnership,
       invitations,
       refreshInvitations,
       acceptInvitation,
@@ -1109,6 +1130,7 @@ export function TripsProvider({ initialTrips, children }: TripsProviderProps) {
       updateMember,
       removeMember,
       inviteMember,
+      transferOwnership,
       invitations,
       refreshInvitations,
       acceptInvitation,

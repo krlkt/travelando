@@ -37,7 +37,9 @@
       "Bash(git -c core.pager=cat diff --stat -- src/lib/email/sendTripInvite.test.ts)",
       "WebFetch(domain:ui-ux-pro-max-skill.nextlevelbuilder.io)",
       "Bash(awk '/^\\(function|const\\) \\(nextSlotIso|nextSlotTime\\)/{f=1} f{print} /^}/{if\\(f\\)c++; if\\(c>=2 && f\\) exit}' src/components/trips/DayMap.tsx)",
-      "mcp__plugin_ecc_playwright__browser_navigate"
+      "mcp__plugin_ecc_playwright__browser_navigate",
+      "Bash(awk '/export function formatMoney/,/^}/' src/lib/trips/grouping.ts)",
+      "Skill(update-config)"
     ]
   }
 }

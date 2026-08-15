@@ -115,6 +115,26 @@ export function convertToEur(
   return amount / rate;
 }
 
+/**
+ * Convert an amount between any two currencies by routing through EUR (all
+ * rates are EUR-based). Returns null when either leg is non-convertible, so
+ * callers can exclude the amount rather than show a wrong figure.
+ */
+export function convertCurrency(
+  amount: number,
+  from: string,
+  to: string,
+  rates: EurRates,
+): number | null {
+  const eur = convertToEur(amount, from, rates);
+  if (eur === null) return null;
+  const target = to.toUpperCase();
+  if (target === 'EUR') return eur;
+  const rate = rates[target];
+  if (!rate || !Number.isFinite(rate) || rate <= 0) return null;
+  return eur * rate;
+}
+
 export function isConvertible(code: string, rates: EurRates): boolean {
   const upper = code.toUpperCase();
   if (upper === 'EUR') return true;

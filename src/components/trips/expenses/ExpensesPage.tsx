@@ -22,18 +22,15 @@ import {
   countCityGroups,
   resolveExpenseCities,
 } from '@/lib/trips/expenseCities';
-import { formatMoney } from '@/lib/trips/grouping';
 import type { Expense } from '@/lib/trips/types';
 import { ExpenseSheet } from './ExpenseSheet';
 import { ExpensesList } from './ExpensesList';
 import { BalancesTab } from './BalancesTab';
 import { CategoryWidget } from './CategoryWidget';
 import { CityFilter } from './CityFilter';
-import { ShareScopeSelect, type ShareScope } from './ShareScopeSelect';
-import {
-  ExpensesBodySkeleton,
-  ExpensesTotalsSkeleton,
-} from './ExpensesSkeleton';
+import { type ShareScope } from './ShareScopeSelect';
+import { TotalsCard } from './TotalsCard';
+import { ExpensesBodySkeleton } from './ExpensesSkeleton';
 import {
   ExpenseSortToggle,
   type AmountSortDir,
@@ -311,47 +308,18 @@ export function ExpensesPage({ tripId }: ExpensesPageProps) {
       </header>
 
       <div className="mx-auto max-w-[var(--container-page)] px-4 pb-24 sm:px-6 md:px-10">
-        <section className="border-border/70 bg-card mt-4 overflow-hidden rounded-[var(--radius-xl)] border p-5 shadow-[0_1px_2px_oklch(20%_0.02_250_/_0.04),0_18px_42px_-24px_oklch(20%_0.02_250_/_0.18)] sm:p-6">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground text-[10px] tracking-[0.16em] uppercase">
-              {scopeCaption}
-            </span>
-            <ShareScopeSelect
-              members={trip.members}
-              value={focusMemberId}
-              currentMemberId={currentMemberId}
-              onChange={setChosenScope}
-            />
-          </div>
-          <div className="mt-3">
-            {isLoadingExtras ? (
-              <ExpensesTotalsSkeleton />
-            ) : totals.byCurrency.length === 0 ? (
-              <span className="font-display text-3xl tabular-nums sm:text-4xl">
-                —
-              </span>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {totals.byCurrency.map((c) => {
-                  const primary = isTripScope ? c.total : c.mine;
-                  const secondary = isTripScope ? c.mine : c.total;
-                  return (
-                    <div key={c.currency} className="flex flex-col gap-0.5">
-                      <span className="font-display text-3xl leading-none tabular-nums sm:text-4xl">
-                        {formatMoney(primary, c.currency)}
-                      </span>
-                      <span className="text-muted-foreground text-xs tabular-nums">
-                        {isTripScope
-                          ? `your share ${formatMoney(secondary, c.currency)}`
-                          : `of ${formatMoney(secondary, c.currency)} trip total`}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </section>
+        <TotalsCard
+          tripId={tripId}
+          totals={totals}
+          rates={rates}
+          isLoading={isLoadingExtras}
+          isTripScope={isTripScope}
+          scopeCaption={scopeCaption}
+          members={trip.members}
+          focusMemberId={focusMemberId}
+          currentMemberId={currentMemberId}
+          onScopeChange={setChosenScope}
+        />
 
         {isLoadingExtras ? (
           <ExpensesBodySkeleton />

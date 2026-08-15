@@ -503,6 +503,32 @@ export function createSupabaseRepository(
       return rowToMember(row);
     },
 
+    async transferOwnership(tripId: string, memberId: string): Promise<string> {
+      if (isDemoTrip(tripId)) throw new Error(DEMO_TRIP_PROTECTED_ERROR);
+
+      // owner_id is guarded by a trigger and can only be changed through this
+      // RPC, which authorizes the caller as the current owner in-DB.
+      const { data, error } = await client.rpc('transfer_trip_ownership', {
+        p_trip_id: tripId,
+        p_member_id: memberId,
+      });
+      if (error) {
+        const known = [
+          'trip_not_found',
+          'not_authorized',
+          'member_not_found',
+          'member_has_no_account',
+          'member_not_accepted',
+          'already_owner',
+        ];
+        const match = known.find((k) => error.message.includes(k));
+        throw new Error(
+          match ?? `transferOwnership ${memberId}: ${error.message}`,
+        );
+      }
+      return data as string;
+    },
+
     async listMyInvitations(): Promise<TripInvitation[]> {
       const { data, error } = await client.rpc('list_my_invitations');
       if (error) throw new Error(`listMyInvitations: ${error.message}`);

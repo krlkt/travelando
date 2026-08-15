@@ -57,8 +57,14 @@ function MembersSheetBody({
   onOpenChange: (open: boolean) => void;
 }) {
   const { user } = useAuth();
-  const { addMember, removeMember, inviteMember, expenses, settlements } =
-    useTrips();
+  const {
+    addMember,
+    removeMember,
+    inviteMember,
+    transferOwnership,
+    expenses,
+    settlements,
+  } = useTrips();
 
   const isOwner = Boolean(user && trip.ownerId && trip.ownerId === user.id);
 
@@ -68,6 +74,10 @@ function MembersSheetBody({
   const [busy, setBusy] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<TripMember | null>(null);
+  const [pendingTransfer, setPendingTransfer] = useState<TripMember | null>(
+    null,
+  );
+  const [transferringId, setTransferringId] = useState<string | null>(null);
 
   // Per-row "invite by email" for an existing name-only member.
   const [invitingId, setInvitingId] = useState<string | null>(null);
@@ -168,6 +178,27 @@ function MembersSheetBody({
       return;
     }
     void performRemove(member);
+  };
+
+  const performTransfer = async (member: TripMember) => {
+    setTransferringId(member.id);
+    try {
+      await transferOwnership(trip.id, member.id);
+      toast.success(`${member.displayName} is now the trip owner`);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : 'Transfer failed';
+      toast.error(
+        raw === 'member_has_no_account'
+          ? "They don't have an account yet — invite them by email first."
+          : raw === 'member_not_accepted'
+            ? "They haven't accepted their invite yet."
+            : raw === 'not_authorized'
+              ? 'Only the trip owner can transfer ownership.'
+              : raw,
+      );
+    } finally {
+      setTransferringId(null);
+    }
   };
 
   const myMembership = user
@@ -300,6 +331,10 @@ function MembersSheetBody({
             const isNameOnly = !member.userId && !isPending;
             const canInvite = isOwner && isNameOnly;
             const isInviting = invitingId === member.id;
+            // Ownership can only go to someone with an account who has
+            // accepted — a name-only entry or pending invitee can't hold it.
+            const canMakeOwner =
+              isOwner && Boolean(member.userId) && member.status === 'accepted';
             return (
               <div
                 key={member.id}
@@ -342,6 +377,19 @@ function MembersSheetBody({
                       </div>
                     )}
                   </div>
+                  {canMakeOwner && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setPendingTransfer(member)}
+                      disabled={transferringId === member.id}
+                      aria-label={`Make ${member.displayName} the owner`}
+                      title="Make owner"
+                      className="text-muted-foreground hover:text-primary"
+                    >
+                      <Crown className="size-4" />
+                    </Button>
+                  )}
                   {canInvite && !isInviting && (
                     <Button
                       variant="ghost"
@@ -459,6 +507,25 @@ function MembersSheetBody({
           const member = pendingRemoval;
           setPendingRemoval(null);
           if (member) void performRemove(member);
+        }}
+      />
+
+      <ConfirmDialog
+        open={pendingTransfer !== null}
+        onOpenChange={(next) => {
+          if (!next) setPendingTransfer(null);
+        }}
+        title="Transfer ownership?"
+        description={
+          pendingTransfer
+            ? `${pendingTransfer.displayName} will become the trip owner and can manage members and delete the trip. You'll stay on the trip as a regular member, and only they can hand ownership back.`
+            : undefined
+        }
+        confirmLabel="Transfer ownership"
+        onConfirm={() => {
+          const member = pendingTransfer;
+          setPendingTransfer(null);
+          if (member) void performTransfer(member);
         }}
       />
     </>

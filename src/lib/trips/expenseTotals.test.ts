@@ -3,6 +3,8 @@ import {
   aggregateByCategory,
   aggregateByCurrency,
   buildItemCurrencyTotals,
+  combineInCurrency,
+  type CurrencyTotal,
 } from './expenseTotals';
 import type { EurRates } from './fx';
 import type { Expense } from './types';
@@ -167,5 +169,71 @@ describe('buildItemCurrencyTotals', () => {
     expect(result.get('i-2')?.byCurrency).toEqual([
       { currency: 'EUR', total: 30, mine: 15 },
     ]);
+  });
+});
+
+describe('combineInCurrency', () => {
+  // 1 USD = 1.25 EUR-rate => 100 USD converts to 80 EUR, and vice versa.
+  const rates: EurRates = { USD: 1.25 };
+
+  it('returns a zeroed total for an empty breakdown', () => {
+    expect(combineInCurrency([], 'EUR', rates)).toEqual({
+      currency: 'EUR',
+      total: 0,
+      mine: 0,
+      unconvertible: [],
+    });
+  });
+
+  it('passes the target currency through untouched', () => {
+    const byCurrency: CurrencyTotal[] = [
+      { currency: 'EUR', total: 150, mine: 75 },
+    ];
+    expect(combineInCurrency(byCurrency, 'EUR', rates)).toEqual({
+      currency: 'EUR',
+      total: 150,
+      mine: 75,
+      unconvertible: [],
+    });
+  });
+
+  it('folds multiple currencies into the target currency', () => {
+    const byCurrency: CurrencyTotal[] = [
+      { currency: 'EUR', total: 100, mine: 50 },
+      { currency: 'USD', total: 100, mine: 40 },
+    ];
+    // 100 USD => 80 EUR; 40 USD => 32 EUR.
+    expect(combineInCurrency(byCurrency, 'EUR', rates)).toEqual({
+      currency: 'EUR',
+      total: 180,
+      mine: 82,
+      unconvertible: [],
+    });
+  });
+
+  it('converts into a non-EUR target currency', () => {
+    const byCurrency: CurrencyTotal[] = [
+      { currency: 'EUR', total: 80, mine: 40 },
+    ];
+    // 80 EUR => 100 USD; 40 EUR => 50 USD.
+    expect(combineInCurrency(byCurrency, 'USD', rates)).toEqual({
+      currency: 'USD',
+      total: 100,
+      mine: 50,
+      unconvertible: [],
+    });
+  });
+
+  it('excludes non-convertible currencies and reports them', () => {
+    const byCurrency: CurrencyTotal[] = [
+      { currency: 'EUR', total: 100, mine: 50 },
+      { currency: 'JPY', total: 5000, mine: 2500 },
+    ];
+    expect(combineInCurrency(byCurrency, 'EUR', rates)).toEqual({
+      currency: 'EUR',
+      total: 100,
+      mine: 50,
+      unconvertible: ['JPY'],
+    });
   });
 });

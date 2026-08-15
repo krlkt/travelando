@@ -302,6 +302,22 @@ export function createInMemoryRepository(
         throw new Error(`Member ${memberId} not found in trip ${tripId}`);
       return { ...(updated as TripMember) };
     },
+    async transferOwnership(tripId, memberId) {
+      const trip = store.find((t) => t.id === tripId);
+      if (!trip) throw new Error('trip_not_found');
+      const member = trip.members.find((m) => m.id === memberId);
+      if (!member) throw new Error('member_not_found');
+      if (!member.userId) throw new Error('member_has_no_account');
+      if (member.status !== 'accepted') throw new Error('member_not_accepted');
+      if (member.userId === trip.ownerId) throw new Error('already_owner');
+
+      // The outgoing owner keeps their member row, so their expense history
+      // and balances survive the handover.
+      store = store.map((t) =>
+        t.id === tripId ? { ...t, ownerId: member.userId } : t,
+      );
+      return member.userId;
+    },
     async listMyInvitations() {
       // No auth context in memory; surface every pending invite as an
       // invitation so tests can assert on the transition.
