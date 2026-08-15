@@ -746,7 +746,7 @@ function MemberAmountInput({
       }}
       placeholder={placeholder}
       disabled={!locked}
-      className="h-7 w-20 px-2 text-right text-xs tabular-nums"
+      className="h-8 w-20 px-2 text-right text-base tabular-nums md:h-7 md:text-xs"
     />
   );
 }
