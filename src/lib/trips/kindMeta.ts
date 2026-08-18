@@ -5,6 +5,7 @@ import {
   Train,
   Car,
   Bus,
+  Bike,
   Ship,
   Footprints,
   TramFront,
@@ -62,6 +63,7 @@ export const transportIcons: Record<TransportMode, LucideIcon> = {
   taxi: Car,
   bus: Bus,
   ferry: Ship,
+  bicycle: Bike,
   walk: Footprints,
 };
 
@@ -80,5 +82,6 @@ export const transportModes: TransportMode[] = [
   'car',
   'taxi',
   'ferry',
+  'bicycle',
   'walk',
 ];

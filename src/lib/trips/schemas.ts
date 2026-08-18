@@ -53,6 +53,7 @@ export const transportModeSchema = z.enum([
   'walk',
   'metro',
   'taxi',
+  'bicycle',
 ]);
 
 export const itemDraftSchema = z.object({

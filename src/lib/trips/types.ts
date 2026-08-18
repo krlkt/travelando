@@ -8,7 +8,8 @@ export type TransportMode =
   | 'ferry'
   | 'walk'
   | 'metro'
-  | 'taxi';
+  | 'taxi'
+  | 'bicycle';
 
 export interface Place {
   label: string;
